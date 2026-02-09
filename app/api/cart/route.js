@@ -1,5 +1,7 @@
 import dbConnect from "@/lib/mongodb";
 import User from "@/models/User";
+import AbandonedCart from "@/models/AbandonedCart";
+import Product from "@/models/Product";
 import { getAuth } from "@/lib/firebase-admin";
 import { NextResponse } from "next/server";
 
@@ -22,14 +24,71 @@ export async function POST(request){
         const userId = decodedToken.uid;
 
         await dbConnect();
-        const { cart } = await request.json();
+        const { cart, customerInfo } = await request.json();
 
         // Ensure user exists (minimal) then update cart
-        await User.findOneAndUpdate(
+        const user = await User.findOneAndUpdate(
             { _id: userId },
             { cart: cart },
             { upsert: true, new: true, setDefaultsOnInsert: true }
         );
+
+        // Track abandoned carts by product store
+        if (cart && Object.keys(cart).length > 0) {
+            try {
+                const cartItems = Object.entries(cart).map(([productId, quantity]) => ({
+                    productId,
+                    quantity
+                }));
+
+                const productIds = cartItems.map(it => it.productId);
+                const products = await Product.find({ _id: { $in: productIds } })
+                    .select('_id storeId name price')
+                    .lean();
+
+                const productMap = new Map(products.map(p => [String(p._id), p]));
+                const grouped = new Map();
+
+                for (const it of cartItems) {
+                    const prod = productMap.get(String(it.productId));
+                    if (!prod?.storeId) continue;
+                    const storeId = String(prod.storeId);
+                    if (!grouped.has(storeId)) grouped.set(storeId, []);
+                    grouped.get(storeId).push({
+                        productId: it.productId,
+                        name: prod.name,
+                        quantity: it.quantity,
+                        price: prod.price || 0,
+                    });
+                }
+
+                const now = new Date();
+
+                for (const [storeId, storeItems] of grouped.entries()) {
+                    await AbandonedCart.updateOne(
+                        { storeId, userId },
+                        {
+                            $set: {
+                                storeId,
+                                userId,
+                                name: user.name || null,
+                                email: user.email?.toLowerCase() || null,
+                                phone: user.phone || null,
+                                address: customerInfo?.address || null,
+                                items: storeItems,
+                                cartTotal: null,
+                                currency: null,
+                                lastSeenAt: now,
+                                source: 'cart',
+                            },
+                        },
+                        { upsert: true }
+                    );
+                }
+            } catch (err) {
+                console.warn('[cart] Could not track abandoned cart:', err.message);
+            }
+        }
 
         return NextResponse.json({ message: 'Cart updated' });
     } catch (error) {

@@ -6,15 +6,23 @@ import AbandonedCart from '@/models/AbandonedCart';
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { items, customer, userId, cartTotal, currency } = body || {};
+    const { items, guestEmail, guestPhone, guestName } = body || {};
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'No items provided' }, { status: 400 });
     }
 
+    // Guest cart must have at least email or phone to track
+    const email = guestEmail?.toLowerCase()?.trim() || null;
+    const phone = guestPhone?.trim() || null;
+
+    if (!email && !phone) {
+      return NextResponse.json({ error: 'Email or phone required for guest cart tracking' }, { status: 400 });
+    }
+
     await dbConnect();
 
-    const productIds = items.map(it => it.productId).filter(Boolean);
+    const productIds = items.map(it => it.productId || it.id).filter(Boolean);
     const products = await Product.find({ _id: { $in: productIds } })
       .select('_id storeId name price')
       .lean();
@@ -24,12 +32,15 @@ export async function POST(request) {
     // Group items by storeId
     const grouped = new Map();
     for (const it of items) {
-      const prod = productMap.get(String(it.productId));
+      const productId = String(it.productId || it.id);
+      const prod = productMap.get(productId);
       if (!prod?.storeId) continue;
+
       const storeId = String(prod.storeId);
       if (!grouped.has(storeId)) grouped.set(storeId, []);
+
       grouped.get(storeId).push({
-        productId: it.productId,
+        productId: String(prod._id),
         name: it.name || prod.name,
         quantity: it.quantity || 1,
         price: it.price || prod.price || 0,
@@ -38,51 +49,41 @@ export async function POST(request) {
     }
 
     const now = new Date();
-    const identifier = userId || customer?.email || customer?.phone || null;
 
+    // Save guest cart to each store
     for (const [storeId, storeItems] of grouped.entries()) {
-      const filter = { storeId };
-      if (identifier) {
-        filter.$or = [
-          ...(userId ? [{ userId }] : []),
-          ...(customer?.email ? [{ email: customer.email.toLowerCase() }] : []),
-          ...(customer?.phone ? [{ phone: customer.phone }] : []),
-        ];
-      }
-
-      // Validate that at least email or phone is provided for tracking
-      const email = customer?.email?.toLowerCase() || null;
-      const phone = customer?.phone || null;
-      
-      if (!email && !phone && !userId) {
-        console.warn('[abandoned-checkout] Skipping cart without email, phone, or userId');
-        continue;
-      }
+      const filter = {
+        storeId,
+        $or: [
+          ...(email ? [{ email }] : []),
+          ...(phone ? [{ phone }] : []),
+        ],
+      };
 
       await AbandonedCart.updateOne(
         filter,
         {
           $set: {
             storeId,
-            userId: userId || null,
-            name: customer?.name?.trim() || null,
+            userId: null,
+            name: guestName?.trim() || null,
             email,
             phone,
-            address: customer?.address || null,
+            address: null,
             items: storeItems,
-            cartTotal: typeof cartTotal === 'number' ? cartTotal : null,
-            currency: currency || null,
+            cartTotal: null,
+            currency: null,
             lastSeenAt: now,
-            source: 'checkout',
+            source: 'guest-cart',
           },
         },
         { upsert: true }
       );
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, message: 'Guest cart tracked' });
   } catch (error) {
-    console.error('[abandoned-checkout] error:', error);
+    console.error('[guest-abandoned-cart] error:', error);
     return NextResponse.json({ error: error.message || 'Failed' }, { status: 500 });
   }
 }

@@ -10,6 +10,7 @@ export default function AbandonedCheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [carts, setCarts] = useState([]);
   const [error, setError] = useState("");
+  const [filter, setFilter] = useState("all"); // all, cart, guest-cart, checkout
 
   const fetchCarts = async () => {
     try {
@@ -31,18 +32,76 @@ export default function AbandonedCheckoutPage() {
 
   if (loading) return <Loading />;
 
+  const sourceLabels = {
+    "cart": "🛒 Added to Cart",
+    "guest-cart": "👤 Guest Cart",
+    "checkout": "💳 At Checkout",
+  };
+
+  const filteredCarts = filter === "all" ? carts : carts.filter(c => c.source === filter);
+
   return (
     <div className="w-full">
       <h1 className="text-2xl font-bold mb-4">Abandoned Checkout</h1>
       {error && <div className="text-red-600 bg-red-50 p-3 rounded mb-4">{error}</div>}
 
-      {carts.length === 0 ? (
-        <div className="text-center py-10 text-slate-500 border rounded">No abandoned checkouts yet.</div>
+      {/* Filter Buttons */}
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <button
+          onClick={() => setFilter("all")}
+          className={`px-4 py-2 rounded text-sm font-medium transition ${
+            filter === "all"
+              ? "bg-blue-600 text-white"
+              : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+          }`}
+        >
+          All ({carts.length})
+        </button>
+        <button
+          onClick={() => setFilter("cart")}
+          className={`px-4 py-2 rounded text-sm font-medium transition ${
+            filter === "cart"
+              ? "bg-blue-600 text-white"
+              : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+          }`}
+        >
+          🛒 Added to Cart ({carts.filter(c => c.source === "cart").length})
+        </button>
+        <button
+          onClick={() => setFilter("guest-cart")}
+          className={`px-4 py-2 rounded text-sm font-medium transition ${
+            filter === "guest-cart"
+              ? "bg-blue-600 text-white"
+              : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+          }`}
+        >
+          👤 Guest ({carts.filter(c => c.source === "guest-cart").length})
+        </button>
+        <button
+          onClick={() => setFilter("checkout")}
+          className={`px-4 py-2 rounded text-sm font-medium transition ${
+            filter === "checkout"
+              ? "bg-blue-600 text-white"
+              : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+          }`}
+        >
+          💳 Checkout ({carts.filter(c => c.source === "checkout").length})
+        </button>
+      </div>
+
+      {filteredCarts.length === 0 ? (
+        <div className="text-center py-10 text-slate-500 border rounded">
+          {filter === "all" 
+            ? "No abandoned checkouts yet."
+            : `No abandoned carts from ${sourceLabels[filter]}.`
+          }
+        </div>
       ) : (
         <div className="overflow-x-auto border rounded">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50">
               <tr>
+                <th className="text-left p-3">Source</th>
                 <th className="text-left p-3">Customer</th>
                 <th className="text-left p-3">Contact</th>
                 <th className="text-left p-3">Location</th>
@@ -52,13 +111,18 @@ export default function AbandonedCheckoutPage() {
               </tr>
             </thead>
             <tbody>
-              {carts.map((c) => (
+              {filteredCarts.map((c) => (
                 <tr key={c._id} className="border-t">
                   <td className="p-3">
-                    <div className="font-medium">{c.name || "Guest"}</div>
+                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-slate-100">
+                      {sourceLabels[c.source] || c.source}
+                    </span>
                   </td>
                   <td className="p-3">
-                    <div>{c.email || "-"}</div>
+                    <div className="font-medium">{c.name || <span className="text-slate-400 italic">Name not provided</span>}</div>
+                  </td>
+                  <td className="p-3">
+                    <div className={!c.email ? "text-slate-400 italic" : ""}>{c.email || "Email not provided"}</div>
                     <div className="text-xs text-slate-500">{c.phone || "-"}</div>
                   </td>
                   <td className="p-3">
