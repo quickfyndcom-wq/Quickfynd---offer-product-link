@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import TopBarNotification from "@/components/TopBarNotification";
 import Footer from "@/components/Footer";
 import SupportBar from "@/components/SupportBar";
+import Chatbot from "@/components/Chatbot";
 import { Toaster } from "react-hot-toast";
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -51,6 +52,7 @@ export default function ClientLayout({ children }) {
       <Toaster />
       <InitializeApp>{children}</InitializeApp>
       <SupportBar />
+      <Chatbot />
       <Footer />
     </ReduxProvider>
   );
