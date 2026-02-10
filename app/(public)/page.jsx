@@ -10,6 +10,8 @@ import Hero from "@/components/Hero";
 import HomeCategories from "@/components/HomeCategories";
 import LatestProducts from "@/components/LatestProducts";
 import HeroBannerSlider from "@/components/HeroBannerSlider";
+import RecentSearchProducts from "@/components/RecentSearchProducts";
+import RecommendedProducts from "@/components/RecommendedProducts";
 
 
 // Below-the-fold components - lazy load
@@ -57,10 +59,9 @@ export default function Home() {
                 <HeroBannerSlider/>
                 {/* <Hero /> */}
                 <LatestProducts />
-                                     <CarouselSlider/>
+                <CarouselSlider/>
                 <BannerSlider/>
-            {/* Carousel Slider below BannerSlider */}
-           
+            
                 <Section3/>
    
             {/* Featured Sections - Display all created sliders from category-slider */}
@@ -69,6 +70,10 @@ export default function Home() {
     <Section4 sections={section4Data} />
   </div>
 )}
+
+                {/* Personalized sections for returning customers */}
+                <RecentSearchProducts />
+                <RecommendedProducts />
 
             {/* <OriginalBrands/> */}
             {/* <QuickFyndCategoryDirectory/>

@@ -297,7 +297,7 @@ const BestSelling = () => {
   }, [])
 
   return (
-    <div className="px-4 py-6 max-w-[1250px] mx-auto">
+    <div className="px-4 py-6 max-w-[1250px] w-full mx-auto bg-white relative z-10">
       <Title
         title="Craziest sale of the year!"
         description="Grab the best deals before they're gone!"

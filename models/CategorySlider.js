@@ -12,6 +12,12 @@ const CategorySliderSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    subtitle: {
+      type: String,
+      required: false,
+      trim: true,
+      default: '',
+    },
     productIds: {
       type: [String],
       required: true,

@@ -2,8 +2,11 @@
 import React, { useRef, useState, useEffect } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { ChevronRight, ChevronLeft } from 'lucide-react'
-import { useSelector } from 'react-redux'
+import { ChevronRight, ChevronLeft, Sparkles, ShoppingCart } from 'lucide-react'
+import { useSelector, useDispatch } from 'react-redux'
+import { addToCart, uploadCart } from '@/lib/features/cart/cartSlice'
+import { useAuth } from '@/lib/useAuth'
+import toast from 'react-hot-toast'
 
 const Section4 = ({ sections }) => {
   const router = useRouter()
@@ -12,8 +15,8 @@ const Section4 = ({ sections }) => {
   if (!sections || sections.length === 0) return null
 
   return (
-    <div className="w-full bg-white py-6 px-4">
-      <div className="space-y-8">
+    <div className="w-full bg-white py-8 px-4">
+      <div className="max-w-[1300px] mx-auto space-y-12">
         {sections.map((section, sectionIdx) => (
           <HorizontalSlider key={section._id || sectionIdx} section={section} router={router} allProducts={products} />
         ))}
@@ -28,25 +31,13 @@ const SkeletonLoader = () => {
       {[...Array(5)].map((_, idx) => (
         <div
           key={idx}
-          className="flex-shrink-0 w-48 sm:w-56 bg-white border border-gray-200 rounded-xl overflow-hidden animate-pulse"
+          className="flex-shrink-0 w-56 sm:w-64 bg-white rounded-xl overflow-hidden border border-gray-100 animate-pulse"
         >
-          {/* Skeleton Image */}
-          <div className="w-full h-56 sm:h-64 bg-gray-300"></div>
-
-          {/* Skeleton Info */}
-          <div className="p-4 space-y-3">
-            {/* Name skeleton */}
-            <div className="h-4 bg-gray-300 rounded w-5/6"></div>
-            <div className="h-3 bg-gray-300 rounded w-3/4"></div>
-
-            {/* Brand skeleton */}
-            <div className="h-3 bg-gray-300 rounded w-1/3"></div>
-
-            {/* Price skeleton */}
-            <div className="h-4 bg-gray-300 rounded w-1/2"></div>
-
-            {/* Rating skeleton */}
-            <div className="h-6 bg-gray-300 rounded w-1/3"></div>
+          <div className="w-full h-56 sm:h-64 bg-gray-100"></div>
+          <div className="p-4 space-y-2.5">
+            <div className="h-3 bg-gray-100 rounded w-1/4"></div>
+            <div className="h-4 bg-gray-100 rounded w-5/6"></div>
+            <div className="h-5 bg-gray-100 rounded w-1/3"></div>
           </div>
         </div>
       ))}
@@ -60,7 +51,11 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
   const [loading, setLoading] = useState(true)
   const [isDragging, setIsDragging] = useState(false)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
-  const dragStateRef = useRef({ isDragging: false, startX: 0, scrollLeft: 0, rafId: null })
+  const dragStateRef = useRef({ isDragging: false, startX: 0, scrollLeft: 0, rafId: null, hasMoved: false })
+  
+  const dispatch = useDispatch()
+  const { getToken } = useAuth() || {}
+  const cartItems = useSelector(state => state.cart?.cartItems || {})
 
   const getCurrentPrice = (product) => product.basePrice ?? product.price ?? product.salePrice
   const getRegularPrice = (product) => product.originalPrice ?? product.mrp ?? product.regularPrice ?? product.price
@@ -76,17 +71,31 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
     // Simulate fetch delay for better UX
     const timer = setTimeout(() => {
       let featured = []
+
+      const normalizeId = (value) => {
+        if (!value) return null
+        if (typeof value === 'string' || typeof value === 'number') return String(value)
+        if (typeof value === 'object') {
+          if (value.$oid) return String(value.$oid)
+          const str = value.toString?.()
+          return str && str !== '[object Object]' ? String(str) : null
+        }
+        return null
+      }
       
       // If section already has products array, use it (section4 format)
       if (section.products && Array.isArray(section.products) && section.products.length > 0) {
         featured = section.products
       }
-      // If section has productIds, filter from allProducts (featured sections format)
+      // If section has productIds, map from allProducts (featured sections format)
       else if (section.productIds && Array.isArray(section.productIds)) {
-        featured = allProducts.filter(p => {
-          const productId = p.id || p._id || p.productId
-          return section.productIds.includes(productId)
-        })
+        const productMap = new Map(
+          allProducts.map(p => [normalizeId(p.id || p._id || p.productId), p])
+        )
+
+        featured = section.productIds
+          .map(pid => productMap.get(normalizeId(pid)))
+          .filter(Boolean)
       }
       
       setSectionProducts(featured)
@@ -115,11 +124,18 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
     const container = scrollRef.current
     if (!container) return
 
+    // Don't start dragging if clicking on interactive elements or product cards
+    const target = e.target
+    if (target.closest('button') || target.closest('a') || target.closest('input') || target.closest('select') || target.closest('.product-card-item')) {
+      return
+    }
+
     container.setPointerCapture?.(e.pointerId)
     container.style.scrollBehavior = 'auto'
     dragStateRef.current.isDragging = true
     dragStateRef.current.startX = e.clientX
     dragStateRef.current.scrollLeft = container.scrollLeft
+    dragStateRef.current.hasMoved = false
     setIsDragging(true)
   }
 
@@ -127,8 +143,13 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
     const container = scrollRef.current
     if (!container || !dragStateRef.current.isDragging) return
 
-    e.preventDefault()
     const walk = (e.clientX - dragStateRef.current.startX) * 1.5
+    
+    // Mark as moved if movement exceeds threshold (5px)
+    if (Math.abs(walk) > 5) {
+      dragStateRef.current.hasMoved = true
+      e.preventDefault()
+    }
 
     if (dragStateRef.current.rafId) {
       cancelAnimationFrame(dragStateRef.current.rafId)
@@ -170,11 +191,21 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
   if (sectionProducts.length === 0 && !loading) return null
 
   return (
-    <div className="w-full mb-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6 px-2">
-        <h3 className="text-lg sm:text-2xl md:text-3xl font-light text-gray-900">{section.title || section.category}</h3>
-      
+    <div className="w-full">
+      {/* Section Header */}
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+            {section.title || section.category}
+          </h2>
+          {section.subtitle && (
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">{section.subtitle}</p>
+          )}
+        </div>
+        {/* <button className="hidden sm:flex items-center gap-1.5 text-xs sm:text-sm font-medium text-blue-600 hover:text-blue-700 transition">
+          View All
+          <ChevronRight size={16} />
+        </button> */}
       </div>
 
       {/* Horizontal Scrollable Container */}
@@ -183,9 +214,10 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
         {canScrollLeft && (
           <button
             onClick={scrollLeftBtn}
-            className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 bg-white rounded-full p-2 hover:bg-gray-100 transition"
+            className="hidden lg:flex absolute -left-3 top-1/2 -translate-y-1/2 z-10 bg-white shadow-xl rounded-full p-2 hover:bg-gray-50 transition-all border border-gray-100"
+            aria-label="Scroll left"
           >
-            <ChevronLeft size={24} />
+            <ChevronLeft size={18} className="text-gray-800" />
           </button>
         )}
 
@@ -197,96 +229,160 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
           onPointerUp={endDragging}
           onPointerLeave={endDragging}
           onPointerCancel={endDragging}
-          className={`flex gap-4 overflow-x-auto scrollbar-hide pb-2 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+          className={`flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide pb-2 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
           style={{ scrollBehavior: 'smooth', touchAction: 'pan-y' }}
         >
           {loading ? (
             <SkeletonLoader />
           ) : (
             sectionProducts.map((product) => (
-            <div
-              key={product._id || product.id}
-              onClick={() => router.push(`/product/${product.slug || product.id}`)}
-              onDragStart={(e) => e.preventDefault()}
-              draggable="false"
-              className="flex-shrink-0 w-48 sm:w-56 bg-white border border-gray-200 rounded-xl overflow-hidden group cursor-pointer transition-all duration-300 select-none"
-            >
-              {/* Product Image - Larger */}
-              <div className="relative w-full h-56 sm:h-64 bg-gray-100 overflow-hidden rounded-t-xl">
-                {product.image || product.images?.[0] ? (
-                  <Image
-                    src={product.image || product.images?.[0]}
-                    alt={product.name}
-                    fill
-                    draggable="false"
-                    className="object-cover group-hover:scale-110 transition-transform duration-500 pointer-events-none select-none"
-                    sizes="(max-width: 640px) 192px, 224px"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400">
-                    <span className="text-sm">No image</span>
-                  </div>
-                )}
-              </div>
+              <div
+                key={product._id || product.id}
+                onClick={(e) => {
+                  // Only navigate if there was no significant dragging
+                  if (!dragStateRef.current.hasMoved) {
+                    e.preventDefault()
+                    router.push(`/product/${product.slug || product.id}`)
+                  }
+                  // Reset hasMoved flag immediately after click
+                  dragStateRef.current.hasMoved = false
+                }}
+                onDragStart={(e) => e.preventDefault()}
+                draggable="false"
+                className="product-card-item flex-shrink-0 w-56 sm:w-64 bg-white rounded-xl overflow-hidden group cursor-pointer transition-all duration-300 select-none border border-gray-100 hover:border-gray-200 hover:shadow-lg"
+              >
+                {/* Product Image */}
+                <div className="relative w-full h-56 sm:h-64 bg-gray-50 overflow-hidden">
+                  {product.image || product.images?.[0] ? (
+                    <>
+                      <Image
+                        src={product.image || product.images?.[0]}
+                        alt={product.name}
+                        fill
+                        draggable="false"
+                        className="object-cover group-hover:scale-110 transition-transform duration-500 pointer-events-none select-none"
+                        sizes="(max-width: 640px) 224px, 256px"
+                      />
+                      
+                      {/* Discount Badge */}
+                      {(() => {
+                        const currentPrice = getCurrentPrice(product)
+                        const regularPrice = getRegularPrice(product)
+                        const discountPercent = getDiscountPercent(regularPrice, currentPrice)
+                        return discountPercent ? (
+                          <div className="absolute top-2 left-2 z-20 bg-orange-500 text-white px-2 py-0.5 rounded text-xs font-bold">
+                            -{discountPercent}%
+                          </div>
+                        ) : null
+                      })()}
 
-              {/* Product Info - Clean Layout */}
-              <div className="p-4 space-y-2">
-                {/* Name */}
-                <h4 className="font-semibold text-sm sm:text-base line-clamp-2 text-gray-900 group-hover:text-indigo-600 transition">
-                  {product.name}
-                </h4>
-
-                {/* Brand */}
-                {product.brand && (
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">{product.brand}</p>
-                )}
-
-                {/* Price - More Details */}
-                {(() => {
-                  const currentPrice = getCurrentPrice(product)
-                  const regularPrice = getRegularPrice(product)
-                  const discountPercent = getDiscountPercent(regularPrice, currentPrice)
-
-                  return (
-                    <div className="pt-1 space-y-1">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-lg sm:text-xl font-bold text-gray-900">
-                          ₹{currentPrice?.toLocaleString?.() || currentPrice}
-                        </span>
-                        {regularPrice && regularPrice > currentPrice && (
-                          <span className="text-xs sm:text-sm text-gray-400 line-through">
-                            ₹{regularPrice?.toLocaleString?.() || regularPrice}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {discountPercent ? (
-                          <span className="text-xs sm:text-sm font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                            {discountPercent}% OFF
-                          </span>
-                        ) : (
-                          <span className="text-xs sm:text-sm text-gray-500">Regular price</span>
-                        )}
-                        {isFastDelivery(product) && (
-                          <span className="text-xs sm:text-sm font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                            Fast delivery
-                          </span>
-                        )}
-                      </div>
+                      {/* Fast Delivery Badge */}
+                      {isFastDelivery(product) && (
+                        <div className="absolute top-2 left-2 z-20 bg-emerald-500 text-white px-2 py-1 rounded-md flex items-center gap-1">
+                          <span className="text-[10px] font-semibold">⚡ Fast</span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <span className="text-sm">No image</span>
                     </div>
-                  )
-                })()}
+                  )}
+                </div>
 
-                {/* Rating */}
-                {product.rating && (
-                  <div className="pt-2">
-                    <span className="inline-block text-xs sm:text-sm bg-green-50 text-green-700 px-2.5 py-1 rounded-full font-medium">
-                      ★ {product.rating}
+                {/* Product Info */}
+                <div className="p-4 space-y-2">
+                  {/* Name */}
+                  <h4 className="font-medium text-sm line-clamp-2 text-gray-900 leading-tight min-h-[2.25rem]">
+                    {product.name}
+                  </h4>
+
+                  {/* Rating and Reviews - Always Show */}
+                  <div className="flex items-center gap-1">
+                    {[...Array(5)].map((_, i) => (
+                      <span 
+                        key={i} 
+                        className={`${i < Math.floor(product.rating || product.averageRating || 0) ? 'text-yellow-400' : 'text-gray-300'} text-xs`}
+                      >
+                        ★
+                      </span>
+                    ))}
+                    <span className="text-xs text-gray-600 ml-0.5">
+                      ({product.reviews || product.reviewCount || product.ratingCount || 0})
                     </span>
                   </div>
-                )}
+
+                  {/* Price Row with Cart Button */}
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-base sm:text-lg font-bold text-gray-900">
+                        ₹{getCurrentPrice(product)?.toLocaleString?.() || getCurrentPrice(product)}
+                      </span>
+                      {(() => {
+                        const regularPrice = getRegularPrice(product)
+                        const currentPrice = getCurrentPrice(product)
+                        return regularPrice && regularPrice > currentPrice ? (
+                          <span className="text-xs text-gray-400 line-through">
+                            ₹{regularPrice?.toLocaleString?.() || regularPrice}
+                          </span>
+                        ) : null
+                      })()}
+                    </div>
+
+                    {/* Round Add to Cart Button */}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        
+                        const productId = product._id || product.id
+                        console.log('🛒 Attempting to add:', {
+                          productId,
+                          product_id: product._id,
+                          product_mongoId: product.id,
+                          fullProduct: product
+                        })
+                        
+                        if (!productId) {
+                          console.error('❌ No product ID found!')
+                          toast.error('Cannot add product - no ID')
+                          return
+                        }
+                        
+                        // Add to cart with Redux
+                        dispatch(addToCart({ productId: String(productId) }))
+                        
+                        // Show success
+                        toast.success('Added to cart')
+                        
+                        // Check cartItems after dispatch
+                        console.log('🔍 Cart items after add:', cartItems)
+                        
+                        // Sync with server
+                        if (getToken && typeof getToken === 'function') {
+                          dispatch(uploadCart({ getToken })).catch(err => {
+                            console.warn('Cart sync failed:', err)
+                          })
+                        }
+                      }}
+                      className="relative flex-shrink-0 bg-gray-900 hover:bg-gray-800 text-white p-2.5 rounded-full transition-all active:scale-95 shadow-md"
+                      aria-label="Add to cart"
+                    >
+                      <ShoppingCart size={16} />
+                      {(() => {
+                        const productId = product._id || product.id
+                        const count = cartItems[productId] || cartItems[String(productId)] || 0
+                        console.log('Badge check:', productId, 'count:', count, 'allItems:', cartItems)
+                        return count > 0 ? (
+                          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center border-2 border-white px-1">
+                            {count}
+                          </span>
+                        ) : null
+                      })()}
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
             ))
           )}
         </div>
@@ -294,9 +390,10 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
         {/* Right Arrow */}
         <button
           onClick={scrollRightBtn}
-          className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 bg-white rounded-full p-2 hover:bg-gray-100 transition"
+          className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 z-10 bg-white shadow-xl rounded-full p-2 hover:bg-gray-50 transition-all border border-gray-100"
+          aria-label="Scroll right"
         >
-          <ChevronRight size={24} />
+          <ChevronRight size={18} className="text-gray-800" />
         </button>
       </div>
     </div>

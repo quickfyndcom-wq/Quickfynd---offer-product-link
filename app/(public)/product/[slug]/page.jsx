@@ -69,26 +69,44 @@ export default function ProductBySlug() {
         }
     }, [product]);
 
-    // Track browse history for signed-in users
+    // Track browse history for signed-in users and localStorage for guests
     useEffect(() => {
-        if (!product?._id) return;
+        if (!product?._id && !product?.id) return;
+
+        const productId = product._id || product.id;
 
         const trackView = async (user) => {
-            if (!user) return;
-            try {
-                const token = await user.getIdToken();
-                await axios.post('/api/browse-history', 
-                    { productId: product._id },
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
-            } catch (error) {
-                // Silent fail - don't interrupt user experience
-                console.log('Browse history tracking failed:', error.message);
+            if (user) {
+                // Logged in - save to database
+                try {
+                    const token = await user.getIdToken();
+                    await axios.post('/api/browse-history', 
+                        { productId: product._id },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                } catch (error) {
+                    // Silent fail - don't interrupt user experience
+                    console.log('Browse history tracking failed:', error.message);
+                }
+            } else {
+                // Guest - save to localStorage
+                try {
+                    const viewed = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
+                    // Remove if already exists
+                    const filtered = viewed.filter(id => id !== productId);
+                    // Add to front
+                    filtered.unshift(productId);
+                    // Keep only 20 most recent
+                    const updated = filtered.slice(0, 20);
+                    localStorage.setItem('recentlyViewed', JSON.stringify(updated));
+                } catch (error) {
+                    console.error('Error saving to localStorage:', error);
+                }
             }
         };
 
         const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) trackView(user);
+            trackView(user);
         });
 
         return () => unsubscribe();

@@ -23,7 +23,12 @@ export async function PUT(req, { params }) {
     const storeId = decoded.uid;
     const { id } = params;
 
-    const { title, productIds } = await req.json();
+    const { title, subtitle, productIds } = await req.json();
+    console.log('=== 💾 PUT SLIDER START ===');
+    console.log('💾 Received ID:', id);
+    console.log('💾 Received title:', title);
+    console.log('💾 Received subtitle:', JSON.stringify(subtitle), 'Type:', typeof subtitle);
+    console.log('💾 Received productIds:', productIds);
 
     if (!title || !title.trim()) {
       return NextResponse.json(
@@ -32,14 +37,26 @@ export async function PUT(req, { params }) {
       );
     }
 
+    // Explicitly handle subtitle - ensure it's a string
+    const subtitleValue = subtitle !== undefined && subtitle !== null ? String(subtitle).trim() : '';
+    console.log('💾 Processed subtitle value:', JSON.stringify(subtitleValue), 'Length:', subtitleValue.length);
+
+    const updateData = {
+      title: title.trim(),
+      subtitle: subtitleValue,
+      productIds: productIds || [],
+    };
+
+    console.log('💾 About to update with:', JSON.stringify(updateData));
+
     const slider = await CategorySlider.findOneAndUpdate(
       { _id: id, storeId },
-      {
-        title: title.trim(),
-        productIds,
-      },
+      updateData,
       { new: true }
     );
+
+    console.log('💾 After update, subtitle:', JSON.stringify(slider?.subtitle));
+    console.log('=== 💾 PUT SLIDER END ===');
 
     if (!slider) {
       return NextResponse.json(
@@ -48,8 +65,12 @@ export async function PUT(req, { params }) {
       );
     }
 
+    // Ensure response includes all fields as plain object
+    const sliderData = slider.toObject ? slider.toObject() : slider;
+    console.log('💾 Returning slider data:', sliderData);
+
     return NextResponse.json(
-      { message: 'Slider updated', slider },
+      { message: 'Slider updated', slider: sliderData },
       { status: 200 }
     );
   } catch (error) {

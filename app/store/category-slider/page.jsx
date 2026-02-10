@@ -8,16 +8,18 @@ import { FiTrash2, FiPlus, FiEdit2, FiX, FiSearch } from 'react-icons/fi';
 import Loading from '@/components/Loading';
 
 export default function CategorySliderPage() {
-  const { user, getToken } = useAuth();
+  const { user, getToken, loading: authLoading } = useAuth();
   const [sliders, setSliders] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingIdx, setEditingIdx] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAllSliders, setShowAllSliders] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
+    subtitle: '',
     productIds: [],
   });
 
@@ -32,35 +34,74 @@ export default function CategorySliderPage() {
     return null;
   };
 
-  // Fetch sliders and products
+  // Fetch sliders and products after auth is ready
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (authLoading) return;
+
+    if (user) {
+      fetchData();
+    } else {
+      setLoading(false);
+    }
+  }, [authLoading, user, showAllSliders]);
+
+  // Log formData changes
+  useEffect(() => {
+    console.log('💾 FormData updated:', formData);
+  }, [formData]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const token = await getToken();
 
-      // Fetch existing sliders
-      const slidersRes = await axios.get('/api/store/featured-sections', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const normalizedSliders = (slidersRes.data.sections || []).map(section => {
+      const getWithAuth = async (url) => {
+        let token = await getToken();
+        if (!token) {
+          throw new Error('Missing auth token');
+        }
+
+        try {
+          return await axios.get(url, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        } catch (error) {
+          if (error?.response?.status === 401) {
+            token = await getToken(true);
+            if (!token) throw error;
+            return await axios.get(url, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+          }
+          throw error;
+        }
+      };
+
+      // Fetch existing sliders (can show all or just user's)
+      const endpoint = showAllSliders ? '/api/public/featured-sections' : '/api/store/category-slider';
+      const slidersRes = showAllSliders 
+        ? await axios.get(endpoint)
+        : await getWithAuth(endpoint);
+      
+      const rawSliders = slidersRes.data.sliders || slidersRes.data.sections || [];
+      const normalizedSliders = rawSliders.map(section => {
         const rawId = section.id || section._id;
         const normalizedId = normalizeId(rawId);
+        
+        // Ensure subtitle is always a string
+        const subtitleValue = section.subtitle ? String(section.subtitle).trim() : '';
 
         return {
           ...section,
-          id: normalizedId
+          id: normalizedId,
+          subtitle: subtitleValue
         };
       });
+      console.log('📊 Fetched sliders:', normalizedSliders);
+      console.log('📊 First slider subtitle:', normalizedSliders[0]?.subtitle);
       setSliders(normalizedSliders);
 
       // Fetch store products
-      const productsRes = await axios.get('/api/store/product', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const productsRes = await getWithAuth('/api/store/product');
       
       // Normalize product IDs (convert _id to id if needed)
       const normalizedProducts = (productsRes.data.products || []).map(p => ({
@@ -79,20 +120,34 @@ export default function CategorySliderPage() {
   };
 
   const handleAddSlider = () => {
-    setFormData({ title: '', productIds: [] });
+    setFormData({ title: '', subtitle: '', productIds: [] });
     setEditingIdx(null);
     setShowForm(true);
   };
 
   const handleEditSlider = (slider) => {
     const sliderId = normalizeId(slider.id || slider._id);
-    setFormData({ 
+    console.log('📝 === EDIT SLIDER STARTED ===');
+    console.log('📝 Full slider object:', slider);
+    console.log('📝 Subtitle raw value:', slider.subtitle);
+    console.log('📝 Subtitle type:', typeof slider.subtitle);
+    console.log('📝 Subtitle length:', slider.subtitle?.length);
+    
+    // Ensure subtitle is a string
+    const subtitleValue = slider.subtitle ? String(slider.subtitle).trim() : '';
+    console.log('📝 Processed subtitle value:', subtitleValue);
+    
+    const newFormData = {
       _id: sliderId,
-      title: slider.title, 
-      productIds: slider.productIds 
-    });
+      title: slider.title || '',
+      subtitle: subtitleValue,
+      productIds: slider.productIds || []
+    };
+    console.log('📝 New form data being set:', newFormData);
+    setFormData(newFormData);
     setEditingIdx(sliderId);
     setShowForm(true);
+    console.log('📝 === EDIT SLIDER COMPLETED ===');
   };
 
   const handleSaveSlider = async () => {
@@ -107,6 +162,7 @@ export default function CategorySliderPage() {
 
     try {
       const token = await getToken();
+      console.log('💾 Saving slider with data:', formData);
 
       if (editingIdx !== null) {
         const editId = normalizeId(editingIdx);
@@ -115,18 +171,54 @@ export default function CategorySliderPage() {
           return;
         }
         // Update existing slider
+        console.log('💾 === UPDATE START ===');
+        console.log('💾 editingIdx:', editingIdx);
+        console.log('💾 formData.subtitle raw:', JSON.stringify(formData.subtitle));
+        console.log('💾 formData.subtitle type:', typeof formData.subtitle);
+        
+        const subtitleValue = formData.subtitle ? String(formData.subtitle).trim() : '';
+        console.log('💾 After processing subtitle:', JSON.stringify(subtitleValue));
+        
+        const updatePayload = { 
+          title: formData.title.trim(), 
+          subtitle: subtitleValue, 
+          productIds: formData.productIds 
+        };
+        console.log('💾 Final update payload:', JSON.stringify(updatePayload));
+        console.log('💾 === UPDATE PAYLOAD READY ===');
         await axios.put(
-          `/api/store/featured-sections/${encodeURIComponent(String(editId))}`,
-          { title: formData.title, productIds: formData.productIds },
+          `/api/store/category-slider/${encodeURIComponent(String(editId))}`,
+          updatePayload,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        toast.success('Slider updated successfully');
+        const successMsg = updatePayload.subtitle 
+          ? `Slider "${updatePayload.title}" with subtitle updated!`
+          : `Slider "${updatePayload.title}" updated!`;
+        toast.success(successMsg);
       } else {
         // Create new slider
-        await axios.post('/api/store/featured-sections', formData, {
+        console.log('💾 === CREATE START ===');
+        console.log('💾 formData.subtitle raw:', JSON.stringify(formData.subtitle));
+        console.log('💾 formData.subtitle type:', typeof formData.subtitle);
+        console.log('💾 formData.subtitle isEmpty:', formData.subtitle === '');
+        console.log('💾 formData.subtitle isFalsy:', !formData.subtitle);
+        
+        const subtitleValue = formData.subtitle ? String(formData.subtitle).trim() : '';
+        console.log('💾 After processing subtitle:', JSON.stringify(subtitleValue));
+        
+        const createPayload = {
+          title: formData.title.trim(),
+          subtitle: subtitleValue,
+          productIds: formData.productIds
+        };
+        console.log('💾 Create payload:', createPayload);
+        await axios.post('/api/store/category-slider', createPayload, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        toast.success('Slider created successfully');
+        const successMsg = createPayload.subtitle 
+          ? `Slider "${createPayload.title}" with subtitle created!`
+          : `Slider "${createPayload.title}" created!`;
+        toast.success(successMsg);
       }
 
       setShowForm(false);
@@ -150,13 +242,13 @@ export default function CategorySliderPage() {
     try {
       const token = await getToken();
       try {
-        await axios.delete('/api/store/featured-sections', {
+        await axios.delete('/api/store/category-slider', {
           headers: { Authorization: `Bearer ${token}` },
           params: { id: String(deleteId) },
         });
       } catch (err) {
         if (err?.response?.status === 404) {
-          await axios.delete(`/api/store/featured-sections/${encodeURIComponent(String(deleteId))}`, {
+          await axios.delete(`/api/store/category-slider/${encodeURIComponent(String(deleteId))}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
         } else {
@@ -195,9 +287,41 @@ export default function CategorySliderPage() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">📊 Category Sliders</h1>
-          <p className="text-gray-600">Create and manage product sliders for your store</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">📊 Category Sliders</h1>
+              <p className="text-gray-600">Create and manage product sliders for your store</p>
+            </div>
+            <button
+              onClick={() => setShowAllSliders(!showAllSliders)}
+              className={`px-4 py-2 rounded-lg font-semibold transition ${
+                showAllSliders 
+                  ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+              }`}
+            >
+              {showAllSliders ? '🌍 Viewing All Sliders' : '👤 My Sliders Only'}
+            </button>
+          </div>
         </div>
+
+        {/* Info Banner when viewing all sliders */}
+        {showAllSliders && (
+          <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700">
+                  <strong>Viewing all sliders in database.</strong> Sliders with an <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-xs font-semibold">Other Store</span> badge belong to different stores and cannot be edited or deleted. Only your sliders (blue border) can be managed.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Main Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -216,32 +340,57 @@ export default function CategorySliderPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {sliders.map((slider) => (
-                  <div key={slider.id} className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition border-l-4 border-blue-500">
+                {sliders.map((slider) => {
+                  const isOwnSlider = !slider.storeId || slider.storeId === user?.uid;
+                  return (
+                  <div key={slider.id} className={`bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition border-l-4 ${isOwnSlider ? 'border-blue-500' : 'border-orange-500'}`}>
                     <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900">{slider.title}</h3>
-                        <p className="text-sm text-gray-500 mt-1">📦 {slider.productIds.length} products</p>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-xl font-bold text-gray-900">{slider.title}</h3>
+                          {!isOwnSlider && (
+                            <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-semibold">
+                              Other Store
+                            </span>
+                          )}
+                        </div>
+                        {slider.subtitle && slider.subtitle.trim() !== '' && (
+                          <p className="text-sm text-gray-600 mb-2 italic">"{slider.subtitle}"</p>
+                        )}
+                        <p className="text-sm text-gray-500 mt-1">📦 {slider.productIds?.length || 0} products</p>
+                        {slider.storeId && showAllSliders && (
+                          <p className="text-xs text-gray-400 mt-1">Store ID: {slider.storeId.substring(0, 8)}...</p>
+                        )}
                       </div>
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleEditSlider(slider)}
-                          className="bg-blue-100 text-blue-600 p-2 rounded-lg hover:bg-blue-200 transition"
-                          title="Edit"
+                          disabled={!isOwnSlider}
+                          className={`p-2 rounded-lg transition ${
+                            isOwnSlider 
+                              ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' 
+                              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          }`}
+                          title={isOwnSlider ? 'Edit' : 'Cannot edit other store\'s slider'}
                         >
                           <FiEdit2 size={18} />
                         </button>
                         <button
                           onClick={() => handleDeleteSlider(slider.id)}
-                          className="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200 transition"
-                          title="Delete"
+                          disabled={!isOwnSlider}
+                          className={`p-2 rounded-lg transition ${
+                            isOwnSlider 
+                              ? 'bg-red-100 text-red-600 hover:bg-red-200' 
+                              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          }`}
+                          title={isOwnSlider ? 'Delete' : 'Cannot delete other store\'s slider'}
                         >
                           <FiTrash2 size={18} />
                         </button>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {slider.productIds.slice(0, 4).map(pid => {
+                      {(slider.productIds || []).slice(0, 4).map(pid => {
                         const prod = products.find(p => p.id === pid);
                         return prod ? (
                           <span key={pid} className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
@@ -249,14 +398,14 @@ export default function CategorySliderPage() {
                           </span>
                         ) : null;
                       })}
-                      {slider.productIds.length > 4 && (
+                      {(slider.productIds?.length || 0) > 4 && (
                         <span className="text-xs bg-gray-200 text-gray-700 px-3 py-1 rounded-full">
                           +{slider.productIds.length - 4} more
                         </span>
                       )}
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             )}
           </div>
@@ -290,6 +439,64 @@ export default function CategorySliderPage() {
                       placeholder="e.g., Best Electronics"
                       className="w-full border-2 border-gray-200 rounded-lg p-3 focus:outline-none focus:border-blue-500 text-sm"
                     />
+                  </div>
+
+                  {/* Subtitle Input */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Subtitle (Optional)
+                    </label>
+                    <input
+                      key={`subtitle-${editingIdx}`}
+                      type="text"
+                      value={formData.subtitle || ''}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        console.log('📝 Subtitle input changed:', newValue);
+                        console.log('📝 Length:', newValue.length);
+                        setFormData(prev => {
+                          const updated = { ...prev, subtitle: newValue };
+                          console.log('📝 Updated formData:', updated);
+                          return updated;
+                        });
+                      }}
+                      onBlur={(e) => {
+                        console.log('📝 Subtitle blur event, value:', e.target.value);
+                      }}
+                      placeholder="e.g., Discover our curated selection"
+                      className="w-full border-2 border-gray-200 rounded-lg p-3 focus:outline-none focus:border-blue-500 text-sm"
+                      autoComplete="off"
+                    />
+                  </div>
+
+                  {/* Subtitle Preview */}
+                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-4">
+                    <p className="text-xs font-semibold text-purple-700 mb-2">📝 Subtitle Preview</p>
+                    {formData.subtitle && String(formData.subtitle).trim() ? (
+                      <p className="text-sm text-gray-700 italic font-medium">"{String(formData.subtitle).trim()}"</p>
+                    ) : (
+                      <p className="text-sm text-gray-400 italic">No subtitle yet</p>
+                    )}
+                  </div>
+
+                  {/* DEBUG: Show Current Form Data */}
+                  <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-3 text-xs">
+                    <p className="font-bold text-yellow-800 mb-1">🔍 DEBUG INFO:</p>
+                    <p className="text-yellow-700">Title: "{formData.title}"</p>
+                    <p className="text-yellow-700">Subtitle: "{formData.subtitle || ''}"</p>
+                    <p className="text-yellow-700">Subtitle Length: {(formData.subtitle || '').length}</p>
+                    <p className="text-yellow-700">Products: {formData.productIds.length}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const testVal = 'TEST SUBTITLE ' + new Date().getTime();
+                        setFormData(prev => ({ ...prev, subtitle: testVal }));
+                        console.log('✅ Test button clicked, set subtitle to:', testVal);
+                      }}
+                      className="mt-2 text-xs bg-yellow-600 text-white px-2 py-1 rounded hover:bg-yellow-700"
+                    >
+                      Test: Fill Subtitle
+                    </button>
                   </div>
 
                   {/* Selected Count */}
@@ -371,6 +578,35 @@ export default function CategorySliderPage() {
                       {editingIdx !== null ? '💾 Update' : '✨ Create'}
                     </button>
                   </div>
+
+                  {/* Test Button - Save with Hardcoded Subtitle */}
+                  <button
+                    onClick={async () => {
+                      try {
+                        const token = await getToken();
+                        const testPayload = {
+                          title: formData.title || 'Test Title',
+                          subtitle: 'TEST SUBTITLE - ' + new Date().toLocaleTimeString(),
+                          productIds: formData.productIds.length > 0 ? formData.productIds : ['test'],
+                        };
+                        console.log('🧪 TEST: Sending payload:', JSON.stringify(testPayload));
+                        
+                        const response = await axios.post('/api/store/category-slider', testPayload, {
+                          headers: { Authorization: `Bearer ${token}` },
+                        });
+                        
+                        console.log('🧪 TEST: Response:', response.data);
+                        toast.success('Test slider created - check console');
+                        await fetchData();
+                      } catch (error) {
+                        console.error('🧪 TEST: Error:', error);
+                        toast.error('Test failed - check console');
+                      }
+                    }}
+                    className="w-full mt-2 text-xs bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 font-semibold transition"
+                  >
+                    🧪 TEST: Create with Hardcoded Subtitle
+                  </button>
                 </div>
               )}
             </div>

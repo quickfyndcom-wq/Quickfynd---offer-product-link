@@ -4,6 +4,8 @@ import ProductCard from "@/components/ProductCard"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useDispatch, useSelector } from "react-redux"
 import { fetchProducts } from "@/lib/features/product/productSlice"
+import { useAuth } from '@/lib/useAuth'
+import axios from 'axios'
 
 function ShopContent() {
     const dispatch = useDispatch();
@@ -17,10 +19,49 @@ function ShopContent() {
     const fetchedRef = useRef({ category: null, general: false });
     const [categoryProducts, setCategoryProducts] = useState([]);
     const [categoryLoading, setCategoryLoading] = useState(false);
+    const { user, getToken } = useAuth();
 
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Save search to history (DB for logged in users, localStorage for guests)
+    useEffect(() => {
+        if (!search || !search.trim()) return;
+
+        const saveSearch = async () => {
+            const trimmedSearch = search.trim();
+            
+            if (user) {
+                // Save to database for logged-in users
+                try {
+                    const token = await getToken();
+                    await axios.post('/api/customer/recent-searches', 
+                        { searchTerm: trimmedSearch },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                } catch (error) {
+                    console.error('Error saving search to database:', error);
+                }
+            } else {
+                // Save to localStorage for guests
+                try {
+                    const existing = JSON.parse(localStorage.getItem('recentSearches') || '[]');
+                    // Remove if already exists
+                    const filtered = existing.filter(s => s !== trimmedSearch);
+                    // Add to front
+                    filtered.unshift(trimmedSearch);
+                    // Keep only 20 most recent
+                    const updated = filtered.slice(0, 20);
+                    localStorage.setItem('recentSearches', JSON.stringify(updated));
+                } catch (error) {
+                    console.error('Error saving search to localStorage:', error);
+                }
+            }
+        };
+
+        saveSearch();
+    }, [search, user, getToken]);
 
     useEffect(() => {
         // Fetch category products directly to avoid global list overrides

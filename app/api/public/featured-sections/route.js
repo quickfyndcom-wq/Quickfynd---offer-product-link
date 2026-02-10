@@ -1,12 +1,13 @@
 import dbConnect from '@/lib/mongodb';
-import FeaturedSection from '@/models/FeaturedSection';
+import CategorySlider from '@/models/CategorySlider';
 import { NextResponse } from 'next/server';
 
 export async function GET(req) {
   try {
     await dbConnect();
 
-    const sections = await FeaturedSection.find({}).lean();
+    // Fetch all category sliders (sections) to display on homepage
+    const sections = await CategorySlider.find({}).lean();
 
     return NextResponse.json({ sections: sections || [] }, { status: 200 });
   } catch (error) {
