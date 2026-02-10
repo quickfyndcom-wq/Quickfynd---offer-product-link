@@ -397,7 +397,26 @@ export default function CheckoutPage() {
   // Auto-select first address
   useEffect(() => {
     if (user && addressList.length > 0 && !form.addressId) {
-      setForm((f) => ({ ...f, addressId: addressList[0]._id }));
+      const firstAddr = addressList[0];
+      // Clean phone number: remove all non-digits
+      const cleanPhone = (phone) => phone ? String(phone).replace(/\D/g, '') : '';
+      
+      setForm((f) => ({ 
+        ...f, 
+        addressId: firstAddr._id,
+        name: firstAddr.name || f.name,
+        email: firstAddr.email || f.email,
+        phone: cleanPhone(firstAddr.phone),
+        phoneCode: firstAddr.phoneCode || '+91',
+        alternatePhone: cleanPhone(firstAddr.alternatePhone),
+        alternatePhoneCode: firstAddr.alternatePhoneCode || '+91',
+        street: firstAddr.street || f.street,
+        city: firstAddr.city || f.city,
+        state: firstAddr.state || f.state,
+        district: firstAddr.district || f.district,
+        country: firstAddr.country || f.country,
+        pincode: firstAddr.zip || firstAddr.pincode || f.pincode,
+      }));
     }
   }, [user, addressList, form.addressId]);
 
@@ -669,8 +688,36 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (form.alternatePhone && !/^[0-9]{7,15}$/.test(form.alternatePhone)) {
+    // Clean and validate phone number
+    const cleanPhone = (phone) => {
+      if (!phone) return '';
+      // First, remove all non-digit characters
+      let cleaned = String(phone).replace(/\D/g, '');
+      return cleaned;
+    };
+
+    const cleanedPhone = cleanPhone(form.phone);
+    const cleanedAlternatePhone = cleanPhone(form.alternatePhone);
+
+    console.log('Checkout validation - Phone details:', {
+      originalPhone: form.phone,
+      cleanedPhone: cleanedPhone,
+      cleanedLength: cleanedPhone.length,
+      isValid: /^[0-9]{7,15}$/.test(cleanedPhone)
+    });
+
+    if (form.alternatePhone && !/^[0-9]{7,15}$/.test(cleanedAlternatePhone)) {
       setFormError("Alternate number must be 7-15 digits.");
+      return;
+    }
+    
+    // Validate main phone number
+    if (!cleanedPhone || cleanedPhone.length < 7 || cleanedPhone.length > 15) {
+      console.warn('Phone validation failed:', {
+        hasValue: !!cleanedPhone,
+        length: cleanedPhone.length
+      });
+      setFormError(`Please enter a valid phone number. Got ${cleanedPhone.length} digits, need 7-15.`);
       return;
     }
     
@@ -678,8 +725,8 @@ export default function CheckoutPage() {
     if (form.payment === 'card') {
       setPlacingOrder(true);
       // Validate phone number
-      if (!form.phone || !/^[0-9]{7,15}$/.test(form.phone)) {
-        setFormError("Please enter a valid phone number (7-15 digits).");
+      if (!cleanedPhone || cleanedPhone.length < 7 || cleanedPhone.length > 15) {
+        setFormError(`Please enter a valid phone number. Got ${cleanedPhone.length} digits, need 7-15.`);
         setPlacingOrder(false);
         return;
       }
@@ -727,9 +774,9 @@ export default function CheckoutPage() {
           payload.guestInfo = {
             name: form.name,
             email: form.email,
-            phone: form.phone,
+            phone: cleanedPhone,
             phoneCode: form.phoneCode,
-            alternatePhone: form.alternatePhone || '',
+            alternatePhone: cleanedAlternatePhone || '',
             alternatePhoneCode: form.alternatePhone ? form.alternatePhoneCode || form.phoneCode : '',
             street: form.street,
             city: form.city,
@@ -756,6 +803,12 @@ export default function CheckoutPage() {
     if (!user) {
       setFormError("Please sign in to use Cash on Delivery. Or use Credit Card for guest checkout.");
       setShowSignIn(true);
+      return;
+    }
+    
+    // Validate phone number for COD as well
+    if (!cleanedPhone || cleanedPhone.length < 7 || cleanedPhone.length > 15) {
+      setFormError(`Please enter a valid phone number. Got ${cleanedPhone.length} digits, need 7-15.`);
       return;
     }
     
@@ -811,9 +864,9 @@ export default function CheckoutPage() {
           payload.addressData = {
             name: form.name || user.displayName || '',
             email: form.email || user.email || '',
-            phone: form.phone || '',
+            phone: cleanedPhone || '',
             phoneCode: form.phoneCode,
-            alternatePhone: form.alternatePhone || '',
+            alternatePhone: cleanedAlternatePhone || '',
             alternatePhoneCode: form.alternatePhone ? form.alternatePhoneCode || form.phoneCode : '',
             street: form.street,
             city: form.city,
@@ -1272,9 +1325,14 @@ export default function CheckoutPage() {
                       name="phone"
                       placeholder="Phone number"
                       value={form.phone || ''}
-                      onChange={handleChange}
+                      onChange={(e) => {
+                        // Only allow digits
+                        const cleaned = e.target.value.replace(/\D/g, '');
+                        setForm(f => ({ ...f, phone: cleaned }));
+                      }}
                       pattern="[0-9]{7,15}"
                       title="Phone number must be 7-15 digits"
+                      maxLength="15"
                       required
                     />
                   </div>
@@ -1317,9 +1375,14 @@ export default function CheckoutPage() {
                           name="alternatePhone"
                           placeholder="Alternate phone (optional)"
                           value={form.alternatePhone || ''}
-                          onChange={handleChange}
+                          onChange={(e) => {
+                            // Only allow digits
+                            const cleaned = e.target.value.replace(/\D/g, '');
+                            setForm(f => ({ ...f, alternatePhone: cleaned }));
+                          }}
                           pattern="[0-9]{7,15}"
                           title="Alternate number must be 7-15 digits"
+                          maxLength="15"
                         />
                       </div>
                       {form.alternatePhone && !/^[0-9]{7,15}$/.test(form.alternatePhone) && (
@@ -1815,7 +1878,30 @@ export default function CheckoutPage() {
         addressList={addressList}
         selectedAddressId={form.addressId}
         onSelectAddress={(addressId) => {
-          setForm(f => ({ ...f, addressId }));
+          // Find the selected address and populate form with its data
+          const selectedAddr = addressList.find(a => a._id === addressId);
+          if (selectedAddr) {
+            // Clean phone number: remove all non-digits
+            const cleanPhone = (phone) => phone ? String(phone).replace(/\D/g, '') : '';
+            setForm(f => ({ 
+              ...f, 
+              addressId,
+              name: selectedAddr.name || f.name,
+              email: selectedAddr.email || f.email,
+              phone: cleanPhone(selectedAddr.phone),
+              phoneCode: selectedAddr.phoneCode || '+91',
+              alternatePhone: cleanPhone(selectedAddr.alternatePhone),
+              alternatePhoneCode: selectedAddr.alternatePhoneCode || '+91',
+              street: selectedAddr.street || f.street,
+              city: selectedAddr.city || f.city,
+              state: selectedAddr.state || f.state,
+              district: selectedAddr.district || f.district,
+              country: selectedAddr.country || f.country,
+              pincode: selectedAddr.zip || selectedAddr.pincode || f.pincode,
+            }));
+          } else {
+            setForm(f => ({ ...f, addressId }));
+          }
         }}
       />
       <SignInModal open={showSignIn} onClose={() => setShowSignIn(false)} />
