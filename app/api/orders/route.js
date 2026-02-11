@@ -71,6 +71,21 @@ export async function POST(request) {
             }
         }
 
+        const validateShippingAddress = (address, sourceLabel) => {
+            const missing = [];
+            if (!address?.street) missing.push('street');
+            if (!address?.city) missing.push('city');
+            if (!address?.state) missing.push('state');
+            if (!address?.country) missing.push('country');
+            if (missing.length > 0) {
+                return NextResponse.json(
+                    { error: 'shipping address required', missingFields: missing, source: sourceLabel },
+                    { status: 400 }
+                );
+            }
+            return null;
+        };
+
         // Validation
         if (isGuest === true) {
             console.log('ORDER API: Validating guest order...');
@@ -90,12 +105,29 @@ export async function POST(request) {
             if (missingFields.length > 0) {
                 return NextResponse.json({ error: 'missing guest information', missingFields, guestInfo }, { status: 400 });
             }
+            const guestAddressCheck = validateShippingAddress(
+                {
+                    street: guestInfo.address || guestInfo.street,
+                    city: guestInfo.city,
+                    state: guestInfo.state,
+                    country: guestInfo.country
+                },
+                'guestInfo'
+            );
+            if (guestAddressCheck) return guestAddressCheck;
             if (!paymentMethod || !items || !Array.isArray(items) || items.length === 0) {
                 return NextResponse.json({ error: 'missing order details.', details: { paymentMethod, items }, guestInfo }, { status: 400 });
             }
         } else {
             if (!userId || !paymentMethod || !items || !Array.isArray(items) || items.length === 0) {
                 return NextResponse.json({ error: 'missing order details.' }, { status: 400 });
+            }
+            if (!addressId && !(addressData && addressData.street)) {
+                return NextResponse.json({ error: 'shipping address required' }, { status: 400 });
+            }
+            if (addressData && addressData.street) {
+                const addressDataCheck = validateShippingAddress(addressData, 'addressData');
+                if (addressDataCheck) return addressDataCheck;
             }
         }
 
@@ -201,6 +233,8 @@ export async function POST(request) {
                 if (!addressExists) {
                     return NextResponse.json({ error: 'Address not found' }, { status: 400 });
                 }
+                const addressCheck = validateShippingAddress(addressExists, 'addressId');
+                if (addressCheck) return addressCheck;
             }
             if (storeId) {
                 const storeExists = await Store.findById(storeId);

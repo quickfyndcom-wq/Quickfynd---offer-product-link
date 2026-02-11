@@ -9,137 +9,297 @@ import axios from "axios";
 
 const StoreSidebar = ({storeInfo}) => {
     const [showSettings, setShowSettings] = useState(false);
+    const [expandedSections, setExpandedSections] = useState({});
     const pathname = usePathname()
+    
+    const toggleSection = (sectionName) => {
+        setExpandedSections(prev => ({
+            ...prev,
+            [sectionName]: !prev[sectionName]
+        }));
+    }
 
-    const sidebarLinks = [
+    const overviewLinks = [
         { name: 'Dashboard', href: '/store', icon: HomeIcon },
+        { name: 'Ads Tracking', href: '/store/ads-tracking', icon: BarChart3 },
+        { name: 'Abandoned Checkout', href: '/store/abandoned-checkout', icon: ShoppingCart },
+        { name: 'Balance', href: '/store/balance', icon: Wallet },
+    ]
+
+    const catalogLinks = [
         { name: 'Categories', href: '/store/categories', icon: FolderIcon },
         { name: 'Add Product', href: '/store/add-product', icon: SquarePlusIcon },
         { name: 'Manage Product', href: '/store/manage-product', icon: SquarePenIcon },
         { name: 'Media', href: '/store/media', icon: ImageIcon },
-        { name: 'Abandoned Checkout', href: '/store/abandoned-checkout', icon: ShoppingCart },
-        { name: 'Ads Tracking', href: '/store/ads-tracking', icon: BarChart3 },
-        { name: 'Coupons', href: '/store/coupons', icon: TicketIcon },
-        { name: 'Shipping', href: '/store/shipping', icon: TruckIcon },
-        { name: 'Customers', href: '/store/customers', icon: UsersIcon },
-        { name: 'Manage Users', href: '/store/settings/users', icon: UserIcon },
+    ]
+
+    const orderLinks = [
         { name: 'Orders', href: '/store/orders', icon: LayoutListIcon },
         { name: 'Courier', href: '/store/courior', icon: TruckIcon },
-        { name: 'Balance', href: '/store/balance', icon: Wallet },
+        { name: 'Shipping', href: '/store/shipping', icon: TruckIcon },
         { name: 'Return Requests', href: '/store/return-requests', icon: RefreshCw },
+    ]
+
+    const customerLinks = [
+        { name: 'Customers', href: '/store/customers', icon: UsersIcon },
+        { name: 'Manage Users', href: '/store/settings/users', icon: UserIcon },
         { name: 'Reviews', href: '/store/reviews', icon: StarIcon },
         { name: 'Support Tickets', href: '/store/tickets', icon: MessageSquare },
         { name: 'Contact Us Messages', href: '/store#contact-messages', icon: StarIcon },
-        { name: 'Product Notifications', href: '/store/product-notifications', icon: BellIcon },
-        { name: 'Promotional Emails', href: '/store/promotional-emails', icon: MailIcon },
     ]
 
-    const featuredProductsLink = { name: 'Featured Products', href: '/store/featured-products', icon: Sparkles }
-    const categorySliderLink = { name: 'Category Sliders', href: '/store/category-slider', icon: Sparkles }
-    const carouselSliderLink = { name: 'Carousel Slider', href: '/store/carousel-slider', icon: StarIcon }
-    const dealsLink = { name: 'Deals of the Day', href: '/store/deals', icon: Clock }
+    const marketingLinks = [
+        { name: 'Coupons', href: '/store/coupons', icon: TicketIcon },
+        { name: 'Product Notifications', href: '/store/product-notifications', icon: BellIcon },
+        { name: 'Promotional Emails', href: '/store/promotional-emails', icon: MailIcon },
+        { name: 'Email Templates', href: '/store/email-templates', icon: MailIcon },
+        { name: 'Send Test Email', href: '/store/send-test-email', icon: BellIcon },
+    ]
+
+    const storefrontLinks = [
+        { name: 'Featured Products', href: '/store/featured-products', icon: Sparkles },
+        { name: 'Category Sliders', href: '/store/category-slider', icon: Sparkles },
+        { name: 'Carousel Slider', href: '/store/carousel-slider', icon: StarIcon },
+        { name: 'Deals of the Day', href: '/store/deals', icon: Clock },
+        { name: 'Sitemap Categories', href: '/store/sitemap-settings', icon: Settings },
+        { name: 'Home Menu Categories', href: '/store/home-menu-categories', icon: FolderIcon },
+        { name: 'Navbar Menu', href: '/store/navbar-menu', icon: Settings },
+    ]
 
     return (
-        <div className="inline-flex h-full flex-col justify-between border-r border-slate-200 sm:min-w-60">
-            <div>
-                <div className="flex flex-col gap-3 justify-center items-center pt-8 max-sm:hidden">
-                    <Image
-                        className="w-14 h-14 rounded-full shadow-md"
-                        src={storeInfo?.logo && !storeInfo.logo.includes('placehold.co') ? storeInfo.logo : '/default-store-logo.png'}
-                        alt={storeInfo?.name || 'Store Logo'}
-                        width={80}
-                        height={80}
-                    />
-                    <p className="text-slate-700">{storeInfo?.name || 'Store'}</p>
-                </div>
-                <div className="max-sm:mt-6">
-                    {
-                        sidebarLinks.map((link, index) => (
-                            <Link key={index} href={link.href} className={`relative flex items-center gap-3 text-slate-500 hover:bg-slate-50 p-2.5 transition ${pathname === link.href && 'bg-slate-100 sm:text-slate-600'}`}>
-                                <link.icon size={18} className="sm:ml-5" />
-                                <p className="max-sm:hidden">{link.name}</p>
-                                {pathname === link.href && <span className="absolute bg-green-500 right-0 top-1.5 bottom-1.5 w-1 sm:w-1.5 rounded-l"></span>}
-                            </Link>
-                        ))
-                    }
-                    
-                    {/* Divider Line */}
-                    <div className="my-4 border-t border-slate-300 mx-2.5"></div>
-                    
-                    {/* Featured Products Link - Below Contact Messages */}
-                    <Link href={featuredProductsLink.href} className={`relative flex items-center gap-3 text-slate-500 hover:bg-slate-50 p-2.5 transition ${pathname === featuredProductsLink.href && 'bg-slate-100 sm:text-slate-600'}`}>
-                        <featuredProductsLink.icon size={18} className="sm:ml-5" />
-                        <p className="max-sm:hidden">{featuredProductsLink.name}</p>
-                        {pathname === featuredProductsLink.href && <span className="absolute bg-green-500 right-0 top-1.5 bottom-1.5 w-1 sm:w-1.5 rounded-l"></span>}
-                    </Link>
-                    
-                    {/* Category Sliders Link */}
-                    <Link href={categorySliderLink.href} className={`relative flex items-center gap-3 text-slate-500 hover:bg-slate-50 p-2.5 transition ${pathname === categorySliderLink.href && 'bg-slate-100 sm:text-slate-600'}`}>
-                        <categorySliderLink.icon size={18} className="sm:ml-5" />
-                        <p className="max-sm:hidden">{categorySliderLink.name}</p>
-                        {pathname === categorySliderLink.href && <span className="absolute bg-green-500 right-0 top-1.5 bottom-1.5 w-1 sm:w-1.5 rounded-l"></span>}
-                    </Link>
-                    
-                    {/* Sitemap Categories Link */}
-                    <Link href="/store/sitemap-settings" className={`relative flex items-center gap-3 text-slate-500 hover:bg-slate-50 p-2.5 transition ${pathname === '/store/sitemap-settings' && 'bg-slate-100 sm:text-slate-600'}`}>
-                        <Settings size={18} className="sm:ml-5" />
-                        <p className="max-sm:hidden">Sitemap Categories</p>
-                        {pathname === '/store/sitemap-settings' && <span className="absolute bg-green-500 right-0 top-1.5 bottom-1.5 w-1 sm:w-1.5 rounded-l"></span>}
-                    </Link>
-                    {/* Home Categories Link */}
-                 
-                    {/* Home Menu Categories Link */}
-                    <Link href="/store/home-menu-categories" className={`relative flex items-center gap-3 text-slate-500 hover:bg-slate-50 p-2.5 transition ${pathname === '/store/home-menu-categories' && 'bg-slate-100 sm:text-slate-600'}`}>
-                        <FolderIcon size={18} className="sm:ml-5" />
-                        <p className="max-sm:hidden">Home Menu Categories</p>
-                        {pathname === '/store/home-menu-categories' && <span className="absolute bg-green-500 right-0 top-1.5 bottom-1.5 w-1 sm:w-1.5 rounded-l"></span>}
-                    </Link>
-                        {/* Navbar Menu Link */}
-                        <Link href="/store/navbar-menu" className={`relative flex items-center gap-3 text-slate-500 hover:bg-slate-50 p-2.5 transition ${pathname === '/store/navbar-menu' && 'bg-slate-100 sm:text-slate-600'}`}>
-                            <Settings size={18} className="sm:ml-5" />
-                            <p className="max-sm:hidden">Navbar Menu</p>
-                            {pathname === '/store/navbar-menu' && <span className="absolute bg-green-500 right-0 top-1.5 bottom-1.5 w-1 sm:w-1.5 rounded-l"></span>}
-                        </Link>
-                    {/* Email Templates Link */}
-                    <Link href="/store/email-templates" className={`relative flex items-center gap-3 text-slate-500 hover:bg-slate-50 p-2.5 transition ${pathname === '/store/email-templates' && 'bg-slate-100 sm:text-slate-600'}`}>
-                        <MailIcon size={18} className="sm:ml-5" />
-                        <p className="max-sm:hidden">Email Templates</p>
-                        {pathname === '/store/email-templates' && <span className="absolute bg-green-500 right-0 top-1.5 bottom-1.5 w-1 sm:w-1.5 rounded-l"></span>}
-                    </Link>
-                    {/* Send Test Email Link */}
-                    <Link href="/store/send-test-email" className={`relative flex items-center gap-3 text-slate-500 hover:bg-slate-50 p-2.5 transition ${pathname === '/store/send-test-email' && 'bg-slate-100 sm:text-slate-600'}`}>
-                        <BellIcon size={18} className="sm:ml-5" />
-                        <p className="max-sm:hidden">Send Test Email</p>
-                        {pathname === '/store/send-test-email' && <span className="absolute bg-green-500 right-0 top-1.5 bottom-1.5 w-1 sm:w-1.5 rounded-l"></span>}
-                    </Link>
-                    {/* Carousel Slider Link - Below Featured Products */}
-                    <Link href={carouselSliderLink.href} className={`relative flex items-center gap-3 text-slate-500 hover:bg-slate-50 p-2.5 transition ${pathname === carouselSliderLink.href && 'bg-slate-100 sm:text-slate-600'}`}>
-                        <carouselSliderLink.icon size={18} className="sm:ml-5" />
-                        <p className="max-sm:hidden">{carouselSliderLink.name}</p>
-                        {pathname === carouselSliderLink.href && <span className="absolute bg-green-500 right-0 top-1.5 bottom-1.5 w-1 sm:w-1.5 rounded-l"></span>}
-                    </Link>
-                    {/* Deals of the Day Link */}
-                    <Link href={dealsLink.href} className={`relative flex items-center gap-3 text-slate-500 hover:bg-slate-50 p-2.5 transition ${pathname === dealsLink.href && 'bg-slate-100 sm:text-slate-600'}`}>
-                        <dealsLink.icon size={18} className="sm:ml-5" />
-                        <p className="max-sm:hidden">{dealsLink.name}</p>
-                        {pathname === dealsLink.href && <span className="absolute bg-green-500 right-0 top-1.5 bottom-1.5 w-1 sm:w-1.5 rounded-l"></span>}
-                    </Link>
+        <div className="flex h-screen flex-col border-r border-slate-200 bg-white sm:min-w-64">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
+                <Image
+                    className="w-9 h-9 rounded-full shadow-sm"
+                    src={storeInfo?.logo && !storeInfo.logo.includes('placehold.co') ? storeInfo.logo : '/default-store-logo.png'}
+                    alt={storeInfo?.name || 'Store Logo'}
+                    width={36}
+                    height={36}
+                />
+                <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{storeInfo?.name || 'Store'}</p>
+                    <p className="text-xs text-slate-400 truncate">Store Dashboard</p>
                 </div>
             </div>
-            <div className="mb-6 flex flex-col items-center">
-                {/* Desktop: full button, Mobile: icon only */}
+            <div className="store-sidebar-scroll flex-1 overflow-y-auto px-2 pb-4 pt-2">
+                <div className="flex flex-col gap-3 max-sm:mt-2">
+                    {/* Overview Section */}
+                    <div className="flex flex-col gap-0">
+                        <button
+                            onClick={() => toggleSection('overview')}
+                            className="flex items-center gap-3 w-full rounded-lg text-slate-700 hover:bg-blue-50 px-3 py-2.5 transition font-medium text-sm group"
+                        >
+                            <div className="p-1.5 rounded-md bg-blue-100 group-hover:bg-blue-200 transition">
+                                <HomeIcon size={16} className="shrink-0 text-blue-700" />
+                            </div>
+                            <p className="max-sm:hidden flex-1 text-left">Overview</p>
+                            <span className="max-sm:hidden text-slate-400 group-hover:text-slate-600 transition-transform duration-200" style={{transform: expandedSections.overview ? 'rotate(90deg)' : 'rotate(0deg)'}}>
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M6 12l4-4-4-4" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </span>
+                        </button>
+                        {expandedSections.overview && (
+                            <div className="flex flex-col gap-1.5 py-2 pl-6">
+                                {overviewLinks.slice(1).map((link) => (
+                                    <Link key={link.href} href={link.href} className={`flex items-center gap-2.5 rounded-md px-3 py-2 transition text-sm ${
+                                        pathname === link.href 
+                                            ? 'bg-blue-100 text-blue-700 font-semibold' 
+                                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                                    }`}>
+                                        <span className={`w-2 h-2 rounded-full transition ${
+                                            pathname === link.href ? 'bg-blue-600 scale-100' : 'bg-slate-300 scale-75'
+                                        }`}></span>
+                                        <p className="max-sm:hidden">{link.name}</p>
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Catalog Section */}
+                    <div className="flex flex-col gap-0">
+                        <button
+                            onClick={() => toggleSection('catalog')}
+                            className="flex items-center gap-3 w-full rounded-lg text-slate-700 hover:bg-amber-50 px-3 py-2.5 transition font-medium text-sm group"
+                        >
+                            <div className="p-1.5 rounded-md bg-amber-100 group-hover:bg-amber-200 transition">
+                                <FolderIcon size={16} className="shrink-0 text-amber-700" />
+                            </div>
+                            <p className="max-sm:hidden flex-1 text-left">Catalog</p>
+                            <span className="max-sm:hidden text-slate-400 group-hover:text-slate-600 transition-transform duration-200" style={{transform: expandedSections.catalog ? 'rotate(90deg)' : 'rotate(0deg)'}}>
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M6 12l4-4-4-4" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </span>
+                        </button>
+                        {expandedSections.catalog && (
+                            <div className="flex flex-col gap-1.5 py-2 pl-6">
+                                {catalogLinks.slice(1).map((link) => (
+                                    <Link key={link.href} href={link.href} className={`flex items-center gap-2.5 rounded-md px-3 py-2 transition text-sm ${
+                                        pathname === link.href 
+                                            ? 'bg-amber-100 text-amber-700 font-semibold' 
+                                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                                    }`}>
+                                        <span className={`w-2 h-2 rounded-full transition ${
+                                            pathname === link.href ? 'bg-amber-600 scale-100' : 'bg-slate-300 scale-75'
+                                        }`}></span>
+                                        <p className="max-sm:hidden">{link.name}</p>
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Orders Section */}
+                    <div className="flex flex-col gap-0">
+                        <button
+                            onClick={() => toggleSection('orders')}
+                            className="flex items-center gap-3 w-full rounded-lg text-slate-700 hover:bg-purple-50 px-3 py-2.5 transition font-medium text-sm group"
+                        >
+                            <div className="p-1.5 rounded-md bg-purple-100 group-hover:bg-purple-200 transition">
+                                <LayoutListIcon size={16} className="shrink-0 text-purple-700" />
+                            </div>
+                            <p className="max-sm:hidden flex-1 text-left">Orders</p>
+                            <span className="max-sm:hidden text-slate-400 group-hover:text-slate-600 transition-transform duration-200" style={{transform: expandedSections.orders ? 'rotate(90deg)' : 'rotate(0deg)'}}>
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M6 12l4-4-4-4" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </span>
+                        </button>
+                        {expandedSections.orders && (
+                            <div className="flex flex-col gap-1.5 py-2 pl-6">
+                                {orderLinks.slice(1).map((link) => (
+                                    <Link key={link.href} href={link.href} className={`flex items-center gap-2.5 rounded-md px-3 py-2 transition text-sm ${
+                                        pathname === link.href 
+                                            ? 'bg-purple-100 text-purple-700 font-semibold' 
+                                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                                    }`}>
+                                        <span className={`w-2 h-2 rounded-full transition ${
+                                            pathname === link.href ? 'bg-purple-600 scale-100' : 'bg-slate-300 scale-75'
+                                        }`}></span>
+                                        <p className="max-sm:hidden">{link.name}</p>
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Customers Section */}
+                    <div className="flex flex-col gap-0">
+                        <button
+                            onClick={() => toggleSection('customers')}
+                            className="flex items-center gap-3 w-full rounded-lg text-slate-700 hover:bg-pink-50 px-3 py-2.5 transition font-medium text-sm group"
+                        >
+                            <div className="p-1.5 rounded-md bg-pink-100 group-hover:bg-pink-200 transition">
+                                <UsersIcon size={16} className="shrink-0 text-pink-700" />
+                            </div>
+                            <p className="max-sm:hidden flex-1 text-left">Customers</p>
+                            <span className="max-sm:hidden text-slate-400 group-hover:text-slate-600 transition-transform duration-200" style={{transform: expandedSections.customers ? 'rotate(90deg)' : 'rotate(0deg)'}}>
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M6 12l4-4-4-4" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </span>
+                        </button>
+                        {expandedSections.customers && (
+                            <div className="flex flex-col gap-1.5 py-2 pl-6">
+                                {customerLinks.slice(1).map((link) => (
+                                    <Link key={link.href} href={link.href} className={`flex items-center gap-2.5 rounded-md px-3 py-2 transition text-sm ${
+                                        pathname === link.href 
+                                            ? 'bg-pink-100 text-pink-700 font-semibold' 
+                                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                                    }`}>
+                                        <span className={`w-2 h-2 rounded-full transition ${
+                                            pathname === link.href ? 'bg-pink-600 scale-100' : 'bg-slate-300 scale-75'
+                                        }`}></span>
+                                        <p className="max-sm:hidden">{link.name}</p>
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Marketing Section */}
+                    <div className="flex flex-col gap-0">
+                        <button
+                            onClick={() => toggleSection('marketing')}
+                            className="flex items-center gap-3 w-full rounded-lg text-slate-700 hover:bg-orange-50 px-3 py-2.5 transition font-medium text-sm group"
+                        >
+                            <div className="p-1.5 rounded-md bg-orange-100 group-hover:bg-orange-200 transition">
+                                <TicketIcon size={16} className="shrink-0 text-orange-700" />
+                            </div>
+                            <p className="max-sm:hidden flex-1 text-left">Marketing</p>
+                            <span className="max-sm:hidden text-slate-400 group-hover:text-slate-600 transition-transform duration-200" style={{transform: expandedSections.marketing ? 'rotate(90deg)' : 'rotate(0deg)'}}>
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M6 12l4-4-4-4" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </span>
+                        </button>
+                        {expandedSections.marketing && (
+                            <div className="flex flex-col gap-1.5 py-2 pl-6">
+                                {marketingLinks.slice(1).map((link) => (
+                                    <Link key={link.href} href={link.href} className={`flex items-center gap-2.5 rounded-md px-3 py-2 transition text-sm ${
+                                        pathname === link.href 
+                                            ? 'bg-orange-100 text-orange-700 font-semibold' 
+                                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                                    }`}>
+                                        <span className={`w-2 h-2 rounded-full transition ${
+                                            pathname === link.href ? 'bg-orange-600 scale-100' : 'bg-slate-300 scale-75'
+                                        }`}></span>
+                                        <p className="max-sm:hidden">{link.name}</p>
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Storefront Section */}
+                    <div className="flex flex-col gap-0">
+                        <button
+                            onClick={() => toggleSection('storefront')}
+                            className="flex items-center gap-3 w-full rounded-lg text-slate-700 hover:bg-emerald-50 px-3 py-2.5 transition font-medium text-sm group"
+                        >
+                            <div className="p-1.5 rounded-md bg-emerald-100 group-hover:bg-emerald-200 transition">
+                                <Sparkles size={16} className="shrink-0 text-emerald-700" />
+                            </div>
+                            <p className="max-sm:hidden flex-1 text-left">Storefront</p>
+                            <span className="max-sm:hidden text-slate-400 group-hover:text-slate-600 transition-transform duration-200" style={{transform: expandedSections.storefront ? 'rotate(90deg)' : 'rotate(0deg)'}}>
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M6 12l4-4-4-4" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </span>
+                        </button>
+                        {expandedSections.storefront && (
+                            <div className="flex flex-col gap-1.5 py-2 pl-6">
+                                {storefrontLinks.slice(1).map((link) => (
+                                    <Link key={link.href} href={link.href} className={`flex items-center gap-2.5 rounded-md px-3 py-2 transition text-sm ${
+                                        pathname === link.href 
+                                            ? 'bg-emerald-100 text-emerald-700 font-semibold' 
+                                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-700'
+                                    }`}>
+                                        <span className={`w-2 h-2 rounded-full transition ${
+                                            pathname === link.href ? 'bg-emerald-600 scale-100' : 'bg-slate-300 scale-75'
+                                        }`}></span>
+                                        <p className="max-sm:hidden">{link.name}</p>
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+            <div className="border-t border-slate-100 px-4 py-4 flex flex-col items-center">
                 <button
-                    className="w-44 px-4 py-2 bg-slate-200 text-slate-700 rounded hover:bg-blue-600 hover:text-white transition max-sm:hidden"
+                    className="w-full px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-blue-600 hover:text-white transition max-sm:hidden"
                     onClick={() => setShowSettings(true)}
                 >
                     Settings
                 </button>
                 <button
-                    className="sm:hidden p-2 rounded-full bg-slate-200 text-slate-700 hover:bg-blue-600 hover:text-white transition"
+                    className="sm:hidden p-2 rounded-full bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white transition"
                     aria-label="Settings"
                     onClick={() => setShowSettings(true)}
                 >
-                    {/* Lucide settings icon */}
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7zm7.94-2.34a1 1 0 0 0 .26-1.09l-1.43-2.49a1 1 0 0 1 0-.94l1.43-2.49a1 1 0 0 0-.26-1.09l-2.12-2.12a1 1 0 0 0-1.09-.26l-2.49 1.43a1 1 0 0 1-.94 0l-2.49-1.43a1 1 0 0 0-1.09.26l-2.12 2.12a1 1 0 0 0-.26 1.09l1.43 2.49a1 1 0 0 1 0 .94l-1.43 2.49a1 1 0 0 0 .26 1.09l2.12 2.12a1 1 0 0 0 1.09.26l2.49-1.43a1 1 0 0 1 .94 0l2.49 1.43a1 1 0 0 0 1.09-.26l2.12-2.12z" />
                     </svg>

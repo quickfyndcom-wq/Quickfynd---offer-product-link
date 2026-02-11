@@ -52,6 +52,9 @@ export default function StoreOrders() {
         courier: ''
     });
     const [filterStatus, setFilterStatus] = useState('ALL');
+    const [datePreset, setDatePreset] = useState('ALL');
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
     const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
     const [schedulingPickup, setSchedulingPickup] = useState(false);
     const [sendingToDelhivery, setSendingToDelhivery] = useState(false);
@@ -207,19 +210,37 @@ export default function StoreOrders() {
         };
         return stats;
     };
-    // Filter orders based on selected status
+    const getDateRange = () => {
+        if (!fromDate && !toDate) return { start: null, end: null };
+        const start = fromDate ? new Date(`${fromDate}T00:00:00`) : null;
+        const end = toDate ? new Date(`${toDate}T23:59:59`) : null;
+        return { start, end };
+    };
+
+    const isOrderInRange = (order) => {
+        const { start, end } = getDateRange();
+        if (!start && !end) return true;
+        const createdAt = order?.createdAt ? new Date(order.createdAt) : null;
+        if (!createdAt || Number.isNaN(createdAt.getTime())) return false;
+        if (start && createdAt < start) return false;
+        if (end && createdAt > end) return false;
+        return true;
+    };
+
+    // Filter orders based on selected status + date range
     const getFilteredOrders = () => {
-        if (filterStatus === 'ALL') return orders;
-        if (filterStatus === 'PENDING_PAYMENT') return orders.filter(o => {
+        const dateFiltered = orders.filter(isOrderInRange);
+        if (filterStatus === 'ALL') return dateFiltered;
+        if (filterStatus === 'PENDING_PAYMENT') return dateFiltered.filter(o => {
             // Auto-mark COD orders as PAID if delivered
             const paymentMethod = (o.paymentMethod || '').toLowerCase();
             const status = (o.status || '').toUpperCase();
             const isPaid = paymentMethod === 'cod' && status === 'DELIVERED' ? true : o.isPaid;
             return !isPaid;
         });
-        if (filterStatus === 'PENDING_SHIPMENT') return orders.filter(o => !o.trackingId && ['ORDER_PLACED', 'PROCESSING'].includes(o.status));
-        if (filterStatus === 'RETURN_REQUESTED') return orders.filter(o => o.returns && o.returns.some(r => r.status === 'REQUESTED'));
-        return orders.filter(o => o.status === filterStatus);
+        if (filterStatus === 'PENDING_SHIPMENT') return dateFiltered.filter(o => !o.trackingId && ['ORDER_PLACED', 'PROCESSING'].includes(o.status));
+        if (filterStatus === 'RETURN_REQUESTED') return dateFiltered.filter(o => o.returns && o.returns.some(r => r.status === 'REQUESTED'));
+        return dateFiltered.filter(o => o.status === filterStatus);
     };
 
     const stats = getOrderStats();
@@ -565,6 +586,34 @@ export default function StoreOrders() {
         };
     }, [autoRefreshEnabled, selectedOrder, refreshInterval]);
 
+    useEffect(() => {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${yyyy}-${mm}-${dd}`;
+
+        if (datePreset === 'TODAY') {
+            setFromDate(todayStr);
+            setToDate(todayStr);
+            return;
+        }
+        if (datePreset === 'LAST_7_DAYS') {
+            const lastWeek = new Date(today);
+            lastWeek.setDate(today.getDate() - 6);
+            const wyyyy = lastWeek.getFullYear();
+            const wmm = String(lastWeek.getMonth() + 1).padStart(2, '0');
+            const wdd = String(lastWeek.getDate()).padStart(2, '0');
+            setFromDate(`${wyyyy}-${wmm}-${wdd}`);
+            setToDate(todayStr);
+            return;
+        }
+        if (datePreset === 'ALL') {
+            setFromDate('');
+            setToDate('');
+        }
+    }, [datePreset]);
+
     const refreshTrackingData = async () => {
         if (!selectedOrder || !selectedOrder.trackingId) return;
         try {
@@ -751,6 +800,59 @@ export default function StoreOrders() {
                         )}
                     </button>
                 ))}
+            </div>
+
+            {/* Date Range Filters */}
+            <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4 flex flex-col gap-4">
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        onClick={() => setDatePreset('ALL')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition ${datePreset === 'ALL' ? 'bg-slate-900 text-white' : 'bg-gray-100 text-slate-700 hover:bg-gray-200'}`}
+                    >
+                        All Orders
+                    </button>
+                    <button
+                        onClick={() => setDatePreset('TODAY')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition ${datePreset === 'TODAY' ? 'bg-slate-900 text-white' : 'bg-gray-100 text-slate-700 hover:bg-gray-200'}`}
+                    >
+                        Today
+                    </button>
+                    <button
+                        onClick={() => setDatePreset('LAST_7_DAYS')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition ${datePreset === 'LAST_7_DAYS' ? 'bg-slate-900 text-white' : 'bg-gray-100 text-slate-700 hover:bg-gray-200'}`}
+                    >
+                        Last 7 Days
+                    </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div>
+                        <label className="text-xs text-slate-500">From</label>
+                        <input
+                            type="date"
+                            value={fromDate}
+                            onChange={(e) => {
+                                setFromDate(e.target.value);
+                                setDatePreset('CUSTOM');
+                            }}
+                            className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs text-slate-500">To</label>
+                        <input
+                            type="date"
+                            value={toDate}
+                            onChange={(e) => {
+                                setToDate(e.target.value);
+                                setDatePreset('CUSTOM');
+                            }}
+                            className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                    </div>
+                    <div className="sm:col-span-2 flex items-end">
+                        <div className="text-xs text-slate-500">Showing orders by date range</div>
+                    </div>
+                </div>
             </div>
 
             {filteredOrders.length === 0 ? (

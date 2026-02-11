@@ -1,4 +1,4 @@
-import { connectDB } from '@/lib/mongodb';
+import connectDB from '@/lib/mongodb';
 import { NextResponse } from 'next/server';
 
 /**
@@ -8,13 +8,13 @@ import { NextResponse } from 'next/server';
  */
 export async function POST(request) {
   try {
-    await connectDB();
+    const mongoose = await connectDB();
     
     const body = await request.json();
     const { source, medium, campaign, referrer, timestamp } = body;
 
     // Get database connection
-    const db = global.mongooseConnection?.connection?.db;
+    const db = mongoose?.connection?.db;
     if (!db) {
       return NextResponse.json(
         { error: 'Database connection failed' },
@@ -57,7 +57,7 @@ export async function POST(request) {
  */
 export async function GET(request) {
   try {
-    await connectDB();
+    const mongoose = await connectDB();
     
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate');
@@ -65,7 +65,7 @@ export async function GET(request) {
     const source = searchParams.get('source');
     const medium = searchParams.get('medium');
 
-    const db = global.mongooseConnection?.connection?.db;
+    const db = mongoose?.connection?.db;
     if (!db) {
       return NextResponse.json(
         { error: 'Database connection failed' },
