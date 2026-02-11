@@ -224,6 +224,11 @@ IMPORTANT: Use ALL this information to answer customer questions accurately. If 
                 const fallbackResponses = {
                     english: {
                         'product': "hey! yeah we've got loads of stuff - electronics, fashion, home essentials, beauty products, and more. what are you looking for specifically?",
+                        'kids': "absolutely! we have tons of kids products - toys, games, books, stationery, kids fashion (clothes, shoes), educational items, school supplies, and more! what age group are you shopping for?",
+                        'electronics': "yes! we've got all kinds of electronics - mobiles, laptops, tablets, headphones, smartwatches, chargers, speakers, and accessories. looking for anything specific?",
+                        'fashion': "great choice! we have fashion for everyone - men's wear, women's wear, kids wear, shoes, bags, accessories, and more. what are you interested in?",
+                        'beauty': "yep! beauty & personal care section has makeup, skincare, haircare, fragrances, grooming products, and wellness items. what do you need?",
+                        'home': "sure thing! home essentials include kitchen items, home decor, furniture, bedding, storage solutions, cleaning supplies, and more. what are you looking for?",
                         'price': "prices vary depending on what you're looking for. got a specific product in mind? I can help you find it and check the price",
                         'shipping': "shipping's free on orders over ₹499! delivery usually takes 3-7 days depending on where you are. metro cities get it in 2-4 days. where should we deliver?",
                         'order': "you can track your order from 'My Orders' in your dashboard. wanna know something specific about your order?",
@@ -239,6 +244,11 @@ IMPORTANT: Use ALL this information to answer customer questions accurately. If 
                     },
                     hindi: {
                         'product': "हां जी! हमारे पास इलेक्ट्रॉनिक्स, फैशन, घर का सामान, ब्यूटी प्रोडक्ट्स सब कुछ है। क्या ढूंढ रहे हो?",
+                        'kids': "बिल्कुल! बच्चों के लिए ढेर सारे प्रोडक्ट्स हैं - खिलौने, गेम्स, किताबें, स्टेशनरी, बच्चों के कपड़े और जूते, एजुकेशनल आइटम्स, स्कूल सामान, और भी बहुत कुछ! कितने उम्र के बच्चे के लिए?",
+                        'electronics': "हां! हमारे पास सब इलेक्ट्रॉनिक्स हैं - मोबाइल, लैपटॉप, टैबलेट, हेडफोन, स्मार्टवॉच, चार्जर, स्पीकर, और एक्सेसरीज। कुछ खास ढूंढ रहे हो?",
+                        'fashion': "बढ़िया! हमारे पास सबके लिए फैशन है - मेंस वियर, वूमेंस वियर, किड्स वियर, जूते, बैग, एक्सेसरीज, और भी बहुत कुछ। क्या देखना है?",
+                        'beauty': "हां! ब्यूटी एंड पर्सनल केयर सेक्शन में मेकअप, स्किनकेयर, हेयरकेयर, परफ्यूम, ग्रूमिंग प्रोडक्ट्स है। क्या चाहिए?",
+                        'home': "ज़रूर! घर के सामान में किचन आइटम्स, होम डेकोर, फर्नीचर, बेडिंग, स्टोरेज, क्लीनिंग सप्लाई है। क्या ढूंढ रहे हो?",
                         'price': "कीमत प्रोडक्ट पर निर्भर करती है। कौन सा प्रोडक्ट देखना है? मैं बता सकता हूं",
                         'shipping': "₹499 से ऊपर के ऑर्डर पर डिलीवरी फ्री है! डिलीवरी में 3-7 दिन लगते हैं, मेट्रो शहरों में 2-4 दिन। कहां डिलीवरी चाहिए?",
                         'order': "अपना ऑर्डर 'माई ऑर्डर्स' में जाकर ट्रैक कर सकते हो। कुछ खास जानना है?",
@@ -254,6 +264,11 @@ IMPORTANT: Use ALL this information to answer customer questions accurately. If 
                     },
                     malayalam: {
                         'product': "ഉണ്ട്! ഞങ്ങൾക്ക് ഇലക്ട്രോണിക്സ്, ഫാഷൻ, വീട്ടുപകരണങ്ങൾ, സൗന്ദര്യവർദ്ധക ഉൽപ്പന്നങ്ങൾ എല്ലാം ഉണ്ട്. എന്താണ് തിരയുന്നത്?",
+                        'kids': "തീർച്ചയായും! കുട്ടികൾക്ക് ധാരാളം ഉൽപ്പന്നങ്ങൾ ഉണ്ട് - കളിപ്പാട്ടങ്ങൾ, ഗെയിമുകൾ, പുസ്തകങ്ങൾ, സ്റ്റേഷനറി, കുട്ടികളുടെ വസ്ത്രങ്ങളും ഷൂകളും, വിദ്യാഭ്യാസ സാധനങ്ങൾ, സ്കൂൾ സാധനങ്ങൾ, കൂടുതൽ! ഏത് പ്രായത്തിലുള്ള കുട്ടിക്കാണ്?",
+                        'electronics': "അതെ! ഞങ്ങൾക്ക് എല്ലാ ഇലക്ട്രോണിക്സും ഉണ്ട് - മൊബൈൽ, ലാപ്ടോപ്പ്, ടാബ്ലെറ്റ്, ഹെഡ്ഫോൺ, സ്മാർട്ട്വാച്ച്, ചാർജറുകൾ, സ്പീക്കറുകൾ, ആക്സസറികൾ. പ്രത്യേകിച്ച് എന്തെങ്കിലും?",
+                        'fashion': "നല്ല തിരഞ്ഞെടുപ്പ്! എല്ലാവർക്കും ഫാഷൻ ഉണ്ട് - പുരുഷന്മാരുടെ വസ്ത്രങ്ങൾ, സ്ത്രീകളുടെ വസ്ത്രങ്ങൾ, കുട്ടികളുടെ വസ്ത്രങ്ങൾ, ഷൂസ്, ബാഗുകൾ, ആക്സസറികൾ. എന്താണ് വേണ്ടത്?",
+                        'beauty': "ഉണ്ട്! ബ്യൂട്ടി & പേഴ്സണൽ കെയർ വിഭാഗത്തിൽ മേക്കപ്പ്, സ്കിൻകെയർ, ഹെയർകെയർ, സുഗന്ധദ്രവ്യങ്ങൾ, ഗ്രൂമിംഗ് ഉൽപ്പന്നങ്ങൾ ഉണ്ട്. എന്താണ് വേണ്ടത്?",
+                        'home': "തീർച്ചയായും! ഗൃഹോപകരണങ്ങളിൽ അടുക്കള സാധനങ്ങൾ, ഹോം ഡെക്കർ, ഫർണിച്ചർ, ബെഡിംഗ്, സ്റ്റോറേജ്, പ്രകൃതീകരണ സാധനങ്ങൾ ഉണ്ട്. എന്താണ് തിരയുന്നത്?",
                         'price': "വില ഉൽപ്പന്നം അനുസരിച്ചിരിക്കും. ഏത് ഉൽപ്പന്നമാണ് നോക്കേണ്ടത്? ഞാൻ സഹായിക്കാം",
                         'shipping': "₹499 മുകളിലുള്ള ഓർഡറുകൾക്ക് സൗജന്യ ഡെലിവറി! സാധാരണ 3-7 ദിവസം എടുക്കും, മെട്രോ നഗരങ്ങളിൽ 2-4 ദിവസം. എവിടെയാണ് ഡെലിവറി വേണ്ടത്?",
                         'order': "'മൈ ഓർഡേഴ്സ്' എന്നതിൽ നിന്ന് നിങ്ങളുടെ ഓർഡർ ട്രാക്ക് ചെയ്യാം. എന്തെങ്കിലും പ്രത്യേകമായി അറിയണോ?",
@@ -275,8 +290,16 @@ IMPORTANT: Use ALL this information to answer customer questions accurately. If 
                 const msgLower = message.toLowerCase();
                 let response = langResponses.default;
                 
+                // Greetings and thanks
                 if (msgLower.match(/\b(hi|hello|hey|hii|helo|yo)\b/)) response = langResponses.greeting;
                 else if (msgLower.match(/\b(thank|thanks|thx|ty|appreciate)\b/)) response = langResponses.thanks;
+                // Specific product categories
+                else if (msgLower.match(/\b(kid|kids|child|children|baby|babies|toddler)\b/)) response = langResponses.kids || langResponses.product;
+                else if (msgLower.match(/\b(electronic|electronics|mobile|phone|laptop|tablet|gadget|tech)\b/)) response = langResponses.electronics || langResponses.product;
+                else if (msgLower.match(/\b(fashion|clothing|clothes|wear|dress|shirt|pant|shoe)\b/)) response = langResponses.fashion || langResponses.product;
+                else if (msgLower.match(/\b(beauty|makeup|cosmetic|skincare|haircare|grooming)\b/)) response = langResponses.beauty || langResponses.product;
+                else if (msgLower.match(/\b(home|kitchen|furniture|decor|bedding)\b/)) response = langResponses.home || langResponses.product;
+               // General queries
                 else if (msgLower.includes('product') || msgLower.includes('item') || msgLower.includes('find') || msgLower.includes('buy') || msgLower.includes('search')) response = langResponses.product;
                 else if (msgLower.includes('price') || msgLower.includes('cost') || msgLower.includes('cheap') || msgLower.includes('expensive') || msgLower.includes('rupee')) response = langResponses.price;
                 else if (msgLower.includes('ship') || msgLower.includes('delivery') || msgLower.includes('deliver') || msgLower.includes('address')) response = langResponses.shipping;
