@@ -16,6 +16,7 @@ const LocationHistorySchema = new mongoose.Schema({
 
 const UserSchema = new mongoose.Schema({
   _id: { type: String, required: true }, // Firebase UID as string
+  firebaseUid: { type: String, unique: true, sparse: true }, // Firebase UID reference
   name: String,
   email: { type: String, unique: true, sparse: true },
   phone: String,
