@@ -229,7 +229,8 @@ const OrderSummary = ({ totalPrice, items }) => {
                 } catch (err) {
                     console.error('Guest order error:', err);
                     console.error('Error response:', err?.response?.data);
-                    toast.error(err?.response?.data?.error || err?.response?.data?.message || 'Order Failed. Please try again.');
+                    // Silently redirect to order-failed page instead of showing error
+                    router.push('/order-failed');
                 }
                 setLoading(false);
                 return;
@@ -237,7 +238,7 @@ const OrderSummary = ({ totalPrice, items }) => {
 
             // Regular logged-in user checkout
             if(!user){
-                return toast.error('Please login or use guest checkout')
+                return toast.error('Please login to continue')
             }
             // If address is not selected, save the form as a new address and select it
             let addressToUse = selectedAddress;
@@ -261,11 +262,15 @@ const OrderSummary = ({ totalPrice, items }) => {
                     setSelectedAddress(data.newAddress);
                     toast.success('Address saved to your account');
                 } catch (err) {
-                    return toast.error('Failed to save address. Please try again.');
+                    console.error('Address save error:', err);
+                    // Silently fail - user can still try to place order with existing address
+                    setLoading(false);
+                    return;
                 }
             }
             if(!addressToUse){
-                return toast.error('Please select or enter an address');
+                setLoading(false);
+                return;
             }
             const token = await getToken();
             const orderData = {
@@ -292,7 +297,7 @@ const OrderSummary = ({ totalPrice, items }) => {
                 }else{
                     // Clear cart immediately for COD orders
                     dispatch(clearCart());
-                    toast.success(data.message);
+                    toast.success(data.message || 'Order placed successfully!');
                     const orderId = data.order.id;
                     // Show prepaid upsell modal before redirecting
                     setUpsellOrderId(orderId);
@@ -301,9 +306,13 @@ const OrderSummary = ({ totalPrice, items }) => {
                     dispatch(fetchCart({getToken}));
                 }
             }else{
+                setLoading(false);
                 router.push('/order-failed');
             }
         } catch (error) {
+            console.error('Order placement error:', error);
+            setLoading(false);
+            // Silently redirect to order-failed page instead of showing errors
             router.push('/order-failed');
         } finally {
             setLoading(false);

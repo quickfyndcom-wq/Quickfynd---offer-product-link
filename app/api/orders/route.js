@@ -11,7 +11,7 @@ import Store from '@/models/Store';
 import Coupon from '@/models/Coupon';
 import GuestUser from '@/models/GuestUser';
 import Wallet from '@/models/Wallet';
-import { sendOrderConfirmationEmail } from '@/lib/email';
+import { sendOrderConfirmationEmail, sendGuestAccountCreationEmail } from '@/lib/email';
 import { fetchNormalizedDelhiveryTracking } from '@/lib/delhivery';
 
 const PaymentMethod = {
@@ -455,6 +455,22 @@ export async function POST(request) {
                         paymentMethod: order.paymentMethod || paymentMethod
                     });
                     console.log('Order confirmation email sent to customer:', customerEmail);
+                    
+                    // Send guest account creation invitation if guest checkout
+                    if (isGuest && customerEmail) {
+                        try {
+                            await sendGuestAccountCreationEmail({
+                                email: customerEmail,
+                                name: customerName,
+                                orderId: order._id,
+                                shortOrderNumber: order.shortOrderNumber
+                            });
+                            console.log('Guest account creation email sent to:', customerEmail);
+                        } catch (guestEmailError) {
+                            console.error('Error sending guest account creation email:', guestEmailError);
+                            // Don't fail the order if email fails
+                        }
+                    }
                 }
             } catch (emailError) {
                 console.error('Error sending order confirmation email:', emailError);

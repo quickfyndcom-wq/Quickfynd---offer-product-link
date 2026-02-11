@@ -36,10 +36,11 @@ const Footer = () => {
         {
             title: "LEGAL & INFO",
             links: [
-                { text: "Cancellation & Refunds", path: '/cancellation-and-refunds', icon: null },
-                { text: "Terms and Conditions", path: '/terms-and-conditions', icon: null },
+                { text: "Terms & Conditions", path: '/terms-and-conditions', icon: null },
+                { text: "Terms of Sale", path: '/terms-of-sale', icon: null },
                 { text: "Shipping Policy", path: '/shipping-policy', icon: null },
                 { text: "Privacy Policy", path: '/privacy-policy', icon: null },
+                { text: "Cancellation & Refunds", path: '/cancellation-and-refunds', icon: null },
                 { text: "Contact Us", path: '/contact-us', icon: null },
                 { text: "Sitemap", path: '/sitemap', icon: null },
             ]

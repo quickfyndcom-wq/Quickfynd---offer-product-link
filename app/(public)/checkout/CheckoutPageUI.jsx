@@ -1296,7 +1296,6 @@ export default function CheckoutPage() {
                       </div>
                     )}
                   </div>
-                </div>
                 
                 {/* Phone Number Section - Show for logged-in users if missing from address */}
                 {user && addressList.length > 0 && (!form.phone || form.phone.length < 7) && (
@@ -1345,6 +1344,7 @@ export default function CheckoutPage() {
                     )}
                   </div>
                 )}
+                </div>
               ) : (addressList.length === 0 && user) ? (
                 <button 
                   type="button"
@@ -1356,7 +1356,7 @@ export default function CheckoutPage() {
                 >
                   <span className="text-xl">+</span> Add Delivery Address
                 </button>
-              ) : (!user && (
+              ) : (!user) ? (
                 <div className="flex flex-col gap-3">{/* Guest form starts here */}
                   {/* ...existing code for guest/inline address form... */}
                   {/* Name */}
@@ -1550,7 +1550,7 @@ export default function CheckoutPage() {
                     ))}
                   </select>
                 </div>
-              ))}
+              ) : null}
               <h2 className="text-xl font-bold mb-3 mt-4 text-gray-900">Payment methods</h2>
               
               {/* Wallet Apply Checkbox */}
@@ -1780,6 +1780,27 @@ export default function CheckoutPage() {
             </div>
           )}
           
+          {/* Cashback Rewards Section */}
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <svg className="w-5 h-5 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M8.16 2.75a.75.75 0 00-1.32 0l-.478 1.408a.75.75 0 01-.562.562l-1.408.478a.75.75 0 000 1.32l1.408.478a.75.75 0 01.562.562l.478 1.408a.75.75 0 001.32 0l.478-1.408a.75.75 0 01.562-.562l1.408-.478a.75.75 0 000-1.32l-1.408-.478a.75.75 0 01-.562-.562L8.16 2.75z" />
+              </svg>
+              <span className="font-semibold text-amber-900">Cashback Options</span>
+            </div>
+            
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-700">Super.Money UPI</span>
+                <span className="font-bold text-amber-600">Up to 5%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-700">Credit Card</span>
+                <span className="font-bold text-amber-600">Up to 2%</span>
+              </div>
+            </div>
+          </div>
+          
           {/* Final Total */}
           <div className="mb-4 pb-4 border-b border-gray-200">
             <div className="flex justify-between font-bold text-lg text-gray-900">
@@ -1978,17 +1999,6 @@ export default function CheckoutPage() {
                 pincode: selectedAddr.zip || selectedAddr.pincode || f.pincode,
               };
             });
-          } else {
-            setForm(f => ({ ...f, addressId }));
-          }
-        }}
-              street: selectedAddr.street || f.street,
-              city: selectedAddr.city || f.city,
-              state: selectedAddr.state || f.state,
-              district: selectedAddr.district || f.district,
-              country: selectedAddr.country || f.country,
-              pincode: selectedAddr.zip || selectedAddr.pincode || f.pincode,
-            }));
           } else {
             setForm(f => ({ ...f, addressId }));
           }

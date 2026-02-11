@@ -114,6 +114,7 @@ export default function SitemapPage() {
       title: '📋 Policies & Legal',
       links: [
         { text: 'Terms & Conditions', path: '/terms-and-conditions', description: 'Terms of use' },
+        { text: 'Terms of Sale', path: '/terms-of-sale', description: 'Purchase terms & conditions' },
         { text: 'Privacy Policy', path: '/privacy-policy', description: 'Privacy & data' },
         { text: 'Shipping Policy', path: '/shipping-policy', description: 'Shipping details' },
         { text: 'Return & Refund Policy', path: '/return-policy', description: 'Returns & refunds' },

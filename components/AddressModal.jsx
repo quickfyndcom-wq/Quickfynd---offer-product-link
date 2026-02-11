@@ -23,6 +23,8 @@ const AddressModal = ({ open, setShowAddressModal, onAddressAdded, initialAddres
     
     const [mode, setMode] = useState('select') // 'select' or 'form'
     const [editingAddress, setEditingAddress] = useState(null) // Track which address is being edited
+    const [pincodeLoading, setPincodeLoading] = useState(false)
+    const [pincodeError, setPincodeError] = useState('')
     
     console.log('🔵 AddressModal Props:', { open, addressListLength: addressList.length, mode, isEdit, selectedAddressId })
 
@@ -128,6 +130,50 @@ const AddressModal = ({ open, setShowAddressModal, onAddressAdded, initialAddres
                 ...address,
                 [name]: value
             })
+        }
+    }
+
+    // Fetch pincode details from API
+    const handlePincodeSearch = async (e) => {
+        const pincode = e.target.value;
+        setAddress({
+            ...address,
+            zip: pincode
+        });
+        
+        if (!pincode || pincode.length < 6) {
+            setPincodeError('');
+            return;
+        }
+
+        setPincodeLoading(true);
+        setPincodeError('');
+        
+        try {
+            // Using India Post API for pincode lookup
+            const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+            const data = await response.json();
+            
+            if (data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
+                const postOffice = data[0].PostOffice[0];
+                
+                // Auto-fill city, state, and district
+                setAddress(prev => ({
+                    ...prev,
+                    city: postOffice.Block || postOffice.District || prev.city,
+                    state: postOffice.State || prev.state,
+                    district: postOffice.District || prev.district,
+                    zip: pincode
+                }));
+                setPincodeError('');
+            } else {
+                setPincodeError('Pincode not found. Please enter a valid pincode.');
+            }
+        } catch (error) {
+            console.error('Pincode fetch error:', error);
+            setPincodeError('Unable to fetch pincode details. Please enter manually.');
+        } finally {
+            setPincodeLoading(false);
         }
     }
 
@@ -320,6 +366,39 @@ const AddressModal = ({ open, setShowAddressModal, onAddressAdded, initialAddres
                     ) : (
                         /* Address Form */
                         <form onSubmit={e => toast.promise(handleSubmit(e), { loading: 'Adding Address...' })} className="p-6 space-y-4">
+                    
+                    {/* Pincode Lookup - Top Section */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Zip/Postal Code</label>
+                        <div className="relative">
+                            <input 
+                                name="zip" 
+                                onChange={handlePincodeSearch}
+                                value={address.zip}
+                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition" 
+                                type="text" 
+                                placeholder="Enter 6-digit pincode (e.g., 673571)" 
+                                maxLength="6"
+                                inputMode="numeric"
+                            />
+                            {pincodeLoading && (
+                                <div className="absolute right-3 top-3">
+                                    <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                    </svg>
+                                </div>
+                            )}
+                        </div>
+                        {pincodeError && (
+                            <p className="text-xs text-red-600 mt-1">{pincodeError}</p>
+                        )}
+                        {address.zip && !pincodeError && (
+                            <p className="text-xs text-green-600 mt-1">✓ Address details auto-filled</p>
+                        )}
+                        <p className="text-xs text-gray-500 mt-1">Enter pincode to auto-fill city, state, and district</p>
+                    </div>
+                    
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name</label>
                         <input 
@@ -405,18 +484,6 @@ const AddressModal = ({ open, setShowAddressModal, onAddressAdded, initialAddres
                             </select>
                         </div>
                     )}
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Zip/Postal Code (Optional)</label>
-                        <input 
-                            name="zip" 
-                            onChange={handleAddressChange} 
-                            value={address.zip} 
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition" 
-                            type="text" 
-                            placeholder="Postal code" 
-                        />
-                    </div>
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">Country</label>
