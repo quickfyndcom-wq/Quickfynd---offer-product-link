@@ -7,7 +7,6 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useSelector } from "react-redux";
 import { auth } from '../lib/firebase';
 import { getAuth } from "firebase/auth";
-console.log("Firebase UID:", getAuth().currentUser?.uid);
 import Image from 'next/image';
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -170,8 +169,6 @@ const Navbar = () => {
       const userEmail = user?.email;
       const userName = user?.displayName || 'Customer';
       
-      console.log('[Sign Out] Email:', userEmail, 'Name:', userName);
-      
       // Sign out immediately
       await auth.signOut();
       
@@ -183,7 +180,6 @@ const Navbar = () => {
       
       // Send email in background (completely non-blocking, no auth required)
       if (userEmail) {
-        console.log('[Sign Out] Sending email to:', userEmail);
         setTimeout(() => {
           axios.post('/api/send-signout-email', {
             email: userEmail,
@@ -191,14 +187,12 @@ const Navbar = () => {
             skipAuth: true
           })
           .then(() => {
-            console.log('[Sign Out] Email sent successfully');
+            // Email sent successfully
           })
           .catch((err) => {
             console.error('[Sign Out] Email failed:', err.response?.data || err.message);
           });
         }, 100);
-      } else {
-        console.log('[Sign Out] No email to send to');
       }
       
       // Navigate
@@ -288,7 +282,6 @@ const Navbar = () => {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       setFirebaseUser(user);
-      console.log("Navbar user:", user);
     });
     return () => unsubscribe();
   }, []);

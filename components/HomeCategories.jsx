@@ -20,7 +20,6 @@ export default function HomeCategories() {
         const oldCache = localStorage.getItem('homeMenuCategoriesCache');
         if (oldCache) {
           localStorage.removeItem('homeMenuCategoriesCache');
-          console.log('Cleared old cache');
         }
         
         // Check localStorage first for immediate display
@@ -44,14 +43,8 @@ export default function HomeCategories() {
 
         if (response.ok) {
           const data = await response.json();
-          console.log('API Response:', data);
           
           if (data.items && Array.isArray(data.items) && data.items.length > 0) {
-            console.log('Setting categories from API:', data.items);
-            // Debug: Log image URLs
-            data.items.forEach((item, idx) => {
-              console.log(`Category ${idx} (${item.name}): image URL = ${item.image || 'MISSING'}`);
-            });
             setCategories(data.items);
             
             // Try to save to localStorage, but handle quota exceeded gracefully
@@ -64,7 +57,6 @@ export default function HomeCategories() {
               localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
             } catch (storageErr) {
               if (storageErr.name === 'QuotaExceededError') {
-                console.warn('localStorage quota exceeded, clearing old cache', storageErr);
                 // Try to clear cache and retry
                 try {
                   localStorage.removeItem(CACHE_KEY);
@@ -75,17 +67,14 @@ export default function HomeCategories() {
                   };
                   localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
                 } catch (retryErr) {
-                  console.warn('Could not save to localStorage even after clearing:', retryErr);
+                  // Could not save to localStorage even after clearing
                   // Continue without caching - data is already set in state
                 }
-              } else {
-                console.warn('localStorage error:', storageErr);
               }
             }
             
             setError(null);
           } else {
-            console.warn('API returned empty items:', data);
             // API returned empty, use cache if available
             if (!cachedData || !cachedData.items || cachedData.items.length === 0) {
               setError('No categories available');

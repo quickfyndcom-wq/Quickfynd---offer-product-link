@@ -50,9 +50,7 @@ export default function RecommendedProducts() {
           }
         } catch (error) {
           // Silently fall back to localStorage - this is expected behavior for new users
-          if (error.response?.status !== 401 && error.response?.status !== 404) {
-            console.warn('Browse history unavailable, using localStorage');
-          }
+          
           // Fallback to localStorage if API fails
           const localViewed = localStorage.getItem('recentlyViewed');
           if (localViewed) {

@@ -23,19 +23,15 @@ const StoreLayout = ({ children }) => {
         try {
             const token = await getToken(true); // Force refresh token
             if (!token) {
-                console.log('[StoreLayout] No token available');
                 setSellerLoading(false);
                 return;
             }
-            console.log('[StoreLayout] Checking seller status with fresh token');
             const { data } = await axios.get('/api/store/is-seller', { 
                 headers: { Authorization: `Bearer ${token}` }
             });
-            console.log('[StoreLayout] /api/store/is-seller response:', data);
             setIsSeller(data.isSeller);
             setStoreInfo(data.storeInfo);
         } catch (error) {
-            console.log('[StoreLayout] is-seller error:', error?.response?.data || error.message);
             setIsSeller(false);
         } finally {
             setSellerLoading(false);

@@ -14,8 +14,6 @@ export default function AdsAttribution() {
 
     if (!sessionData || !window.fbq) return;
 
-    console.log('🎯 Attribution Data:', sessionData);
-
     // Store attribution data globally for use in events
     window.attributionData = {
       utm_source: sessionData.source,

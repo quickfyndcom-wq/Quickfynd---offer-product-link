@@ -145,24 +145,27 @@ const OrderSummary = ({ totalPrice, items }) => {
         event.preventDefault();
         try {
             if(!user){
-                return toast('Please login to proceed')
+                return toast.error('Please sign in to use coupons')
             }
-            const token = await getToken();
             
             // Get store ID from first item (assuming all items are from same store)
             const storeId = items[0]?.storeId;
             const productIds = items.map(item => item.id);
             
-            const { data } = await axios.post('/api/coupon', {
+            const { data } = await axios.post('/api/coupons', {
                 code: couponCodeInput,
-                cartTotal: totalPrice,
-                productIds: productIds,
-                storeId: storeId
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
+                storeId: storeId,
+                orderTotal: totalPrice,
+                userId: user.uid,
+                cartProductIds: productIds
             })
-            setCoupon(data.coupon)
-            toast.success('Coupon Applied')
+            
+            if (data.valid && data.coupon) {
+                setCoupon(data.coupon)
+                toast.success('Coupon Applied')
+            } else {
+                toast.error(data.error || 'Invalid coupon code')
+            }
         } catch (error) {
             toast.error(error?.response?.data?.error || error.message)
         }
@@ -198,8 +201,6 @@ const OrderSummary = ({ totalPrice, items }) => {
                         city: guestInfo.district || guestInfo.city || guestInfo.state,
                     }
                 };
-
-                console.log('Guest order data:', orderData);
 
                 try {
                     const { data } = await axios.post('/api/orders', orderData, {

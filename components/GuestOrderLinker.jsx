@@ -24,8 +24,6 @@ export default function GuestOrderLinker() {
 
                 if (!email && !phone) return
 
-                console.log('Attempting to link guest orders for:', email)
-
                 const { data } = await axios.post('/api/user/link-guest-orders', {
                     email,
                     phone
@@ -37,7 +35,6 @@ export default function GuestOrderLinker() {
                     toast.success(`Welcome back! We've linked ${data.count} previous order(s) to your account.`, {
                         duration: 5000
                     })
-                    console.log('Guest orders linked:', data.count)
                 }
 
                 setChecked(true)

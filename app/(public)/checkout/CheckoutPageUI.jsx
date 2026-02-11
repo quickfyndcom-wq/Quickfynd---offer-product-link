@@ -92,6 +92,12 @@ export default function CheckoutPage() {
       return;
     }
     
+    if (!user) {
+      setCouponError("Please sign in to use coupons.");
+      setShowSignIn(true);
+      return;
+    }
+    
     if (!storeId) {
       setCouponError("Store information not loaded. Please refresh.");
       return;
@@ -131,7 +137,7 @@ export default function CheckoutPage() {
           code: coupon.toUpperCase(),
           storeId: storeId,
           orderTotal: itemsTotal,
-          userId: user?.uid || null,
+          userId: user.uid,
           cartProductIds: cartProductIds, // Send product IDs for product-specific validation
         }),
       });
@@ -816,14 +822,8 @@ export default function CheckoutPage() {
       return;
     }
     
-    // COD and other payment methods - REQUIRES LOGIN
-    if (!user) {
-      setFormError("Please sign in to use Cash on Delivery. Or use Credit Card for guest checkout.");
-      setShowSignIn(true);
-      return;
-    }
-    
-    // Validate phone number for COD as well
+    // COD and other payment methods - Now supports guest checkout
+    // Validate phone number for COD
     if (!cleanedPhone || cleanedPhone.length < 7 || cleanedPhone.length > 15) {
       setFormError(`Please enter a valid phone number. Got ${cleanedPhone.length} digits, need 7-15.`);
       return;
@@ -847,15 +847,15 @@ export default function CheckoutPage() {
       console.log('Checkout - User state:', user ? 'logged in' : 'guest');
       console.log('Checkout - User object:', user);
       
+      // Build items directly from cartItems to preserve variantOptions
+      const itemsFromState = Object.entries(cartItems || {}).map(([id, value]) => {
+        const qty = typeof value === 'number' ? value : value?.quantity || 0;
+        const variantOptions = typeof value === 'object' ? value?.variantOptions : undefined;
+        return { id, quantity: qty, ...(variantOptions ? { variantOptions } : {}) };
+      }).filter(i => i.quantity > 0);
+      
       if (user) {
         console.log('Building logged-in user payload...');
-        // Build items directly from cartItems to preserve variantOptions
-        const itemsFromState = Object.entries(cartItems || {}).map(([id, value]) => {
-          const qty = typeof value === 'number' ? value : value?.quantity || 0;
-          const variantOptions = typeof value === 'object' ? value?.variantOptions : undefined;
-          return { id, quantity: qty, ...(variantOptions ? { variantOptions } : {}) };
-        }).filter(i => i.quantity > 0);
-
         payload = {
           items: itemsFromState,
           paymentMethod: form.payment === 'cod' ? 'COD' : form.payment.toUpperCase(),
@@ -891,6 +891,37 @@ export default function CheckoutPage() {
             country: form.country || 'UAE',
             zip: form.zip || form.pincode || '000000',
             district: form.district || ''
+          };
+        }
+      } else {
+        // Guest COD checkout
+        console.log('Building guest COD payload...');
+        payload = {
+          items: itemsFromState,
+          paymentMethod: form.payment === 'cod' ? 'COD' : form.payment.toUpperCase(),
+          shippingFee: shipping,
+          isGuest: true,
+          guestInfo: {
+            name: form.name,
+            email: form.email,
+            phone: cleanedPhone,
+            phoneCode: form.phoneCode,
+            alternatePhone: cleanedAlternatePhone || '',
+            alternatePhoneCode: form.alternatePhone ? form.alternatePhoneCode || form.phoneCode : '',
+            street: form.street,
+            city: form.city,
+            state: form.state,
+            country: form.country,
+            pincode: form.pincode,
+          }
+        };
+        // Add coupon for guest if applied
+        if (appliedCoupon && couponDiscount > 0) {
+          payload.coupon = {
+            code: appliedCoupon.code,
+            discountAmount: couponDiscount,
+            title: appliedCoupon.title,
+            description: appliedCoupon.description,
           };
         }
       }
@@ -1682,16 +1713,8 @@ export default function CheckoutPage() {
               </div>
               
               {!user && (
-                <div className="mt-4 text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <span className="font-semibold text-blue-900">Note:</span> To proceed with Cash on Delivery, please{" "}
-                  <button
-                    type="button"
-                    onClick={() => setShowSignIn(true)}
-                    className="text-blue-600 font-semibold hover:underline"
-                  >
-                    sign in
-                  </button>{" "}
-                  or create an account.
+                <div className="mt-4 text-sm text-gray-600 bg-green-50 border border-green-200 rounded-lg p-3">
+                  <span className="font-semibold text-green-900">✓ Guest Checkout Available:</span> You can place COD orders without creating an account. Your order will be processed instantly!
                 </div>
               )}
             </form>
@@ -1702,7 +1725,14 @@ export default function CheckoutPage() {
           {/* Discounts & Coupons - Clickable Section */}
           <button
             type="button"
-            onClick={() => setShowCouponModal(true)}
+            onClick={() => {
+              if (!user) {
+                setCouponError("Please sign in to use coupons.");
+                setShowSignIn(true);
+                return;
+              }
+              setShowCouponModal(true);
+            }}
             className="mb-6 pb-4 border-b border-gray-200 flex items-center justify-between hover:bg-gray-50 -mx-2 px-2 py-2 rounded transition"
           >
             <div className="flex items-center gap-2">
@@ -2144,7 +2174,7 @@ export default function CheckoutPage() {
                                 code: cpn.code,
                                 storeId: storeId,
                                 orderTotal: itemsTotal,
-                                userId: user?.uid || null,
+                                userId: user.uid,
                                 cartProductIds: cartItemsArray.map(i => i.productId),
                               }),
                             });

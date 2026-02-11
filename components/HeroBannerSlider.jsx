@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import BannerC from '@/assets/heroslider1/main2.webp';
@@ -9,6 +9,8 @@ import WideBanner2 from '@/assets/heroslider1/main1.webp';
 import Banner3 from '@/assets/heroslider1/banner05.avif';
 
 const HEIGHT = 320;
+const SLIDE_INTERVAL = 5000;
+const SKELETON_TIMEOUT = 3000; // Increased for mobile - shows skeleton until images load 
 
 const slides = [
   { image: BannerC, link: '/offers', bg: '#420608' },
@@ -19,57 +21,76 @@ const slides = [
 
 export default function HeroBannerSlider() {
   const [index, setIndex] = useState(0);
-  const [loaded, setLoaded] = useState(() => slides.map(() => false));
+  const [loaded, setLoaded] = useState(() => [false, false, false, false]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const router = useRouter();
+  const intervalRef = useRef(null);
 
-  useEffect(() => {
-    const id = setInterval(() => {
-      setIndex((i) => (i + 1) % slides.length);
-    }, 5000);
-    return () => clearInterval(id);
+  // Memoized click handler
+  const handleSlideClick = useCallback((link) => {
+    router.push(link);
+  }, [router]);
+
+  // Memoized image load handler
+  const handleImageLoad = useCallback((i) => {
+    setLoaded((prev) => {
+      if (prev[i]) return prev;
+      const next = [...prev];
+      next[i] = true;
+      return next;
+    });
   }, []);
 
   useEffect(() => {
-    // Mark initial load as complete once first image loads
+
+    intervalRef.current = setInterval(() => {
+      setIndex((i) => (i + 1) % slides.length);
+    }, SLIDE_INTERVAL);
+
+    const skeletonTimer = setTimeout(() => {
+      setIsInitialLoad(false);
+    }, SKELETON_TIMEOUT);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      clearTimeout(skeletonTimer);
+    };
+  }, []);
+
+  useEffect(() => {
     if (loaded[0]) {
       setIsInitialLoad(false);
     }
   }, [loaded]);
 
-  useEffect(() => {
-    // Fallback: if images haven't loaded after 800ms, show banner anyway
-    const timeout = setTimeout(() => {
-      if (isInitialLoad) {
-        setIsInitialLoad(false);
-      }
-    }, 800);
-    
-    return () => clearTimeout(timeout);
-  }, [isInitialLoad]);
-
-  // Show skeleton while first image is loading
   if (isInitialLoad && !loaded[0]) {
     return (
-      <div className="hero-banner-skeleton" style={{
-        width: '100%',
-        height: `${HEIGHT}px`,
-        backgroundColor: '#f3f4f6',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        <div style={{
-          width: '100%',
-          maxWidth: '1250px',
-          height: '100%',
-          background: 'linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%)',
-          backgroundSize: '200% 100%',
-          animation: 'shimmer 1.5s infinite'
-        }}></div>
+      <>
+        <div className="hero-banner-skeleton">
+          <div className="hero-banner-skeleton__inner"></div>
+        </div>
         <style jsx>{`
+          .hero-banner-skeleton {
+            width: 100%;
+            height: ${HEIGHT}px;
+            background-color: #f3f4f6;
+            position: relative;
+            overflow: hidden;
+            contain: layout style paint;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          
+          .hero-banner-skeleton__inner {
+            width: 100%;
+            max-width: 1250px;
+            height: 100%;
+            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s ease-in-out infinite;
+          }
+          
           @keyframes shimmer {
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
@@ -79,78 +100,78 @@ export default function HeroBannerSlider() {
             .hero-banner-skeleton {
               height: auto;
               aspect-ratio: 1250 / 320;
-              min-height: calc(100vw * 320 / 1250);
+              min-height: 100px;
+            }
+            
+            .hero-banner-skeleton__inner {
+              width: 100%;
+              max-width: 100%;
+              height: 100%;
+              position: absolute;
+              top: 0;
+              left: 0;
             }
           }
         `}</style>
-      </div>
+      </>
     );
   }
 
   return (
-    /* FULL WIDTH BACKGROUND */
     <div
       className="hero-banner"
       style={{
         backgroundColor: slides[index].bg,
+        contain: 'layout style paint',
       }}
     >
-      {/* IMAGE VIEWPORT (CENTERED, FIXED WIDTH) */}
       <div className="hero-banner__viewport">
-        {slides.map((slide, i) => (
-          <div
-            key={i}
-            onClick={() => router.push(slide.link)}
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              cursor: 'pointer',
-              opacity: i === index ? 1 : 0,
-              clipPath: i === index ? 'circle(120% at 50% 50%)' : 'circle(0% at 50% 50%)',
-              transition: 'opacity 0.6s ease',
-              animation: i === index ? 'qfCircleReveal 0.9s ease' : 'none',
-              pointerEvents: i === index ? 'auto' : 'none',
-            }}
-          >
-            <Image
-              src={slide.image}
-              alt="Banner"
-              width={1250}
-              height={HEIGHT}
-              priority={i === 0}
-              loading={i === 0 ? 'eager' : 'lazy'}
-              quality={i === 0 ? 85 : 75}
+        {slides.map((slide, i) => {
+          const isActive = i === index;
+          const isAdjacent = i === (index + 1) % slides.length || i === (index - 1 + slides.length) % slides.length;
+          
+          if (!isActive && !isAdjacent && !loaded[i]) return null;
+          
+          return (
+            <div
+              key={i}
+              onClick={() => handleSlideClick(slide.link)}
               style={{
+                position: 'absolute',
+                inset: 0,
                 width: '100%',
                 height: '100%',
-                objectFit: 'cover',
-                objectPosition: 'center',
-                display: 'block',
+                cursor: 'pointer',
+                opacity: isActive ? 1 : 0,
+                transform: isActive ? 'translateZ(0) scale(1)' : 'translateZ(0) scale(0.95)',
+                transition: 'opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+                pointerEvents: isActive ? 'auto' : 'none',
+                willChange: isActive ? 'opacity, transform' : 'auto',
+                backfaceVisibility: 'hidden',
               }}
-              onLoadingComplete={() => {
-                setLoaded((prev) => {
-                  if (prev[i]) return prev;
-                  const next = [...prev];
-                  next[i] = true;
-                  return next;
-                });
-              }}
-              onError={() => {
-                // Silently handle image load failures and continue
-                setLoaded((prev) => {
-                  if (prev[i]) return prev;
-                  const next = [...prev];
-                  next[i] = true; // Mark as loaded to prevent blocking
-                  return next;
-                });
-                // Show banner anyway if image fails
-                setIsInitialLoad(false);
-              }}
-            />
-          </div>
-        ))}
+            >
+              <Image
+                src={slide.image}
+                alt={`Banner ${i + 1}`}
+                width={1250}
+                height={HEIGHT}
+                priority={i === 0}
+                loading={i === 0 ? 'eager' : 'lazy'}
+                quality={i === 0 ? 85 : 60}
+                placeholder="blur"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center',
+                  display: 'block',
+                }}
+                onLoad={() => handleImageLoad(i)}
+                onError={() => handleImageLoad(i)}
+              />
+            </div>
+          );
+        })}
       </div>
       <style jsx>{`
         .hero-banner {
@@ -158,9 +179,10 @@ export default function HeroBannerSlider() {
           height: ${HEIGHT}px;
           position: relative;
           overflow: hidden;
-          transition: background-color 0.6s ease;
+          transition: background-color 0.6s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex;
           justify-content: center;
+          will-change: background-color;
         }
 
         .hero-banner__viewport {
@@ -169,46 +191,43 @@ export default function HeroBannerSlider() {
           width: 100%;
           max-width: 1250px;
           overflow: hidden;
+          contain: layout style paint;
         }
 
         @media (max-width: 640px) {
           .hero-banner {
             height: auto;
             aspect-ratio: 1250 / 320;
-            min-height: calc(100vw * 320 / 1250);
           }
-
           .hero-banner__viewport {
             height: 100%;
           }
         }
-
-        @keyframes qfCircleReveal {
-          0% { clip-path: circle(0% at 50% 50%); filter: blur(3px); }
-          70% { clip-path: circle(70% at 50% 50%); filter: blur(0px); }
-          100% { clip-path: circle(120% at 50% 50%); filter: blur(0px); }
-        }
       `}</style>
 
-      {/* PILLS */}
+      {/* Navigation Pills */}
       <div
         style={{
           position: 'absolute',
           bottom: 12,
           left: '50%',
-          transform: 'translateX(-50%)',
+          transform: 'translateX(-50%) translateZ(0)',
           display: 'flex',
           gap: 8,
           padding: '3px 5px',
           borderRadius: 999,
           background: 'rgba(255,255,255,0.15)',
           backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
         }}
       >
         {slides.map((_, i) => (
           <button
             key={i}
-            onClick={() => setIndex(i)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIndex(i);
+            }}
             aria-label={`Go to slide ${i + 1}`}
             style={{
               width: i === index ? 40 : 30,
@@ -219,7 +238,8 @@ export default function HeroBannerSlider() {
               cursor: 'pointer',
               border: 'none',
               padding: 0,
-              transition: 'all 0.2s ease',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              transform: 'translateZ(0)',
             }}
           />
         ))}

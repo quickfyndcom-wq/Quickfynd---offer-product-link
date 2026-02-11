@@ -12,7 +12,6 @@ const SocialProofPopup = () => {
   // Ensure component is mounted (client-side only)
   useEffect(() => {
     setMounted(true)
-    console.log('SocialProofPopup mounted')
   }, [])
 
   useEffect(() => {
@@ -21,36 +20,31 @@ const SocialProofPopup = () => {
     // Fetch recent products
     const fetchProducts = async () => {
       try {
-        console.log('Fetching social proof products...')
         const res = await fetch('/api/social-proof-products')
         
         if (!res.ok) {
-          console.error('API response not OK:', res.status, res.statusText)
+          // API response not OK
         } else {
           const data = await res.json()
-          console.log('Social proof data:', data)
           
           if (data.success && data.products && data.products.length > 0) {
             setProducts(data.products)
-            console.log('Real products loaded:', data.products.length)
             return
           }
         }
       } catch (error) {
-        console.error('API error:', error)
+        // API error
       }
       
       // If API fails or returns no products, fetch from regular products endpoint
-      console.log('Trying fallback products endpoint...')
       try {
         const res2 = await fetch('/api/products?limit=20')
         const data2 = await res2.json()
         if (data2.products && data2.products.length > 0) {
-          console.log('Fallback products loaded:', data2.products.length)
           setProducts(data2.products)
         }
       } catch (error2) {
-        console.error('Fallback also failed:', error2)
+        // Fallback also failed
       }
     }
 
@@ -59,19 +53,14 @@ const SocialProofPopup = () => {
 
   useEffect(() => {
     if (products.length === 0) {
-      console.log('No products available for social proof')
       return
     }
-
-    console.log('Setting up social proof popups with', products.length, 'products')
 
     const showRandomProduct = () => {
       const randomProduct = products[Math.floor(Math.random() * products.length)]
       const randomCustomers = Math.floor(Math.random() * 5) + 2 // 2-6 customers
       const randomSoldCount = Math.floor(Math.random() * 200) + 50 // 50-250 sold
       const randomStock = Math.floor(Math.random() * 30) + 5 // 5-35 left
-      
-      console.log('Showing product:', randomProduct.name)
       
       setCurrentProduct({
         ...randomProduct,
@@ -89,7 +78,6 @@ const SocialProofPopup = () => {
 
     // Show first popup after 2 seconds (for testing - change to 5000 for production)
     const initialTimeout = setTimeout(() => {
-      console.log('Showing initial popup')
       showRandomProduct()
     }, 2000)
 
@@ -112,8 +100,6 @@ const SocialProofPopup = () => {
   if (!visible || !currentProduct) {
     return null
   }
-
-  console.log('Rendering popup for:', currentProduct.name)
 
   return (
     <div 

@@ -58,7 +58,6 @@ const SignInModal = ({ open, onClose, defaultMode = 'login', bonusMessage = '' }
   };
 
   const handleGoogleSignIn = async () => {
-    console.log('Google sign-in clicked');
     setError('');
     setLoading(true);
     try {
@@ -94,7 +93,7 @@ const SignInModal = ({ open, onClose, defaultMode = 'login', bonusMessage = '' }
           // Silently fail
         });
       } catch (emailError) {
-        console.log('Failed to send email (non-critical)');
+        // Failed to send email (non-critical)
       }
       
       onClose();
@@ -147,7 +146,7 @@ const SignInModal = ({ open, onClose, defaultMode = 'login', bonusMessage = '' }
             headers: { Authorization: `Bearer ${token}` }
           });
         } catch (err) {
-          console.warn('[wallet bonus] failed:', err?.response?.data || err.message);
+          // Wallet bonus failed
         }
         
         // Check if welcome bonus was claimed from top bar
@@ -191,7 +190,7 @@ const SignInModal = ({ open, onClose, defaultMode = 'login', bonusMessage = '' }
             // Silently fail - don't block login
           });
         } catch (emailError) {
-          console.log('Failed to send login email (non-critical)');
+          // Failed to send login email (non-critical)
         }
       }
       onClose();

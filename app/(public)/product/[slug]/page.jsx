@@ -1,7 +1,6 @@
 "use client"
 import ProductDescription from "@/components/ProductDescription";
 import ProductDetails from "@/components/ProductDetails";
-// import axios from "axios";
 import ProductCard from "@/components/ProductCard";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -10,9 +9,65 @@ import axios from "axios";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
+// Skeleton Loader Components
+const ProductDetailsSkeleton = () => (
+    <div className="animate-pulse">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            {/* Image Skeleton */}
+            <div>
+                <div className="bg-slate-200 rounded-lg h-96 mb-4"></div>
+                <div className="flex gap-2">
+                    {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="bg-slate-200 rounded h-20 w-20"></div>
+                    ))}
+                </div>
+            </div>
+            
+            {/* Details Skeleton */}
+            <div className="space-y-4">
+                <div className="h-8 bg-slate-200 rounded w-3/4"></div>
+                <div className="h-6 bg-slate-200 rounded w-1/4"></div>
+                <div className="space-y-2">
+                    <div className="h-4 bg-slate-200 rounded w-full"></div>
+                    <div className="h-4 bg-slate-200 rounded w-5/6"></div>
+                    <div className="h-4 bg-slate-200 rounded w-4/6"></div>
+                </div>
+                <div className="h-10 bg-slate-200 rounded w-full"></div>
+                <div className="h-10 bg-slate-200 rounded w-full"></div>
+            </div>
+        </div>
+    </div>
+);
+
+const ProductDescriptionSkeleton = () => (
+    <div className="animate-pulse space-y-4 mt-8">
+        <div className="h-6 bg-slate-200 rounded w-1/4"></div>
+        <div className="space-y-2">
+            <div className="h-4 bg-slate-200 rounded w-full"></div>
+            <div className="h-4 bg-slate-200 rounded w-full"></div>
+            <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+        </div>
+    </div>
+);
+
+const RelatedProductsSkeleton = () => (
+    <div className="px-4 mt-12 mb-16">
+        <div className="h-8 bg-slate-200 rounded w-48 mb-6 animate-pulse"></div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-5 gap-6">
+            {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="animate-pulse">
+                    <div className="bg-slate-200 rounded-lg h-48 mb-3"></div>
+                    <div className="h-4 bg-slate-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+                </div>
+            ))}
+        </div>
+    </div>
+);
+
 export default function ProductBySlug() {
     const { slug } = useParams();
-    const [product, setProduct] = useState();
+    const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
     const [relatedProducts, setRelatedProducts] = useState([]);
     const [reviews, setReviews] = useState([]);
@@ -21,37 +76,44 @@ export default function ProductBySlug() {
 
     const fetchProduct = async () => {
         setLoading(true);
-        let found = products.find((product) => product.slug === slug);
-        // If the Redux product is missing variants, refetch from backend to get full data
-        const needsFresh = !found || !Array.isArray(found.variants) || found.variants.length === 0;
-        if (needsFresh) {
-            try {
+        try {
+            let found = products.find((product) => product.slug === slug);
+            
+            // If the Redux product is missing variants, refetch from backend to get full data
+            const needsFresh = !found || !Array.isArray(found.variants) || found.variants.length === 0;
+            
+            if (needsFresh) {
                 const { data } = await axios.get(`/api/products/by-slug?slug=${encodeURIComponent(slug)}`);
                 found = data.product || found || null;
-            } catch {
-                // keep whatever we had in Redux if API fails
-                found = found || null;
             }
+            
+            setProduct(found);
+            
+            // Get related products from Redux if available
+            if (found && products.length > 0) {
+                const related = products
+                    .filter(p => p.slug !== slug && p.category === found.category && p.inStock)
+                    .slice(0, 5);
+                setRelatedProducts(related);
+            } else {
+                setRelatedProducts([]);
+            }
+        } catch (error) {
+            console.error('Error fetching product:', error);
+            setProduct(null);
+        } finally {
+            setLoading(false);
         }
-        setProduct(found);
-        // Get related products from Redux if available
-        if (found && products.length > 0) {
-            const related = products
-                .filter(p => p.slug !== slug && p.category === found.category && p.inStock)
-                .slice(0, 5);
-            setRelatedProducts(related);
-        } else {
-            setRelatedProducts([]);
-        }
-        setLoading(false);
     }
 
     const fetchReviews = async (productId) => {
+        if (!productId) return;
         setLoadingReviews(true);
         try {
             const { data } = await axios.get(`/api/review?productId=${productId}`);
             setReviews(data.reviews || []);
         } catch (error) {
+            console.error('Error fetching reviews:', error);
             setReviews([]);
         } finally {
             setLoadingReviews(false);
@@ -59,21 +121,25 @@ export default function ProductBySlug() {
     };
 
     useEffect(() => {
-        fetchProduct();
-        scrollTo(0, 0);
-    }, [slug, products]);
+        if (slug) {
+            fetchProduct();
+            window.scrollTo({ top: 0, behavior: 'instant' });
+        }
+    }, [slug]);
 
     useEffect(() => {
-        if (product && (product._id || product.id)) {
-            fetchReviews(product._id || product.id);
+        const productId = product?._id || product?.id;
+        if (productId) {
+            fetchReviews(productId);
         }
-    }, [product]);
+    }, [product?._id, product?.id]);
 
     // Track browse history for signed-in users and localStorage for guests
     useEffect(() => {
-        if (!product?._id && !product?.id) return;
+        const productId = product?._id || product?.id;
+        if (!productId) return;
 
-        const productId = product._id || product.id;
+        let unsubscribe;
 
         const trackView = async (user) => {
             if (user) {
@@ -81,43 +147,42 @@ export default function ProductBySlug() {
                 try {
                     const token = await user.getIdToken();
                     await axios.post('/api/browse-history', 
-                        { productId: product._id },
+                        { productId },
                         { headers: { Authorization: `Bearer ${token}` } }
                     );
                 } catch (error) {
                     // Silent fail - don't interrupt user experience
-                    console.log('Browse history tracking failed:', error.message);
                 }
             } else {
                 // Guest - save to localStorage
                 try {
                     const viewed = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
-                    // Remove if already exists
+                    // Remove if already exists and add to front
                     const filtered = viewed.filter(id => id !== productId);
-                    // Add to front
                     filtered.unshift(productId);
                     // Keep only 20 most recent
-                    const updated = filtered.slice(0, 20);
-                    localStorage.setItem('recentlyViewed', JSON.stringify(updated));
+                    localStorage.setItem('recentlyViewed', JSON.stringify(filtered.slice(0, 20)));
                 } catch (error) {
                     console.error('Error saving to localStorage:', error);
                 }
             }
         };
 
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            trackView(user);
-        });
+        unsubscribe = onAuthStateChanged(auth, trackView);
 
-        return () => unsubscribe();
-    }, [product]);
+        return () => unsubscribe?.();
+    }, [product?._id, product?.id]);
 
     return (
         <div className="w-full">
             <div className="max-w-[1250px] mx-auto px-2 sm:px-6 pb-24 lg:pb-0">
                 {/* Product Details */}
                 {loading ? (
-                    <div className="text-center py-16 text-gray-400">Loading product…</div>
+                    <>
+                        <ProductDetailsSkeleton />
+                        <ProductDescriptionSkeleton />
+                        <RelatedProductsSkeleton />
+                    </>
                 ) : product ? (
                     <>
                         <ProductDetails product={product} reviews={reviews} loadingReviews={loadingReviews} />
@@ -135,7 +200,10 @@ export default function ProductBySlug() {
                         )}
                     </>
                 ) : (
-                    <div className="text-center py-16 text-gray-400">Product not found.</div>
+                    <div className="text-center py-16">
+                        <div className="text-slate-400 text-lg">Product not found.</div>
+                        <p className="text-slate-500 text-sm mt-2">The product you're looking for doesn't exist or has been removed.</p>
+                    </div>
                 )}
             </div>
         </div>

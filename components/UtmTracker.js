@@ -31,9 +31,6 @@ export default function UtmTracker() {
     // Store in localStorage for entire session
     localStorage.setItem('utm_data', JSON.stringify(utmData));
 
-    // Log for debugging
-    console.log('📊 UTM Parameters Tracked:', utmData);
-
     // Send to Meta Pixel as custom event for better tracking
     if (window.fbq) {
       window.fbq('track', 'PageView', {

@@ -319,10 +319,8 @@ const ProductDetails = ({ product, reviews = [] }) => {
     // Add to cart for both guests and signed-in users
     let qty = Math.min(quantity, maxOrderQty || 0);
     if (!Number.isFinite(qty) || qty <= 0) {
-      console.warn('[OrderNow] qty non-positive; applying fallback to 1', { quantity, maxOrderQty });
       qty = 1;
     }
-    console.log('[OrderNow] computed qty:', qty, 'maxOrderQty:', maxOrderQty, 'requested quantity:', quantity);
     for (let i = 0; i < qty; i++) {
       dispatch(addToCart({ 
         productId: product._id, 
@@ -342,10 +340,8 @@ const ProductDetails = ({ product, reviews = [] }) => {
     // Add to cart for both guests and signed-in users
     let qty = Math.min(quantity, maxOrderQty || 0);
     if (!Number.isFinite(qty) || qty <= 0) {
-      console.warn('[AddToCart] qty non-positive; applying fallback to 1', { quantity, maxOrderQty });
       qty = 1;
     }
-    console.log('[AddToCart] computed qty:', qty, 'maxOrderQty:', maxOrderQty, 'requested quantity:', quantity);
     for (let i = 0; i < qty; i++) {
       const payload = {
         productId: product._id,
@@ -356,17 +352,8 @@ const ProductDetails = ({ product, reviews = [] }) => {
           bundleQty: selectedBundleQty || null
         }
       };
-      console.log('[AddToCart] Dispatching addToCart with payload:', payload);
       dispatch(addToCart(payload));
     }
-    setTimeout(() => {
-      try {
-        const cartState = JSON.parse(localStorage.getItem('cartState'));
-        console.log('[AddToCart] localStorage cartState after dispatch:', cartState);
-      } catch (e) {
-        console.log('[AddToCart] Error reading cartState from localStorage:', e);
-      }
-    }, 500);
     
     // Upload to server if signed in
     if (isSignedIn) {

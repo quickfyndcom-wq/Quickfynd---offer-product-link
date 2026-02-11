@@ -336,15 +336,8 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
                         e.stopPropagation()
                         
                         const productId = product._id || product.id
-                        console.log('🛒 Attempting to add:', {
-                          productId,
-                          product_id: product._id,
-                          product_mongoId: product.id,
-                          fullProduct: product
-                        })
                         
                         if (!productId) {
-                          console.error('❌ No product ID found!')
                           toast.error('Cannot add product - no ID')
                           return
                         }
@@ -355,13 +348,10 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
                         // Show success
                         toast.success('Added to cart')
                         
-                        // Check cartItems after dispatch
-                        console.log('🔍 Cart items after add:', cartItems)
-                        
                         // Sync with server
                         if (getToken && typeof getToken === 'function') {
                           dispatch(uploadCart({ getToken })).catch(err => {
-                            console.warn('Cart sync failed:', err)
+                            // Cart sync failed silently
                           })
                         }
                       }}
@@ -372,7 +362,6 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
                       {(() => {
                         const productId = product._id || product.id
                         const count = cartItems[productId] || cartItems[String(productId)] || 0
-                        console.log('Badge check:', productId, 'count:', count, 'allItems:', cartItems)
                         return count > 0 ? (
                           <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center border-2 border-white px-1">
                             {count}
