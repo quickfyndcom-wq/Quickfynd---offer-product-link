@@ -161,11 +161,14 @@ const ProductCard = ({ product }) => {
       {/* Cart Button with Badge - Bottom Right */}
       <button 
         onClick={handleAddToCart}
-        className='absolute bottom-4 right-4 w-10 h-10 bg-slate-700 hover:bg-slate-900 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 cursor-pointer z-10'
+        className='absolute bottom-4 right-4 w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 cursor-pointer z-10'
+        style={{ backgroundColor: itemQuantity > 0 ? '#262626' : '#DC013C' }}
+        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#1a1a1a' : '#b8012f'}
+        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#262626' : '#DC013C'}
       >
         <ShoppingCartIcon className='text-white' size={18} />
         {itemQuantity > 0 && (
-          <span className='absolute -top-1 -right-1 bg-orange-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-md'>
+          <span className='absolute -top-1 -right-1 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-md' style={{ backgroundColor: '#DC013C' }}>
             {itemQuantity}
           </span>
         )}

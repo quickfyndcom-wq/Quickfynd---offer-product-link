@@ -89,9 +89,12 @@ export default function MarketingExpenses() {
             if (response.data.connected) {
                 setMetaConnected(true);
                 setLastSynced(response.data.integration.lastSyncedAt);
+            } else {
+                setMetaConnected(false);
             }
         } catch (error) {
             console.error('Error checking Meta connection:', error);
+            setMetaConnected(false);
         }
     };
     
@@ -106,8 +109,15 @@ export default function MarketingExpenses() {
             );
             
             setLastSynced(new Date());
+            toast.success('Meta data synced successfully');
         } catch (error) {
             console.error('Auto-sync error:', error);
+            const errorMessage = error.response?.data?.error || 'Failed to sync Meta data';
+            toast.error(errorMessage);
+            // If integration not configured, mark as not connected
+            if (error.response?.status === 400) {
+                setMetaConnected(false);
+            }
         } finally {
             setSyncing(false);
         }
@@ -127,11 +137,31 @@ export default function MarketingExpenses() {
                 headers: { Authorization: `Bearer ${token}` }
             });
             
-            const sortedExpenses = (response.data.expenses || []).sort((a, b) => {
+            // Group expenses by campaign name and date range
+            const expensesMap = new Map();
+            (response.data.expenses || []).forEach(expense => {
+                const key = `${expense.campaignName}-${expense.platform}-${new Date(expense.startDate).toLocaleDateString()}`;
+                
+                if (expensesMap.has(key)) {
+                    // Merge duplicate campaigns - sum up metrics
+                    const existing = expensesMap.get(key);
+                    existing.amount += (expense.amount || 0);
+                    existing.clicks = (existing.clicks || 0) + (expense.clicks || 0);
+                    existing.impressions = (existing.impressions || 0) + (expense.impressions || 0);
+                    existing.conversions = (existing.conversions || 0) + (expense.conversions || 0);
+                    existing.reach = Math.max(existing.reach || 0, expense.reach || 0); // Use max reach, not sum
+                } else {
+                    expensesMap.set(key, { ...expense });
+                }
+            });
+            
+            // Convert map back to array and sort
+            const sortedExpenses = Array.from(expensesMap.values()).sort((a, b) => {
                 const dateA = new Date(a.startDate || a.createdAt);
                 const dateB = new Date(b.startDate || b.createdAt);
                 return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
             });
+            
             setExpenses(sortedExpenses);
             setTotals(response.data.totals);
         } catch (error) {
@@ -259,6 +289,24 @@ export default function MarketingExpenses() {
         } catch (error) {
             console.error('Error deleting expense:', error);
             toast.error('Failed to delete expense');
+        }
+    };
+    
+    const handleCleanupDuplicates = async () => {
+        if (!confirm('This will merge duplicate campaign entries in the database. Continue?')) return;
+        
+        try {
+            const token = await getToken(true);
+            
+            await axios.post('/api/store/marketing-expenses/cleanup-duplicates', {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            toast.success('Duplicates cleaned up successfully');
+            fetchExpenses();
+        } catch (error) {
+            console.error('Error cleaning duplicates:', error);
+            toast.error('Failed to cleanup duplicates');
         }
     };
     

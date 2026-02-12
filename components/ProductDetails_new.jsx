@@ -500,7 +500,10 @@ const ProductDetails = ({ product }) => {
             <div className="flex gap-3">
               <button 
                 onClick={handleOrderNow}
-                className="flex-1 bg-red-500 text-white py-4 px-6 rounded-lg font-semibold text-base hover:bg-red-600 transition shadow-sm flex items-center justify-center gap-2"
+                className="flex-1 text-white py-4 px-6 rounded-lg font-semibold text-base transition shadow-sm flex items-center justify-center gap-2"
+                style={{ backgroundColor: '#DC013C' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#b8012f'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#DC013C'}
               >
                 Order Now
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>

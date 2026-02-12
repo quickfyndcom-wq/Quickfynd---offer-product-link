@@ -43,8 +43,21 @@ export default function NavbarMenuPage() {
     return (
         <div className="flex flex-col h-screen bg-white">
             <div className="border-b border-slate-200 px-6 py-4">
-                <h2 className="text-2xl font-semibold text-slate-900">Navbar Menu</h2>
-                <p className="text-sm text-slate-500">Configure navigation bar appearance and behavior</p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-2xl font-semibold text-slate-900">Navbar Menu</h2>
+                        <p className="text-sm text-slate-500">Configure navigation bar appearance and behavior</p>
+                    </div>
+                    <a 
+                        href="/store/navbar-menu"
+                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm font-medium flex items-center gap-2"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                        Menu Items
+                    </a>
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">

@@ -969,11 +969,14 @@ const ProductDetails = ({ product, reviews = [] }) => {
                 ) : (
                   <button 
                     onClick={handleAddToCart}
-                    className="relative w-12 h-12 rounded-lg transition flex items-center justify-center flex-shrink-0 bg-green-500 hover:bg-green-600 text-white"
+                    className="relative w-12 h-12 rounded-lg transition flex items-center justify-center flex-shrink-0 text-white"
+                    style={{ backgroundColor: cartCount > 0 ? '#262626' : '#DC013C' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = cartCount > 0 ? '#1a1a1a' : '#b8012f'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = cartCount > 0 ? '#262626' : '#DC013C'}
                   >
                     <ShoppingCartIcon size={20} />
                     {cartCount > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                      <span className="absolute -top-2 -right-2 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5" style={{ backgroundColor: '#DC013C' }}>
                         {cartCount > 99 ? '99+' : cartCount}
                       </span>
                     )}

@@ -211,7 +211,8 @@ const Chatbot = () => {
             {!isOpen && (
                 <button
                     onClick={() => setIsOpen(true)}
-                    className="hidden md:flex fixed bottom-6 right-6 z-50 w-16 h-16 bg-gradient-to-br from-teal-500 via-cyan-600 to-blue-600 text-white rounded-full shadow-2xl hover:shadow-3xl transition-all transform hover:scale-110 group items-center justify-center border-2 border-white/20"
+                    style={{ background: 'linear-gradient(135deg, #E6003E 0%, #691223 100%)' }}
+                    className="hidden md:flex fixed bottom-6 right-6 z-50 w-16 h-16 text-white rounded-full shadow-2xl hover:shadow-3xl transition-all transform hover:scale-110 group items-center justify-center border-2 border-white/20"
                     aria-label="Open chat"
                 >
                     <div className="relative">
@@ -229,7 +230,7 @@ const Chatbot = () => {
                 <div className="hidden md:flex fixed bottom-6 right-6 z-50 w-full max-w-md bg-gradient-to-b from-white to-gray-50 rounded-3xl shadow-3xl flex flex-col overflow-hidden border border-white/80 animate-in slide-in-from-bottom-5" style={{ height: '600px' }}>
                     
                     {/* Header - Professional Design */}
-                    <div className="bg-gradient-to-r from-teal-500 via-cyan-600 to-blue-600 text-white p-5 rounded-t-3xl">
+                    <div style={{ background: 'linear-gradient(90deg, #E6003E 0%, #691223 100%)' }} className="text-white p-5 rounded-t-3xl">
                         <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
                                 <div className="relative">
@@ -268,7 +269,7 @@ const Chatbot = () => {
                                         onClick={() => handleLanguageChange('english')}
                                         className={`w-full px-4 py-3 text-left text-sm font-semibold transition-colors ${
                                             language === 'english'
-                                                ? 'bg-teal-50 text-teal-600'
+                                                ? 'bg-pink-50 text-pink-700'
                                                 : 'text-gray-700 hover:bg-gray-50'
                                         }`}
                                     >
@@ -278,7 +279,7 @@ const Chatbot = () => {
                                         onClick={() => handleLanguageChange('hindi')}
                                         className={`w-full px-4 py-3 text-left text-sm font-semibold transition-colors ${
                                             language === 'hindi'
-                                                ? 'bg-teal-50 text-teal-600'
+                                                ? 'bg-pink-50 text-pink-700'
                                                 : 'text-gray-700 hover:bg-gray-50'
                                         }`}
                                     >
@@ -288,7 +289,7 @@ const Chatbot = () => {
                                         onClick={() => handleLanguageChange('malayalam')}
                                         className={`w-full px-4 py-3 text-left text-sm font-semibold transition-colors border-t border-gray-100 ${
                                             language === 'malayalam'
-                                                ? 'bg-teal-50 text-teal-600'
+                                                ? 'bg-pink-50 text-pink-700'
                                                 : 'text-gray-700 hover:bg-gray-50'
                                         }`}
                                     >
@@ -308,15 +309,16 @@ const Chatbot = () => {
                                     className={`flex gap-3 animate-in fade-in slide-in-from-bottom-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                 >
                                     {msg.role === 'assistant' && (
-                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center flex-shrink-0 mt-1 shadow-md border border-white/20">
+                                        <div style={{ background: 'linear-gradient(135deg, #E6003E 0%, #691223 100%)' }} className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 mt-1 shadow-md border border-white/20">
                                             <MessageCircle size={18} className="text-white" />
                                         </div>
                                     )}
                                     
                                     <div
+                                        style={msg.role === 'user' ? { background: 'linear-gradient(90deg, #E6003E 0%, #691223 100%)' } : {}}
                                         className={`max-w-[75%] rounded-2xl px-4 py-3 transition-all duration-200 ${
                                             msg.role === 'user'
-                                                ? 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-br-none shadow-md'
+                                                ? 'text-white rounded-br-none shadow-md'
                                                 : msg.isError
                                                 ? 'bg-red-50 text-red-800 border-l-4 border-red-400 rounded-bl-none shadow-sm'
                                                 : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm'
@@ -390,7 +392,7 @@ const Chatbot = () => {
                                         )}
 
                                         <p className={`text-xs mt-1 ${
-                                            msg.role === 'user' ? 'text-teal-100' : 'text-gray-400'
+                                            msg.role === 'user' ? 'text-white/70' : 'text-gray-400'
                                         }`}>
                                             {new Date(msg.timestamp).toLocaleTimeString([], { 
                                                 hour: '2-digit', 
@@ -410,14 +412,14 @@ const Chatbot = () => {
                             {/* Typing Indicator */}
                             {isTyping && (
                                 <div className="flex gap-3 justify-start">
-                                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center flex-shrink-0 shadow-md border border-white/20">
+                                    <div style={{ background: 'linear-gradient(135deg, #E6003E 0%, #691223 100%)' }} className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 shadow-md border border-white/20">
                                         <Bot size={18} className="text-white" />
                                     </div>
                                     <div className="bg-white border-2 border-gray-200 rounded-2xl rounded-bl-none px-5 py-3 shadow-sm">
                                         <div className="flex gap-1.5">
-                                            <span className="w-2.5 h-2.5 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                                            <span className="w-2.5 h-2.5 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                                            <span className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                                            <span className="w-2.5 h-2.5 rounded-full animate-bounce" style={{ backgroundColor: '#E6003E', animationDelay: '0ms' }}></span>
+                                            <span className="w-2.5 h-2.5 rounded-full animate-bounce" style={{ backgroundColor: '#A8091E', animationDelay: '150ms' }}></span>
+                                            <span className="w-2.5 h-2.5 rounded-full animate-bounce" style={{ backgroundColor: '#691223', animationDelay: '300ms' }}></span>
                                         </div>
                                     </div>
                                 </div>
@@ -434,7 +436,7 @@ const Chatbot = () => {
                                     <button
                                         key={index}
                                         onClick={() => handleQuickQuestion(question)}
-                                        className="w-full text-left text-sm px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-teal-400 hover:bg-gradient-to-r hover:from-teal-50 hover:to-cyan-50 transition-all duration-200 text-gray-700 font-medium hover:text-teal-700 transform hover:translate-x-1"
+                                        className="w-full text-left text-sm px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-pink-400 hover:bg-pink-50 transition-all duration-200 text-gray-700 font-medium hover:text-pink-700 transform hover:translate-x-1"
                                     >
                                         ➤ {question}
                                     </button>
@@ -453,12 +455,13 @@ const Chatbot = () => {
                                 onChange={(e) => setInputMessage(e.target.value)}
                                 placeholder="Ask me anything..."
                                 disabled={isTyping}
-                                className="flex-1 px-5 py-3 border-2 border-gray-200 rounded-full focus:outline-none focus:border-teal-400 focus:ring-3 focus:ring-teal-200 disabled:bg-gray-50 disabled:cursor-not-allowed text-sm font-medium bg-white transition-all duration-200 placeholder-gray-400"
+                                className="flex-1 px-5 py-3 border-2 border-gray-200 rounded-full focus:outline-none focus:border-pink-400 focus:ring-3 focus:ring-pink-200 disabled:bg-gray-50 disabled:cursor-not-allowed text-sm font-medium bg-white transition-all duration-200 placeholder-gray-400"
                             />
                             <button
                                 type="submit"
                                 disabled={!inputMessage.trim() || isTyping}
-                                className="bg-gradient-to-r from-teal-500 via-cyan-600 to-blue-600 text-white p-3 rounded-full hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-110 active:scale-95 font-bold border-2 border-white/20"
+                                style={{ background: 'linear-gradient(90deg, #E6003E 0%, #691223 100%)' }}
+                                className="text-white p-3 rounded-full hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-110 active:scale-95 font-bold border-2 border-white/20"
                                 aria-label="Send message"
                             >
                                 {isTyping ? (

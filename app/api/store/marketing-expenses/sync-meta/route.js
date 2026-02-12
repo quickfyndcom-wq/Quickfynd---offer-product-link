@@ -78,6 +78,13 @@ export async function POST(req) {
         const campaignsData = await campaignsResponse.json();
         
         if (campaignsData.error) {
+            // Check if token expired
+            if (campaignsData.error.code === 190) {
+                return NextResponse.json(
+                    { error: `Meta Access Token Expired: ${campaignsData.error.message}. Please reconnect your Meta account in Store Settings → Marketing Expenses.` },
+                    { status: 401 }
+                );
+            }
             return NextResponse.json(
                 { error: `Meta API Error: ${campaignsData.error.message}` },
                 { status: 400 }
@@ -116,11 +123,12 @@ export async function POST(req) {
                         campaignType = 'CONSIDERATION';
                     }
                     
-                    // Check if expense already exists for this campaign and date range
+                    // Check if expense already exists for this campaign and exact date range
                     const existingExpense = await MarketingExpense.findOne({
                         campaignName: insights.campaign_name,
-                        startDate: { $gte: since },
-                        endDate: { $lte: until }
+                        platform: 'FACEBOOK',
+                        startDate: since,
+                        endDate: until
                     });
                     
                     if (existingExpense) {
@@ -131,6 +139,7 @@ export async function POST(req) {
                         existingExpense.reach = parseInt(insights.reach) || 0;
                         existingExpense.conversions = conversions;
                         existingExpense.campaignType = campaignType;
+                        existingExpense.notes = `Auto-synced from Meta Ads - Campaign ID: ${campaign.id} (Last updated: ${new Date().toISOString()})`;
                         await existingExpense.save();
                         syncedCampaigns.push(existingExpense);
                     } else {

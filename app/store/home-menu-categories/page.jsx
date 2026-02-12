@@ -14,6 +14,7 @@ export default function HomeMenuCategories() {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [fieldErrors, setFieldErrors] = useState({});
   const [configLoaded, setConfigLoaded] = useState(false);
+  const [showSettingsHeader] = useState(true);
 
   // Fetch all available categories
   useEffect(() => {
@@ -330,13 +331,40 @@ export default function HomeMenuCategories() {
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
       {/* Header */}
-      <div style={{ marginBottom: '40px' }}>
-        <h1 style={{ fontSize: '32px', fontWeight: 'bold', margin: '0 0 10px 0', color: '#111827' }}>
-          🏠 Home Menu Categories
-        </h1>
-        <p style={{ color: '#6b7280', margin: '0', fontSize: '14px' }}>
-          Configure the categories section displayed on your home page
-        </p>
+      <div style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 style={{ fontSize: '32px', fontWeight: 'bold', margin: '0 0 10px 0', color: '#111827' }}>
+            🏠 Home Menu Categories
+          </h1>
+          <p style={{ color: '#6b7280', margin: '0', fontSize: '14px' }}>
+            Configure the categories section displayed on your home page
+          </p>
+        </div>
+        <a
+          href="/store/storefront/home-menu-categories"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 16px',
+            backgroundColor: '#2563eb',
+            color: 'white',
+            borderRadius: '8px',
+            textDecoration: 'none',
+            fontSize: '14px',
+            fontWeight: '500',
+            transition: 'background-color 0.2s',
+            cursor: 'pointer'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+        >
+          <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          Settings
+        </a>
       </div>
 
       {/* Message */}

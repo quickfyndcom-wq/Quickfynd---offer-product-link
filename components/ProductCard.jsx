@@ -189,11 +189,14 @@ const ProductCard = ({ product }) => {
 
                         <button
                             onClick={handleAddToCart}
-                            className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-700 hover:bg-slate-800 rounded-full flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 relative flex-shrink-0"
+                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 relative flex-shrink-0"
+                            style={{ backgroundColor: itemQuantity > 0 ? '#262626' : '#DC013C' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#1a1a1a' : '#b8012f'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#262626' : '#DC013C'}
                         >
                             <ShoppingCartIcon className="text-white" size={15} strokeWidth={2} />
                             {itemQuantity > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] sm:text-[10px] font-bold min-w-[15px] h-[15px] sm:min-w-[16px] sm:h-[16px] rounded-full flex items-center justify-center shadow-md border-2 border-white px-0.5">
+                                <span className="absolute -top-1 -right-1 text-white text-[9px] sm:text-[10px] font-bold min-w-[15px] h-[15px] sm:min-w-[16px] sm:h-[16px] rounded-full flex items-center justify-center shadow-md border-2 border-white px-0.5" style={{ backgroundColor: '#DC013C' }}>
                                     {itemQuantity > 99 ? '99+' : itemQuantity}
                                 </span>
                             )}

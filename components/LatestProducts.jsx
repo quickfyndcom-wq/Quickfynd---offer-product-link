@@ -240,11 +240,14 @@ const ProductCard = ({ product }) => {
           
           <button 
             onClick={handleAddToCart}
-            className='w-8 h-8 sm:w-10 sm:h-10 bg-slate-700 hover:bg-slate-900 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 relative'
+            className='w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 relative'
+            style={{ backgroundColor: itemQuantity > 0 ? '#262626' : '#DC013C' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#1a1a1a' : '#b8012f'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#262626' : '#DC013C'}
           >
             <ShoppingCartIcon className='text-white' size={16} />
             {itemQuantity > 0 && (
-              <span className='absolute -top-1 -right-1 bg-orange-500 text-white text-[10px] font-bold w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center shadow-md'>
+              <span className='absolute -top-1 -right-1 text-white text-[10px] font-bold w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center shadow-md' style={{ backgroundColor: '#DC013C' }}>
                 {itemQuantity}
               </span>
             )}

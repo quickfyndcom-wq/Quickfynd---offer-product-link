@@ -265,10 +265,13 @@ function WishlistAuthed() {
                             onClick={() =>
                               dispatch(addToCart({ product }))
                             }
-                            className="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 hover:shadow-md"
+                            className="flex-1 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 hover:shadow-md"
+                            style={{ backgroundColor: '#DC013C' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#b8012f'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#DC013C'}
                           >
                             <ShoppingCartIcon size={16} />
-                            Add
+                            Add to Cart
                           </button>
 
                           <button

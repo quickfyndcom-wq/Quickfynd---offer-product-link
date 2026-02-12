@@ -355,7 +355,24 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
                           })
                         }
                       }}
-                      className="relative flex-shrink-0 bg-gray-900 hover:bg-gray-800 text-white p-2.5 rounded-full transition-all active:scale-95 shadow-md"
+                      className="relative flex-shrink-0 text-white p-2.5 rounded-full transition-all active:scale-95 shadow-md"
+                      style={{ 
+                        backgroundColor: (() => {
+                          const productId = product._id || product.id
+                          const count = cartItems[productId] || cartItems[String(productId)] || 0
+                          return count > 0 ? '#262626' : '#DC013C'
+                        })()
+                      }}
+                      onMouseEnter={(e) => {
+                        const productId = product._id || product.id
+                        const count = cartItems[productId] || cartItems[String(productId)] || 0
+                        e.currentTarget.style.backgroundColor = count > 0 ? '#1a1a1a' : '#b8012f'
+                      }}
+                      onMouseLeave={(e) => {
+                        const productId = product._id || product.id
+                        const count = cartItems[productId] || cartItems[String(productId)] || 0
+                        e.currentTarget.style.backgroundColor = count > 0 ? '#262626' : '#DC013C'
+                      }}
                       aria-label="Add to cart"
                     >
                       <ShoppingCart size={16} />
@@ -363,7 +380,7 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
                         const productId = product._id || product.id
                         const count = cartItems[productId] || cartItems[String(productId)] || 0
                         return count > 0 ? (
-                          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center border-2 border-white px-1">
+                          <span className="absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center border-2 border-white px-1" style={{ backgroundColor: '#DC013C' }}>
                             {count}
                           </span>
                         ) : null
