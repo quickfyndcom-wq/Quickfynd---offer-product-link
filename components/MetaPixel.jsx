@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 
 export default function MetaPixel() {
+  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID || "828400993416271";
 
   useEffect(() => {
     !(function(f, b, e, v, n, t, s) {
@@ -21,9 +22,9 @@ export default function MetaPixel() {
       s.parentNode.insertBefore(t, s);
     })(window, document, "script", "https://connect.facebook.net/en_US/fbevents.js");
 
-    window.fbq && window.fbq("init", "820947720963942");
+    window.fbq && window.fbq("init", pixelId);
     window.fbq && window.fbq("track", "PageView");
-  }, []);
+  }, [pixelId]);
 
     return (
       <>
@@ -33,7 +34,7 @@ export default function MetaPixel() {
             height="1"
             width="1"
             style={{ display: "none" }}
-            src="https://www.facebook.com/tr?id=820947720963942&ev=PageView&noscript=1"
+            src={`https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1`}
             alt="Meta Pixel"
           />
         </noscript>
