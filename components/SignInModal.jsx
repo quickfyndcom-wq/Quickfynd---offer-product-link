@@ -22,6 +22,28 @@ const SignInModal = ({ open, onClose, defaultMode = 'login', bonusMessage = '' }
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  const getAuthErrorMessage = (err, fallback = 'Something went wrong. Please try again.') => {
+    const code = err?.code || '';
+    const msg = String(err?.message || '').toLowerCase();
+
+    if (code === 'auth/email-already-in-use') return 'This email is already registered. Please sign in.';
+    if (code === 'auth/weak-password') return 'Password is too weak. Please use at least 6 characters.';
+    if (code === 'auth/invalid-email') return 'Please enter a valid email address.';
+    if (code === 'auth/user-not-found') return 'No account found with this email. Please sign up first.';
+    if (code === 'auth/wrong-password') return 'Incorrect password. Please try again.';
+    if (code === 'auth/invalid-credential') return 'Invalid email or password. Please try again.';
+    if (code === 'auth/too-many-requests') return 'Too many attempts. Please try again later.';
+    if (code === 'auth/network-request-failed') return 'Network error. Please check your connection and try again.';
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return 'Sign-in cancelled. Please try again.';
+    if (code === 'auth/popup-blocked') return 'Pop-up blocked. Please allow pop-ups and try again.';
+
+    if (msg.includes('invalid-credential') || msg.includes('auth/invalid-credential')) {
+      return 'Invalid email or password. Please try again.';
+    }
+
+    return fallback;
+  };
+
   React.useEffect(() => {
     const interval = setInterval(() => {
       setScrollPos(prev => (prev + 1) % 2000);
@@ -99,20 +121,7 @@ const SignInModal = ({ open, onClose, defaultMode = 'login', bonusMessage = '' }
       onClose();
     } catch (err) {
       console.error('Google sign-in error:', err);
-      let errorMessage = 'Google sign-in failed';
-      
-      if (err.code === 'auth/popup-closed-by-user') {
-        errorMessage = 'Sign-in cancelled. Please try again.';
-      } else if (err.code === 'auth/popup-blocked') {
-        errorMessage = 'Pop-up blocked. Please allow pop-ups and try again.';
-      } else if (err.code === 'auth/cancelled-popup-request') {
-        errorMessage = 'Sign-in cancelled. Please try again.';
-      } else if (err.code === 'auth/network-request-failed') {
-        errorMessage = 'Network error. Please check your connection.';
-      } else if (err.message) {
-        errorMessage = err.message.replace('Firebase: Error', '').replace(/\(.*?\)/g, '').trim() || 'Google sign-in failed';
-      }
-      
+      const errorMessage = getAuthErrorMessage(err, 'Google sign-in failed. Please try again.');
       setError(errorMessage);
     }
     setLoading(false);
@@ -195,25 +204,7 @@ const SignInModal = ({ open, onClose, defaultMode = 'login', bonusMessage = '' }
       }
       onClose();
     } catch (err) {
-      // User-friendly error messages
-      let errorMessage = 'Authentication failed';
-      
-      if (err.code === 'auth/email-already-in-use') {
-        errorMessage = 'This email is already registered. Please sign in or use a different email.';
-      } else if (err.code === 'auth/weak-password') {
-        errorMessage = 'Password is too weak. Please use at least 6 characters.';
-      } else if (err.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address. Please check and try again.';
-      } else if (err.code === 'auth/user-not-found') {
-        errorMessage = 'No account found with this email. Please sign up first.';
-      } else if (err.code === 'auth/wrong-password') {
-        errorMessage = 'Incorrect password. Please try again.';
-      } else if (err.code === 'auth/too-many-requests') {
-        errorMessage = 'Too many failed attempts. Please try again later.';
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-      
+      const errorMessage = getAuthErrorMessage(err, 'Sign in failed. Please try again.');
       setError(errorMessage);
     }
     setLoading(false);

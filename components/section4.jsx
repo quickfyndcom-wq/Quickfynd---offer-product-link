@@ -1,6 +1,7 @@
 'use client'
 import React, { useRef, useState, useEffect } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronRight, ChevronLeft, Sparkles, ShoppingCart } from 'lucide-react'
 import { useSelector, useDispatch } from 'react-redux'
@@ -64,6 +65,18 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
     return Math.round(((regular - current) / regular) * 100)
   }
   const isFastDelivery = (product) => Boolean(product.fastDelivery || product.isFastDelivery || product.deliveryFast || product.express)
+  const isOutOfStockProduct = (product) => {
+    if (!product) return true
+    if (product.inStock === false) return true
+
+    if (Array.isArray(product.variants) && product.variants.length > 0) {
+      const hasVariantStock = product.variants.some((v) => Number(v?.stock || 0) > 0)
+      if (!hasVariantStock) return true
+    }
+
+    if (typeof product.stockQuantity === 'number' && product.stockQuantity <= 0) return true
+    return false
+  }
 
   useEffect(() => {
     setLoading(true)
@@ -145,8 +158,8 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
 
     const walk = (e.clientX - dragStateRef.current.startX) * 1.0
     
-    // Mark as moved if movement exceeds threshold (5px)
-    if (Math.abs(walk) > 5) {
+    // Mark as moved if movement exceeds threshold
+    if (Math.abs(walk) > 12) {
       dragStateRef.current.hasMoved = true
       e.preventDefault()
     }
@@ -236,13 +249,13 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
             <SkeletonLoader />
           ) : (
             sectionProducts.map((product) => (
-              <div
+              <Link
                 key={product._id || product.id}
+                href={`/product/${encodeURIComponent(String(product.slug || product._id || product.id || ''))}`}
                 onClick={(e) => {
                   // Only navigate if there was no significant dragging
-                  if (!dragStateRef.current.hasMoved) {
+                  if (dragStateRef.current.hasMoved) {
                     e.preventDefault()
-                    router.push(`/product/${product.slug || product.id}`)
                   }
                   // Reset hasMoved flag immediately after click
                   dragStateRef.current.hasMoved = false
@@ -271,17 +284,6 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
                         </div>
                       )}
 
-                      {/* Discount Badge */}
-                      {(() => {
-                        const currentPrice = getCurrentPrice(product)
-                        const regularPrice = getRegularPrice(product)
-                        const discountPercent = getDiscountPercent(regularPrice, currentPrice)
-                        return discountPercent ? (
-                          <div className="absolute top-2 right-2 z-20 text-white px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: '#00BC7D' }}>
-                            {discountPercent}% OFF
-                          </div>
-                        ) : null
-                      })()}
                     </>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -299,17 +301,19 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
 
                   {/* Rating and Reviews - Always Show */}
                   <div className="flex items-center gap-1">
-                    {[...Array(5)].map((_, i) => (
-                      <span 
-                        key={i} 
-                        className={`${i < Math.floor(product.rating || product.averageRating || 0) ? 'text-yellow-400' : 'text-gray-300'} text-xs`}
-                      >
-                        ★
+                    <div className="flex items-center min-w-0 gap-1">
+                      {[...Array(5)].map((_, i) => (
+                        <span 
+                          key={i} 
+                          className={`${i < Math.floor(product.rating || product.averageRating || 0) ? 'text-yellow-400' : 'text-gray-300'} text-xs`}
+                        >
+                          ★
+                        </span>
+                      ))}
+                      <span className="text-xs text-gray-600 ml-0.5 truncate">
+                        ({product.reviews || product.reviewCount || product.ratingCount || 0})
                       </span>
-                    ))}
-                    <span className="text-xs text-gray-600 ml-0.5">
-                      ({product.reviews || product.reviewCount || product.ratingCount || 0})
-                    </span>
+                    </div>
                   </div>
 
                   {/* Price Row with Cart Button */}
@@ -322,73 +326,79 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
                         const regularPrice = getRegularPrice(product)
                         const currentPrice = getCurrentPrice(product)
                         return regularPrice && regularPrice > currentPrice ? (
-                          <span className="text-xs text-gray-400 line-through">
-                            ₹{regularPrice?.toLocaleString?.() || regularPrice}
-                          </span>
+                          <>
+                            <span className="text-xs text-gray-400 line-through">
+                              ₹{regularPrice?.toLocaleString?.() || regularPrice}
+                            </span>
+                            {(() => {
+                              const discountPercent = getDiscountPercent(regularPrice, currentPrice)
+                              return discountPercent ? (
+                                <span className="text-[10px] sm:text-xs font-semibold text-green-600">
+                                  {discountPercent}% off
+                                </span>
+                              ) : null
+                            })()}
+                          </>
                         ) : null
                       })()}
                     </div>
 
-                    {/* Round Add to Cart Button */}
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        
-                        const productId = product._id || product.id
-                        
-                        if (!productId) {
-                          toast.error('Cannot add product - no ID')
-                          return
-                        }
-                        
-                        // Add to cart with Redux
-                        dispatch(addToCart({ productId: String(productId) }))
-                        
-                        // Show success
-                        toast.success('Added to cart')
-                        
-                        // Sync with server
-                        if (getToken && typeof getToken === 'function') {
-                          dispatch(uploadCart({ getToken })).catch(err => {
-                            // Cart sync failed silently
-                          })
-                        }
-                      }}
-                      className="relative flex-shrink-0 text-white p-2.5 rounded-full transition-all active:scale-95 shadow-md"
-                      style={{ 
-                        backgroundColor: (() => {
-                          const productId = product._id || product.id
-                          const count = cartItems[productId] || cartItems[String(productId)] || 0
-                          return count > 0 ? '#262626' : '#DC013C'
-                        })()
-                      }}
-                      onMouseEnter={(e) => {
-                        const productId = product._id || product.id
-                        const count = cartItems[productId] || cartItems[String(productId)] || 0
-                        e.currentTarget.style.backgroundColor = count > 0 ? '#1a1a1a' : '#b8012f'
-                      }}
-                      onMouseLeave={(e) => {
-                        const productId = product._id || product.id
-                        const count = cartItems[productId] || cartItems[String(productId)] || 0
-                        e.currentTarget.style.backgroundColor = count > 0 ? '#262626' : '#DC013C'
-                      }}
-                      aria-label="Add to cart"
-                    >
-                      <ShoppingCart size={16} />
-                      {(() => {
-                        const productId = product._id || product.id
-                        const count = cartItems[productId] || cartItems[String(productId)] || 0
-                        return count > 0 ? (
-                          <span className="absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center border-2 border-white px-1" style={{ backgroundColor: '#DC013C' }}>
-                            {count}
-                          </span>
-                        ) : null
-                      })()}
-                    </button>
+                    {/* Out of stock / Add to cart */}
+                    {(() => {
+                      const productId = product._id || product.id
+                      const count = cartItems[productId] || cartItems[String(productId)] || 0
+                      const isOutOfStock = isOutOfStockProduct(product)
+
+                      if (isOutOfStock) {
+                        return (
+                          <div className="flex-shrink-0 px-3 py-1.5 rounded-full bg-gray-200 text-gray-600 text-xs font-semibold">
+                            Out of Stock
+                          </div>
+                        )
+                      }
+
+                      return (
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+
+                            if (!productId) {
+                              toast.error('Cannot add product - no ID')
+                              return
+                            }
+
+                            dispatch(addToCart({ productId: String(productId) }))
+                            toast.success('Added to cart')
+
+                            if (getToken && typeof getToken === 'function') {
+                              dispatch(uploadCart({ getToken })).catch(() => {
+                                // Cart sync failed silently
+                              })
+                            }
+                          }}
+                          className="relative flex-shrink-0 text-white p-2.5 rounded-full transition-all active:scale-95 shadow-md"
+                          style={{ backgroundColor: count > 0 ? '#262626' : '#DC013C' }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = count > 0 ? '#1a1a1a' : '#b8012f'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = count > 0 ? '#262626' : '#DC013C'
+                          }}
+                          aria-label="Add to cart"
+                        >
+                          <ShoppingCart size={16} />
+                          {count > 0 ? (
+                            <span className="absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center border-2 border-white px-1" style={{ backgroundColor: '#DC013C' }}>
+                              {count}
+                            </span>
+                          ) : null}
+                        </button>
+                      )
+                    })()}
                   </div>
                 </div>
-              </div>
+              </Link>
             ))
           )}
         </div>

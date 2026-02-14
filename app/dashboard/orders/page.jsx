@@ -8,6 +8,8 @@ import Link from 'next/link'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import DashboardSidebar from '@/components/DashboardSidebar'
+import { downloadInvoice } from '@/lib/generateInvoice'
+import ReviewForm from '@/components/ReviewForm'
 
 export default function DashboardOrdersPage() {
   const [user, setUser] = useState(undefined)
@@ -26,6 +28,13 @@ export default function DashboardOrdersPage() {
   const [returnFiles, setReturnFiles] = useState([])
   const [uploadError, setUploadError] = useState('')
   const [refreshingTracking, setRefreshingTracking] = useState(false)
+  const [cancellingOrderId, setCancellingOrderId] = useState(null)
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [cancelOrderTarget, setCancelOrderTarget] = useState(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelNote, setCancelNote] = useState('')
+  const [creatingTicketForOrderId, setCreatingTicketForOrderId] = useState(null)
+  const [activeReviewKey, setActiveReviewKey] = useState(null)
 
   const orderStatuses = [
     { value: 'ALL', label: 'All Orders', icon: '📦' },
@@ -54,6 +63,118 @@ export default function DashboardOrdersPage() {
     }
     
     return order.isPaid || false;
+  }
+
+  const canCancelOrder = (order) => {
+    const status = String(order?.status || '').toUpperCase()
+    const trackingStatus = String(order?.delhivery?.current_status || '').toUpperCase()
+
+    const blockedKeywords = ['SHIPPED', 'TRANSIT', 'IN TRANSIT', 'OUT_FOR_DELIVERY', 'OUT FOR DELIVERY', 'DELIVERED', 'CANCELLED', 'RETURNED']
+    const hasBlockedTrackingStatus = blockedKeywords.some((k) => trackingStatus.includes(k))
+
+    if (hasBlockedTrackingStatus) return false
+
+    return ['ORDER_PLACED', 'CONFIRMED', 'PROCESSING', 'PICKUP_REQUESTED', 'WAITING_FOR_PICKUP'].includes(status)
+  }
+
+  const openCancelOrderModal = (order, e) => {
+    e?.stopPropagation?.()
+    if (!canCancelOrder(order)) {
+      toast.error('This order cannot be cancelled now')
+      return
+    }
+    setCancelOrderTarget(order)
+    setCancelReason('')
+    setCancelNote('')
+    setShowCancelModal(true)
+  }
+
+  const closeCancelOrderModal = () => {
+    if (cancellingOrderId) return
+    setShowCancelModal(false)
+    setCancelOrderTarget(null)
+    setCancelReason('')
+    setCancelNote('')
+  }
+
+  const handleCancelOrder = async () => {
+    const order = cancelOrderTarget
+    const orderId = order?._id || order?.id
+    if (!orderId) return
+    if (!canCancelOrder(order)) {
+      toast.error('This order cannot be cancelled now')
+      return
+    }
+
+    if (!cancelReason) {
+      toast.error('Please select a cancellation reason')
+      return
+    }
+
+    const fullCancelReason = cancelNote?.trim()
+      ? `${cancelReason}: ${cancelNote.trim()}`
+      : cancelReason
+
+    try {
+      setCancellingOrderId(orderId)
+      const token = await auth.currentUser.getIdToken(true)
+      await axios.post('/api/orders/cancel', {
+        orderId,
+        reason: fullCancelReason,
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      const refreshed = await axios.get('/api/orders', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const refreshedList = Array.isArray(refreshed?.data?.orders)
+        ? refreshed.data.orders
+        : (Array.isArray(refreshed?.data) ? refreshed.data : [])
+      setOrders(refreshedList)
+
+      toast.success('Order cancelled successfully')
+      closeCancelOrderModal()
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to cancel order')
+    } finally {
+      setCancellingOrderId(null)
+    }
+  }
+
+  const handleCreateSupportTicket = async (order, item = null, e = null) => {
+    e?.stopPropagation?.()
+    try {
+      const orderId = order?._id || order?.id
+      if (!orderId) return
+      setCreatingTicketForOrderId(orderId)
+
+      const token = await auth.currentUser.getIdToken(true)
+      const itemName = item?.name || item?.productId?.name || 'Order item'
+      const orderNo = order?.shortOrderNumber || String(orderId).slice(0, 8).toUpperCase()
+
+      const { data } = await axios.post('/api/tickets', {
+        subject: `Order Support - #${orderNo}`,
+        category: 'Order Issue',
+        priority: 'normal',
+        orderId,
+        description: `Need support for order #${orderNo}${item ? `\nProduct: ${itemName}` : ''}.`,
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      toast.success('Support ticket created')
+      const ticketId = data?.ticket?._id
+      if (ticketId) {
+        window.location.href = `/dashboard/tickets/${ticketId}`
+      } else {
+        window.location.href = '/dashboard/tickets'
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to create support ticket')
+    } finally {
+      setCreatingTicketForOrderId(null)
+    }
   }
 
   const filteredOrders = selectedStatus === 'ALL' ? orders : orders.filter(order => order.status === selectedStatus)
@@ -404,7 +525,12 @@ export default function DashboardOrdersPage() {
             </div>
           </div>
           {loadingOrders ? (
-            <Loading />
+            <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-10 flex items-center justify-center min-h-[220px]">
+              <div className="flex flex-col items-center gap-3 text-slate-500">
+                <div className="w-8 h-8 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin" />
+                <p className="text-sm">Loading orders...</p>
+              </div>
+            </div>
           ) : orders.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
               <p className="text-slate-600">No orders found.</p>
@@ -421,7 +547,7 @@ export default function DashboardOrdersPage() {
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="max-h-[70vh] overflow-y-auto pr-1 space-y-4">
               {filteredOrders.map((order) => {
                 const orderId = order._id || order.id
                 const isExpanded = expandedOrder === orderId
@@ -514,7 +640,10 @@ export default function DashboardOrdersPage() {
                             </a>
                           )}
                           <button
-                            onClick={() => setExpandedOrder(isExpanded ? null : orderId)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setExpandedOrder(isExpanded ? null : orderId)
+                            }}
                             className="px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition"
                           >
                             {isExpanded ? 'Hide Details' : 'View Details'}
@@ -528,12 +657,15 @@ export default function DashboardOrdersPage() {
                           <p className="text-xs text-slate-500 font-medium">Products:</p>
                           <div className="flex gap-2 flex-wrap">
                             {orderItems.slice(0, 4).map((item, idx) => {
-                              const product = item.productId || item.product || {}
+                              const product = (item.productId && typeof item.productId === 'object') ? item.productId : (item.product || {})
+                              const fallbackItem = Array.isArray(order.items) ? (order.items[idx] || {}) : {}
+                              const productName = product?.name || item?.name || fallbackItem?.name || 'Product'
+                              const productImage = product?.images?.[0] || item?.image || fallbackItem?.image || fallbackItem?.images?.[0] || ''
                               return (
                                 <div key={idx} className="relative">
                                   <div className="w-16 h-16 bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
-                                    {product.images?.[0] ? (
-                                      <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
+                                    {productImage ? (
+                                      <img src={productImage} alt={productName} className="w-full h-full object-cover" />
                                     ) : (
                                       <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">No image</div>
                                     )}
@@ -676,6 +808,18 @@ export default function DashboardOrdersPage() {
                             </button>
                           </div>
                         )}
+
+                        {canCancelOrder(order) && (
+                          <div className="flex justify-end">
+                            <button
+                              onClick={(e) => openCancelOrderModal(order, e)}
+                              disabled={cancellingOrderId === orderId}
+                              className={`px-4 py-2 rounded-lg border text-sm font-medium transition ${cancellingOrderId === orderId ? 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-300 bg-white text-slate-600 hover:border-red-300 hover:text-red-600 hover:bg-red-50'}`}
+                            >
+                              {cancellingOrderId === orderId ? 'Cancelling...' : 'Cancel This Order'}
+                            </button>
+                          </div>
+                        )}
                         
                         {/* Payment & Summary - Moved to top */}
                         <div className="bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-lg p-5">
@@ -748,24 +892,57 @@ export default function DashboardOrdersPage() {
                           </div>
                         </div>
 
+                        {/* Delivered order actions */}
+                        {order.status === 'DELIVERED' && (
+                          <div className="flex flex-wrap gap-2 justify-end">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                downloadInvoice(order)
+                              }}
+                              className="px-4 py-2 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 text-sm font-medium"
+                            >
+                              Download Invoice
+                            </button>
+                            <button
+                              onClick={(e) => handleCreateSupportTicket(order, null, e)}
+                              disabled={creatingTicketForOrderId === orderId}
+                              className={`px-4 py-2 rounded-lg border text-sm font-medium ${creatingTicketForOrderId === orderId ? 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+                            >
+                              {creatingTicketForOrderId === orderId ? 'Creating Ticket...' : 'Ticket Support'}
+                            </button>
+                            <Link
+                              href="/dashboard/tickets"
+                              onClick={(e) => e.stopPropagation()}
+                              className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 text-sm font-medium"
+                            >
+                              Ticket Details
+                            </Link>
+                          </div>
+                        )}
+
                         {/* Products */}
                         <div>
                           <h3 className="text-sm font-semibold text-slate-800 mb-3">Order Items ({totalItems})</h3>
                           <div className="space-y-3">
                             {orderItems.map((item, idx) => {
-                              const product = item.productId || item.product || {}
+                              const product = (item.productId && typeof item.productId === 'object') ? item.productId : (item.product || {})
+                              const fallbackItem = Array.isArray(order.items) ? (order.items[idx] || {}) : {}
+                              const productName = product?.name || item?.name || fallbackItem?.name || 'Product'
+                              const productImage = product?.images?.[0] || item?.image || fallbackItem?.image || fallbackItem?.images?.[0] || ''
+                              const productSku = product?.sku || item?.sku || fallbackItem?.sku || ''
                               return (
                                 <div key={idx} className="flex items-start gap-4 pb-4 border-b border-slate-100 last:border-0">
                                   <div className="w-24 h-24 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200">
-                                    {product.images?.[0] ? (
-                                      <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
+                                    {productImage ? (
+                                      <img src={productImage} alt={productName} className="w-full h-full object-cover" />
                                     ) : (
                                       <div className="w-full h-full flex items-center justify-center text-slate-400">No image</div>
                                     )}
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <h4 className="font-semibold text-slate-800 text-sm mb-1">{product.name || 'Product'}</h4>
-                                    {product.sku && <p className="text-xs text-slate-500 mb-2">SKU: {product.sku}</p>}
+                                    <h4 className="font-semibold text-slate-800 text-sm mb-1">{productName}</h4>
+                                    {productSku && <p className="text-xs text-slate-500 mb-2">SKU: {productSku}</p>}
                                     <div className="grid grid-cols-2 gap-2 text-sm">
                                       <div>
                                         <p className="text-xs text-slate-500">Quantity</p>
@@ -776,6 +953,40 @@ export default function DashboardOrdersPage() {
                                         <p className="font-medium text-slate-800">₹{(item.price || 0).toFixed(2)}</p>
                                       </div>
                                     </div>
+
+                                    {order.status === 'DELIVERED' && (
+                                      <div className="mt-3 flex flex-wrap gap-2">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            const reviewKey = `${orderId}-${idx}`
+                                            setActiveReviewKey((prev) => prev === reviewKey ? null : reviewKey)
+                                          }}
+                                          className="px-3 py-1.5 text-xs rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                                        >
+                                          {activeReviewKey === `${orderId}-${idx}` ? 'Hide Review Form' : 'Write Review'}
+                                        </button>
+                                        <button
+                                          onClick={(e) => handleCreateSupportTicket(order, item, e)}
+                                          disabled={creatingTicketForOrderId === orderId}
+                                          className={`px-3 py-1.5 text-xs rounded-lg border ${creatingTicketForOrderId === orderId ? 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+                                        >
+                                          Ticket Support
+                                        </button>
+                                      </div>
+                                    )}
+
+                                    {order.status === 'DELIVERED' && activeReviewKey === `${orderId}-${idx}` && (
+                                      <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                                        <ReviewForm
+                                          productId={typeof item?.productId === 'object' ? item?.productId?._id : item?.productId}
+                                          onReviewAdded={() => {
+                                            setActiveReviewKey(null)
+                                            toast.success('Thanks for your review!')
+                                          }}
+                                        />
+                                      </div>
+                                    )}
                                   </div>
                                   <div className="text-right">
                                     <p className="text-xs text-slate-500 mb-1">Line Total</p>
@@ -1130,6 +1341,69 @@ export default function DashboardOrdersPage() {
                       {submittingReturn ? 'Submitting...' : 'Submit Request'}
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Cancel Order Modal */}
+          {showCancelModal && cancelOrderTarget && (
+            <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closeCancelOrderModal}>
+              <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold text-slate-800">Cancel Order</h2>
+                  <button onClick={closeCancelOrderModal} className="text-slate-400 hover:text-slate-600" disabled={!!cancellingOrderId}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="mb-4 text-sm text-slate-600">
+                  You are cancelling order <span className="font-semibold text-slate-800">#{cancelOrderTarget.shortOrderNumber || (cancelOrderTarget._id || cancelOrderTarget.id || '').toString().slice(0, 8).toUpperCase()}</span>.
+                </div>
+
+                <div className="mb-5">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Reason *</label>
+                  <select
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 mb-3"
+                  >
+                    <option value="">Select cancellation reason</option>
+                    <option value="Ordered by mistake">Ordered by mistake</option>
+                    <option value="Found a better price">Found a better price</option>
+                    <option value="Need to change address">Need to change address</option>
+                    <option value="Need to change quantity">Need to change quantity</option>
+                    <option value="Delivery is taking too long">Delivery is taking too long</option>
+                    <option value="Other">Other</option>
+                  </select>
+
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Additional note (optional)</label>
+                  <textarea
+                    value={cancelNote}
+                    onChange={(e) => setCancelNote(e.target.value)}
+                    placeholder="Add more details"
+                    rows="3"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={closeCancelOrderModal}
+                    className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition"
+                    disabled={!!cancellingOrderId}
+                  >
+                    Keep Order
+                  </button>
+                  <button
+                    onClick={handleCancelOrder}
+                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!!cancellingOrderId}
+                  >
+                    {cancellingOrderId ? 'Cancelling...' : 'Confirm Cancel'}
+                  </button>
                 </div>
               </div>
             </div>

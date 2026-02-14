@@ -69,14 +69,11 @@ export default function DashboardWishlistPage() {
     };
 
     const handleAddToCart = (product) => {
+        const productId = product?._id || product?.id;
+        if (!productId) return;
         dispatch(addToCart({
-            product,
-            userId: user?.uid,
-            user: {
-                name: user?.displayName,
-                email: user?.email,
-                image: user?.photoURL
-            }
+            productId,
+            price: Number(product?.price) || 0,
         }));
     };
 

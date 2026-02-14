@@ -50,7 +50,7 @@ export async function POST(request) {
     const userEmail = decodedToken.email;
     const userName = decodedToken.name || decodedToken.email;
 
-    const { subject, category, description, priority } = await request.json();
+    const { subject, category, description, priority, orderId } = await request.json();
 
     if (!subject || !category || !description) {
       return NextResponse.json({ 
@@ -66,6 +66,7 @@ export async function POST(request) {
       category,
       description,
       priority: priority || 'normal',
+      orderId: orderId || undefined,
       status: 'open'
     });
 

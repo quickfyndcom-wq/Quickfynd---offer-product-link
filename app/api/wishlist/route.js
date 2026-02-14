@@ -30,20 +30,26 @@ export async function GET(request) {
         }
         await dbConnect();
         const wishlistItems = await WishlistItem.find({ userId }).sort({ createdAt: -1 }).lean();
-        // Populate product data
-        for (let item of wishlistItems) {
-            if (item.productId && typeof item.productId === 'string' && item.productId.match(/^[a-fA-F0-9]{24}$/)) {
-                try {
-                    const product = await Product.findById(item.productId).lean();
-                    item.product = product;
-                } catch (err) {
-                    console.error('Product.findById error:', err, 'productId:', item.productId);
-                    item.product = null;
-                }
-            } else {
-                item.product = null;
-            }
+
+        // Populate product data in a single query (avoids N+1 DB calls)
+        const validProductIds = [...new Set(
+            wishlistItems
+                .map(item => item?.productId)
+                .filter(pid => typeof pid === 'string' && /^[a-fA-F0-9]{24}$/.test(pid))
+        )];
+
+        const products = validProductIds.length
+            ? await Product.find({ _id: { $in: validProductIds } })
+                .select('_id name slug price mrp images inStock stockQuantity')
+                .lean()
+            : [];
+
+        const productMap = new Map(products.map(p => [String(p._id), p]));
+
+        for (const item of wishlistItems) {
+            item.product = productMap.get(String(item.productId)) || null;
         }
+
         return NextResponse.json({ wishlist: wishlistItems });
     } catch (error) {
         console.error('Error fetching wishlist:', error);

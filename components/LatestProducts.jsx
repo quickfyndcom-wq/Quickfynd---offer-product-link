@@ -90,6 +90,7 @@ const ProductCard = ({ product }) => {
     product.deliverySpeed === 'fast' ||
     product.delivery_speed === 'fast'
   )
+  const isOutOfStock = product.inStock === false || (typeof product.stockQuantity === 'number' && product.stockQuantity <= 0)
 
   const hasSecondary = secondaryImage !== 'https://ik.imagekit.io/jrstupuke/placeholder.png' && 
                        secondaryImage !== primaryImage &&
@@ -150,6 +151,10 @@ const ProductCard = ({ product }) => {
   const handleAddToCart = (e) => {
     e.preventDefault()
     e.stopPropagation()
+    if (isOutOfStock) {
+      toast.error('Out of stock')
+      return
+    }
     dispatch(addToCart({ productId: product._id }))
     dispatch(uploadCart({ getToken }))
     toast.success('Added to cart')
@@ -167,11 +172,6 @@ const ProductCard = ({ product }) => {
         {hasFastDelivery && (
           <span className="absolute top-2 left-2 z-20 pointer-events-none inline-flex items-center gap-1 text-white text-[10px] sm:text-[8px] lg:text-[12px] font-bold px-2 py-1 sm:px-1.5 sm:py-0.5 lg:px-2.5 lg:py-1.5 rounded-full shadow-md" style={{ backgroundColor: '#DC013C' }}>
             Fast Delivery
-          </span>
-        )}
-        {discount > 0 && (
-          <span className="absolute top-2 right-2 z-20 pointer-events-none inline-flex items-center gap-1 text-white text-[10px] sm:text-[8px] lg:text-[12px] font-bold px-2 py-1 sm:px-1.5 sm:py-0.5 lg:px-2.5 lg:py-1.5 rounded-full shadow-md" style={{ backgroundColor: '#00BC7D' }}>
-            {discount}% OFF
           </span>
         )}
         <Image
@@ -210,7 +210,7 @@ const ProductCard = ({ product }) => {
         </h3>
         {/* Only show rating and review count, no date or initials */}
         <div className="flex items-center mb-0">
-          <>
+          <div className="flex items-center min-w-0">
             {[...Array(5)].map((_, i) => (
               <FaStar
                 key={i}
@@ -218,10 +218,10 @@ const ProductCard = ({ product }) => {
                 className={i < ratingValue ? 'text-yellow-400' : 'text-gray-300'}
               />
             ))}
-            <span className="text-gray-500 text-[8px] sm:text-xs ml-1">
+            <span className="text-gray-500 text-[8px] sm:text-xs ml-1 truncate">
               {reviewCount > 0 ? `(${reviewCount})` : 'No reviews yet'}
             </span>
-          </>
+          </div>
         </div>
 
         <div className="mt-auto flex items-center justify-between">
@@ -232,18 +232,32 @@ const ProductCard = ({ product }) => {
               </p>
             )}
             {mrpNum > 0 && mrpNum > priceNum && (
-              <p className="text-xs sm:text-sm text-gray-400 line-through">
-                ₹{mrpNum.toFixed(2)}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs sm:text-sm text-gray-400 line-through">
+                  ₹{mrpNum.toFixed(2)}
+                </p>
+                {discount > 0 && (
+                  <span className="text-[10px] sm:text-xs font-semibold text-green-600">
+                    {discount}% off
+                  </span>
+                )}
+              </div>
             )}
           </div>
           
           <button 
             onClick={handleAddToCart}
+            disabled={isOutOfStock}
             className='w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 relative'
-            style={{ backgroundColor: itemQuantity > 0 ? '#262626' : '#DC013C' }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#1a1a1a' : '#b8012f'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#262626' : '#DC013C'}
+            style={{ backgroundColor: isOutOfStock ? '#9CA3AF' : (itemQuantity > 0 ? '#262626' : '#DC013C') }}
+            onMouseEnter={(e) => {
+              if (isOutOfStock) return
+              e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#1a1a1a' : '#b8012f'
+            }}
+            onMouseLeave={(e) => {
+              if (isOutOfStock) return
+              e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#262626' : '#DC013C'
+            }}
           >
             <ShoppingCartIcon className='text-white' size={16} />
             {itemQuantity > 0 && (

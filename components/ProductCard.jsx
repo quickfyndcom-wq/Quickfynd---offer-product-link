@@ -110,10 +110,15 @@ const ProductCard = ({ product }) => {
         product.fast || product.expressDelivery || product.express_delivery ||
         product.deliverySpeed === 'fast' || product.delivery_speed === 'fast'
     )
+    const isOutOfStock = product.inStock === false || (typeof product.stockQuantity === 'number' && product.stockQuantity <= 0)
 
     const handleAddToCart = (e) => {
         e.preventDefault()
         e.stopPropagation()
+        if (isOutOfStock) {
+            toast.error('Out of stock')
+            return
+        }
         dispatch(addToCart({ 
             productId: product._id,
             price: priceNum > 0 ? priceNum : undefined
@@ -138,11 +143,6 @@ const ProductCard = ({ product }) => {
                     {hasFastDelivery && (
                         <span className="absolute top-3 left-3 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm z-20 pointer-events-none" style={{ backgroundColor: '#DC013C' }}>
                             Fast
-                        </span>
-                    )}
-                    {discount > 0 && (
-                        <span className="absolute top-3 right-3 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm z-20 pointer-events-none" style={{ backgroundColor: '#00BC7D' }}>
-                            {discount}% OFF
                         </span>
                     )}
                     <Image
@@ -189,10 +189,17 @@ const ProductCard = ({ product }) => {
 
                         <button
                             onClick={handleAddToCart}
+                            disabled={isOutOfStock}
                             className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 relative flex-shrink-0"
-                            style={{ backgroundColor: itemQuantity > 0 ? '#262626' : '#DC013C' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#1a1a1a' : '#b8012f'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#262626' : '#DC013C'}
+                            style={{ backgroundColor: isOutOfStock ? '#9CA3AF' : (itemQuantity > 0 ? '#262626' : '#DC013C') }}
+                            onMouseEnter={(e) => {
+                                if (isOutOfStock) return
+                                e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#1a1a1a' : '#b8012f'
+                            }}
+                            onMouseLeave={(e) => {
+                                if (isOutOfStock) return
+                                e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#262626' : '#DC013C'
+                            }}
                         >
                             <ShoppingCartIcon className="text-white" size={15} strokeWidth={2} />
                             {itemQuantity > 0 && (
@@ -209,7 +216,14 @@ const ProductCard = ({ product }) => {
                                 <p className="text-sm sm:text-base font-bold text-gray-900">{currency} {priceNum.toFixed(2)}</p>
                             )}
                             {mrpNum > 0 && mrpNum > priceNum && priceNum > 0 && (
-                                <p className="text-[10px] sm:text-xs text-gray-400 line-through">{currency} {mrpNum.toFixed(2)}</p>
+                                <div className="flex items-center gap-1.5">
+                                    <p className="text-[10px] sm:text-xs text-gray-400 line-through">{currency} {mrpNum.toFixed(2)}</p>
+                                    {discount > 0 && (
+                                        <span className="text-[10px] sm:text-xs font-semibold text-green-600">
+                                            {discount}% off
+                                        </span>
+                                    )}
+                                </div>
                             )}
                         </div>
                     )}

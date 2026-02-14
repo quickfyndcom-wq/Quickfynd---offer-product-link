@@ -4,7 +4,7 @@ import { PackageIcon, Search, ShoppingCart, LifeBuoy, Menu, X, HeartIcon, StarIc
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { auth } from '../lib/firebase';
 import { getAuth } from "firebase/auth";
 import Image from 'next/image';
@@ -17,8 +17,10 @@ import Truck from '../assets/delivery.png';
 import WalletIcon from '../assets/common/wallet.svg';
 import SignInModal from './SignInModal';
 import NavbarMenuBar from './NavbarMenuBar';
+import { clearCart, fetchCart } from '@/lib/features/cart/cartSlice';
 
 const Navbar = () => {
+  const dispatch = useDispatch();
   // State for image search modal
   const [showImageSearch, setShowImageSearch] = useState(false);
   const [imageSearchResults, setImageSearchResults] = useState([]);
@@ -130,7 +132,13 @@ const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [wishlistCount, setWishlistCount] = useState(0);
-  const cartCount = useSelector((state) => state.cart.total);
+  const cartItems = useSelector((state) => state.cart.cartItems || {});
+  const cartCount = useMemo(() => {
+    return Object.values(cartItems || {}).reduce((acc, entry) => {
+      const qty = typeof entry === 'number' ? entry : entry?.quantity || 0;
+      return acc + (Number.isFinite(qty) ? qty : 0);
+    }, 0);
+  }, [cartItems]);
   const products = useSelector((state) => state.product.list);
   const [signInOpen, setSignInOpen] = useState(false);
   const [signInMode, setSignInMode] = useState('login');
@@ -176,6 +184,10 @@ const Navbar = () => {
       setUserDropdownOpen(false);
       setMobileMenuOpen(false);
       setSignOutConfirmOpen(false);
+      dispatch(clearCart());
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('cartState');
+      }
       toast.success('Signed out successfully');
       
       // Send email in background (completely non-blocking, no auth required)
@@ -209,6 +221,10 @@ const Navbar = () => {
         setUserDropdownOpen(false);
         setMobileMenuOpen(false);
         setSignOutConfirmOpen(false);
+        dispatch(clearCart());
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('cartState');
+        }
         router.push('/');
         window.location.reload();
       } catch (finalError) {
@@ -280,11 +296,59 @@ const Navbar = () => {
   }, [searchPlaceholder, isDeleting, productIndex, productNames]);
 
   useEffect(() => {
+    const syncGuestWishlistToDatabase = async (user) => {
+      try {
+        if (typeof window === 'undefined' || !user) return;
+        const raw = localStorage.getItem('guestWishlist');
+        if (!raw) return;
+
+        let guestWishlist = [];
+        try {
+          guestWishlist = JSON.parse(raw);
+        } catch {
+          guestWishlist = [];
+        }
+
+        const productIds = Array.isArray(guestWishlist)
+          ? [...new Set(
+              guestWishlist
+                .map((item) => item?.productId || item?.id)
+                .filter((id) => typeof id === 'string' && id.trim().length > 0)
+            )]
+          : [];
+
+        if (productIds.length === 0) {
+          localStorage.removeItem('guestWishlist');
+          return;
+        }
+
+        const token = await user.getIdToken();
+        await Promise.all(
+          productIds.map((productId) =>
+            axios.post(
+              '/api/wishlist',
+              { productId, action: 'add' },
+              { headers: { Authorization: `Bearer ${token}` } }
+            )
+          )
+        );
+
+        localStorage.removeItem('guestWishlist');
+        window.dispatchEvent(new Event('wishlistUpdated'));
+      } catch (error) {
+        console.error('Error syncing guest wishlist:', error);
+      }
+    };
+
     const unsubscribe = auth.onAuthStateChanged((user) => {
       setFirebaseUser(user);
+      if (user) {
+        dispatch(fetchCart({ getToken: async () => user.getIdToken() }));
+        syncGuestWishlistToDatabase(user);
+      }
     });
     return () => unsubscribe();
-  }, []);
+  }, [dispatch]);
 
   const fetchWalletCoins = async () => {
     try {
@@ -321,29 +385,47 @@ const Navbar = () => {
   }, []);
 
   useEffect(() => {
-    const fetchIfLoggedIn = () => {
+    const syncWishlistCount = () => {
       if (auth.currentUser) {
         fetchWishlistCount();
-      } else {
-        // Get guest wishlist count from localStorage
-        try {
-          const guestWishlist = JSON.parse(localStorage.getItem('guestWishlist') || '[]');
-          setWishlistCount(Array.isArray(guestWishlist) ? guestWishlist.length : 0);
-        } catch {
-          setWishlistCount(0);
-        }
+        return;
+      }
+
+      // Guest wishlist count from localStorage (only valid entries)
+      try {
+        const guestWishlist = JSON.parse(localStorage.getItem('guestWishlist') || '[]');
+        const validGuestItems = Array.isArray(guestWishlist)
+          ? guestWishlist.filter((item) => item && (item.productId || item.id))
+          : [];
+        setWishlistCount(validGuestItems.length);
+      } catch {
+        setWishlistCount(0);
       }
     };
-    fetchIfLoggedIn();
-    // Listen for wishlist updates
-    const handleWishlistUpdate = () => {
-      fetchIfLoggedIn();
+
+    syncWishlistCount();
+
+    const handleWishlistUpdate = () => syncWishlistCount();
+    const handleFocus = () => syncWishlistCount();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') syncWishlistCount();
     };
+    const handleStorage = (e) => {
+      if (!e || e.key === 'guestWishlist') syncWishlistCount();
+    };
+
     window.addEventListener('wishlistUpdated', handleWishlistUpdate);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('storage', handleStorage);
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
       window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('storage', handleStorage);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, []);
+  }, [firebaseUser, pathname]);
 
   const fetchWishlistCount = async () => {
     try {
@@ -365,8 +447,7 @@ const Navbar = () => {
       });
       // Only count wishlist items that have valid products (same filter as wishlist page)
       const validItems = data.wishlist?.filter(item => {
-        const product = item.product || item;
-        return product && (product.name || product._id);
+        return item && item.productId && item.product;
       }) || [];
       setWishlistCount(validItems.length);
     } catch (error) {

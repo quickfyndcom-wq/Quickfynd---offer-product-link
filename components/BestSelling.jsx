@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { FaStar } from 'react-icons/fa'
 import { ShoppingCartIcon } from 'lucide-react'
 import { addToCart, uploadCart } from '@/lib/features/cart/cartSlice'
+import { useAuth } from '@/lib/useAuth'
 
 import toast from 'react-hot-toast'
 import Title from './Title'
@@ -42,6 +43,7 @@ const ProductCard = ({ product }) => {
     product.mrp && product.mrp > product.price
       ? Math.round(((product.mrp - product.price) / product.mrp) * 100)
       : 0
+  const isOutOfStock = product.inStock === false || (typeof product.stockQuantity === 'number' && product.stockQuantity <= 0)
   // Support both array and number for rating
   // Use backend response fields
   const ratingValue = Math.round(product.averageRating || 0);
@@ -56,6 +58,10 @@ const ProductCard = ({ product }) => {
   const handleAddToCart = (e) => {
     e.preventDefault()
     e.stopPropagation()
+    if (isOutOfStock) {
+      toast.error('Out of stock')
+      return
+    }
     dispatch(addToCart({ productId: product._id }))
     dispatch(uploadCart({ getToken }))
     toast.success('Added to cart')
@@ -102,13 +108,6 @@ const ProductCard = ({ product }) => {
             onError={(e) => { e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png' }}
           />
         )}
-        
-        {/* Discount Badge */}
-        {discount > 0 && (
-          <span className={`absolute top-2 right-2 ${discount >= 50 ? 'bg-green-500' : 'bg-orange-500'} text-white text-xs font-bold px-2 py-1 rounded-full shadow-md z-10`}>
-            {discount}% OFF
-          </span>
-        )}
       </div>
 
       {/* Product Info */}
@@ -119,20 +118,22 @@ const ProductCard = ({ product }) => {
             {productName}
           </h3>
           <div className="flex items-center mt-1">
-            {reviewCount > 0 ? (
-              <>
-                {[...Array(5)].map((_, i) => (
-                  <FaStar
-                    key={i}
-                    size={12}
-                    className={i < ratingValue ? 'text-yellow-400' : 'text-gray-300'}
-                  />
-                ))}
-                <span className="text-gray-500 text-xs ml-1">({reviewCount})</span>
-              </>
-            ) : (
-              <span className="text-xs text-gray-400 ml-1">No reviews</span>
-            )}
+            <div className="flex items-center min-w-0">
+              {reviewCount > 0 ? (
+                <>
+                  {[...Array(5)].map((_, i) => (
+                    <FaStar
+                      key={i}
+                      size={12}
+                      className={i < ratingValue ? 'text-yellow-400' : 'text-gray-300'}
+                    />
+                  ))}
+                  <span className="text-gray-500 text-xs ml-1 truncate">({reviewCount})</span>
+                </>
+              ) : (
+                <span className="text-xs text-gray-400 ml-1">No reviews</span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -148,31 +149,45 @@ const ProductCard = ({ product }) => {
 
             {/* Original Price */}
             {product.mrp && product.mrp > product.price && (
-              <p className="text-gray-400 text-xs line-through flex items-baseline">
-                <span className="mr-0.5">₹</span>
-                <span>{intOrig}</span>
-                <span className="text-[10px] align-top ml-0.5">.{decOrig}</span>
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-gray-400 text-xs line-through flex items-baseline">
+                  <span className="mr-0.5">₹</span>
+                  <span>{intOrig}</span>
+                  <span className="text-[10px] align-top ml-0.5">.{decOrig}</span>
+                </p>
+                {discount > 0 && (
+                  <span className="text-[10px] sm:text-xs font-semibold text-green-600">
+                    {discount}% off
+                  </span>
+                )}
+              </div>
             )}
+
           </div>
         </div>
       </div>
 
-      {/* Cart Button with Badge - Bottom Right */}
-      <button 
-        onClick={handleAddToCart}
-        className='absolute bottom-4 right-4 w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 cursor-pointer z-10'
-        style={{ backgroundColor: itemQuantity > 0 ? '#262626' : '#DC013C' }}
-        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#1a1a1a' : '#b8012f'}
-        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#262626' : '#DC013C'}
-      >
-        <ShoppingCartIcon className='text-white' size={18} />
-        {itemQuantity > 0 && (
-          <span className='absolute -top-1 -right-1 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-md' style={{ backgroundColor: '#DC013C' }}>
-            {itemQuantity}
-          </span>
-        )}
-      </button>
+      {/* Cart / Out of stock indicator - Bottom Right */}
+      {isOutOfStock ? (
+        <div className="absolute bottom-4 right-4 px-3 py-1.5 rounded-full bg-gray-200 text-gray-600 text-xs font-semibold z-10">
+          Out of Stock
+        </div>
+      ) : (
+        <button 
+          onClick={handleAddToCart}
+          className='absolute bottom-4 right-4 w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 cursor-pointer z-10'
+          style={{ backgroundColor: itemQuantity > 0 ? '#262626' : '#DC013C' }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#1a1a1a' : '#b8012f'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#262626' : '#DC013C'}
+        >
+          <ShoppingCartIcon className='text-white' size={18} />
+          {itemQuantity > 0 && (
+            <span className='absolute -top-1 -right-1 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-md' style={{ backgroundColor: '#DC013C' }}>
+              {itemQuantity}
+            </span>
+          )}
+        </button>
+      )}
     </Link>
   )
 }

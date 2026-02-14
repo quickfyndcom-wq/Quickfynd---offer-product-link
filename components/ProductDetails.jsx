@@ -122,19 +122,36 @@ const ProductDetails = ({ product, reviews = [] }) => {
     ? selectedVariant.stock
     : (typeof product.stockQuantity === 'number' ? product.stockQuantity : 0);
   const maxOrderQty = Math.min(20, Math.max(0, availableStock));
+  const hasAnyVariantStock = variants.length > 0
+    ? variants.some(v => Number(v?.stock || 0) > 0)
+    : false;
+  const hasBaseStock = typeof product.stockQuantity === 'number' ? product.stockQuantity > 0 : true;
+  const isGloballyOutOfStock = variants.length > 0
+    ? !hasAnyVariantStock || product.inStock === false
+    : product.inStock === false || !hasBaseStock;
   const discountPercent = effMrp > effPrice
     ? Math.round(((effMrp - effPrice) / effMrp) * 100)
     : 0;
 
   // Helper to check if a color+size combination has stock
   const isVariantInStock = (color, size) => {
+    if (isGloballyOutOfStock) return false;
+
     const variant = variants.find(v => {
       const cOk = v.options?.color ? v.options.color === color : !color;
       const sOk = v.options?.size ? v.options.size === size : !size;
       return cOk && sOk;
     });
-    return variant ? (variant.stock > 0) : true;
+    if (variant) return variant.stock > 0;
+    // For non-variant products, rely on base stock/inStock flags
+    if (variants.length === 0) {
+      const hasStockQty = typeof product.stockQuantity === 'number' ? product.stockQuantity > 0 : true;
+      return product.inStock !== false && hasStockQty;
+    }
+    return false;
   };
+
+  const isSelectionInStock = isVariantInStock(selectedColor, selectedSize);
 
   // Helper to check if color has any size in stock
   const isColorAvailable = (color) => {
@@ -209,7 +226,11 @@ const ProductDetails = ({ product, reviews = [] }) => {
     try {
       if (isSignedIn) {
         // Check server wishlist for signed-in users
-        const { data } = await axios.get('/api/wishlist');
+        const token = await user?.getIdToken?.();
+        if (!token) return;
+        const { data } = await axios.get('/api/wishlist', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const isInList = data.wishlist?.some(item => item.productId === product._id);
         setIsInWishlist(isInList);
       } else {
@@ -232,9 +253,13 @@ const ProductDetails = ({ product, reviews = [] }) => {
       if (isSignedIn) {
         // Handle server wishlist for signed-in users
         const action = isInWishlist ? 'remove' : 'add';
+        const token = await user?.getIdToken?.();
+        if (!token) throw new Error('No auth token');
         await axios.post('/api/wishlist', { 
           productId: product._id, 
           action 
+        }, {
+          headers: { Authorization: `Bearer ${token}` },
         });
         
         setIsInWishlist(!isInWishlist);
@@ -257,6 +282,7 @@ const ProductDetails = ({ product, reviews = [] }) => {
           // Add to wishlist with product details
           const wishlistItem = {
             productId: product._id,
+            slug: product.slug,
             name: product.name,
             price: effPrice,
             mrp: effMrp,
@@ -316,6 +342,7 @@ const ProductDetails = ({ product, reviews = [] }) => {
   };
 
   const handleOrderNow = () => {
+    if (!isSelectionInStock || maxOrderQty <= 0) return;
     // Add to cart for both guests and signed-in users
     let qty = Math.min(quantity, maxOrderQty || 0);
     if (!Number.isFinite(qty) || qty <= 0) {
@@ -337,6 +364,7 @@ const ProductDetails = ({ product, reviews = [] }) => {
   };
 
   const handleAddToCart = async () => {
+    if (!isSelectionInStock || maxOrderQty <= 0) return;
     // Add to cart for both guests and signed-in users
     let qty = Math.min(quantity, maxOrderQty || 0);
     if (!Number.isFinite(qty) || qty <= 0) {
@@ -696,9 +724,9 @@ const ProductDetails = ({ product, reviews = [] }) => {
             </div>
 
             {/* Stock Availability */}
-              {typeof product.stockQuantity === 'number' && (
+              {(typeof product.stockQuantity === 'number' || product.inStock === false) && (
                 <div className="flex items-center gap-2">
-                  {product.stockQuantity === 0 ? (
+                  {isGloballyOutOfStock ? (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 text-sm font-medium rounded-lg border border-red-200">
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -718,7 +746,7 @@ const ProductDetails = ({ product, reviews = [] }) => {
 
             {/* Price Section */}
             <div className="space-y-2">
-              {!isVariantInStock(selectedColor, selectedSize) && (
+              {!isSelectionInStock && !isGloballyOutOfStock && (
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 text-sm font-medium rounded-lg border border-red-200">
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -911,53 +939,55 @@ const ProductDetails = ({ product, reviews = [] }) => {
             </div>
 
             {/* Quantity */}
-            <div className="space-y-2 pt-2">
-              <label className="text-sm font-semibold text-gray-900">Quantity</label>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  disabled={quantity <= 1}
-                  className={`w-9 h-9 flex items-center justify-center border rounded transition ${quantity <= 1 ? 'border-gray-200 text-gray-300 cursor-not-allowed' : 'border-gray-300 hover:bg-gray-100 text-gray-700'}`}
-                >
-                  <MinusIcon size={16} className="text-gray-700" />
-                </button>
-                <div className="w-14 h-9 flex items-center justify-center border border-gray-300 rounded font-semibold text-base">
-                  {quantity}
+            {isSelectionInStock && (
+              <div className="space-y-2 pt-2">
+                <label className="text-sm font-semibold text-gray-900">Quantity</label>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    disabled={quantity <= 1}
+                    className={`w-9 h-9 flex items-center justify-center border rounded transition ${quantity <= 1 ? 'border-gray-200 text-gray-300 cursor-not-allowed' : 'border-gray-300 hover:bg-gray-100 text-gray-700'}`}
+                  >
+                    <MinusIcon size={16} className="text-gray-700" />
+                  </button>
+                  <div className="w-14 h-9 flex items-center justify-center border border-gray-300 rounded font-semibold text-base">
+                    {quantity}
+                  </div>
+                  <button
+                    onClick={() => setQuantity(Math.min(quantity + 1, maxOrderQty || 1))}
+                    disabled={quantity >= (maxOrderQty || 1) || !isSelectionInStock}
+                    className={`w-9 h-9 flex items-center justify-center border rounded transition ${
+                      quantity >= (maxOrderQty || 1) || !isSelectionInStock
+                        ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                        : 'border-gray-300 hover:bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    <PlusIcon size={16} className="text-gray-700" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => setQuantity(Math.min(quantity + 1, maxOrderQty || 1))}
-                  disabled={quantity >= (maxOrderQty || 1) || !isVariantInStock(selectedColor, selectedSize)}
-                  className={`w-9 h-9 flex items-center justify-center border rounded transition ${
-                    quantity >= (maxOrderQty || 1) || !isVariantInStock(selectedColor, selectedSize)
-                      ? 'border-gray-200 text-gray-300 cursor-not-allowed'
-                      : 'border-gray-300 hover:bg-gray-100 text-gray-700'
-                  }`}
-                >
-                  <PlusIcon size={16} className="text-gray-700" />
-                </button>
               </div>
-            </div>
+            )}
 
             {/* Action Buttons */}
             <div className="hidden md:flex gap-2 pt-3">
               <button 
                 onClick={handleOrderNow}
-                disabled={!isVariantInStock(selectedColor, selectedSize)}
+                disabled={!isSelectionInStock}
                 className={`flex-1 py-3.5 px-6 rounded-lg font-semibold text-base transition flex items-center justify-center gap-2 ${
-                  !isVariantInStock(selectedColor, selectedSize)
+                  !isSelectionInStock
                     ? 'bg-gray-400 text-white cursor-not-allowed opacity-70'
                     : 'bg-red-500 text-white hover:bg-red-600'
                 }`}
               >
-                {!isVariantInStock(selectedColor, selectedSize) ? 'Out of Stock' : 'Order Now'}
-                {isVariantInStock(selectedColor, selectedSize) && (
+                {!isSelectionInStock ? 'Out of Stock' : 'Order Now'}
+                {isSelectionInStock && (
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                   </svg>
                 )}
               </button>
 
-              {isVariantInStock(selectedColor, selectedSize) && (
+              {isSelectionInStock && (
                 cartItems[product._id] ? (
                   <button
                     onClick={() => router.push('/cart')}
@@ -1212,7 +1242,7 @@ const ProductDetails = ({ product, reviews = [] }) => {
         effPrice={effPrice}
         currency={currency}
         cartCount={cartCount}
-        isOutOfStock={!isVariantInStock(selectedColor, selectedSize)}
+        isOutOfStock={!isSelectionInStock}
       />
 
       <style jsx>{`

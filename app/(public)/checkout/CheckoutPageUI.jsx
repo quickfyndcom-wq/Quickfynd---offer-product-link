@@ -497,6 +497,12 @@ export default function CheckoutPage() {
 
   // Build cart array
   const cartArray = [];
+  const isPurchasableProduct = (product) => {
+    if (!product) return false;
+    if (product.inStock === false) return false;
+    if (typeof product.stockQuantity === 'number' && product.stockQuantity <= 0) return false;
+    return true;
+  };
   console.log('Checkout - Cart Items:', cartItems);
   console.log('Checkout - Products:', products?.map(p => ({ id: p._id, name: p.name })));
   
@@ -505,9 +511,11 @@ export default function CheckoutPage() {
     const qty = typeof value === 'number' ? value : value?.quantity || 0;
     const priceOverride = typeof value === 'number' ? undefined : value?.price;
     if (product && qty > 0) {
-      console.log('Found product for key:', key, product.name);
-      const unitPrice = priceOverride ?? product.price ?? 0;
-      cartArray.push({ ...product, quantity: qty, _cartPrice: unitPrice });
+      if (isPurchasableProduct(product)) {
+        console.log('Found purchasable product for key:', key, product.name);
+        const unitPrice = priceOverride ?? product.price ?? 0;
+        cartArray.push({ ...product, quantity: qty, _cartPrice: unitPrice });
+      }
     } else {
       console.log('No product found for key:', key);
     }
@@ -711,7 +719,7 @@ export default function CheckoutPage() {
     setFormError("");
     // Validate required fields
     if (cartArray.length === 0) {
-      setFormError("Your cart is empty.");
+      setFormError("All items in your cart are currently out of stock. Please remove them to continue.");
       return;
     }
 
@@ -783,11 +791,12 @@ export default function CheckoutPage() {
       }
       // Prepare payload but DON'T create order yet - wait for payment verification
       try {
-        // Build items from cart state to include variantOptions
-        const itemsFromStateCard = Object.entries(cartItems || {}).map(([id, value]) => {
-          const qty = typeof value === 'number' ? value : value?.quantity || 0;
+        // Build items from purchasable cart items only
+        const itemsFromStateCard = cartArray.map((item) => {
+          const value = cartItems?.[item._id];
+          const qty = typeof value === 'number' ? value : value?.quantity || item.quantity || 0;
           const variantOptions = typeof value === 'object' ? value?.variantOptions : undefined;
-          return { id, quantity: qty, ...(variantOptions ? { variantOptions } : {}) };
+          return { id: item._id, quantity: qty, ...(variantOptions ? { variantOptions } : {}) };
         }).filter(i => i.quantity > 0);
 
         let payload = {
@@ -876,10 +885,11 @@ export default function CheckoutPage() {
       console.log('Checkout - User object:', user);
       
       // Build items directly from cartItems to preserve variantOptions
-      const itemsFromState = Object.entries(cartItems || {}).map(([id, value]) => {
-        const qty = typeof value === 'number' ? value : value?.quantity || 0;
+      const itemsFromState = cartArray.map((item) => {
+        const value = cartItems?.[item._id];
+        const qty = typeof value === 'number' ? value : value?.quantity || item.quantity || 0;
         const variantOptions = typeof value === 'object' ? value?.variantOptions : undefined;
-        return { id, quantity: qty, ...(variantOptions ? { variantOptions } : {}) };
+        return { id: item._id, quantity: qty, ...(variantOptions ? { variantOptions } : {}) };
       }).filter(i => i.quantity > 0);
       
       if (user) {

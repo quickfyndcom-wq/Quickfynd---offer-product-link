@@ -14,7 +14,6 @@ import {
 import { useDispatch } from "react-redux";
 import { addToCart } from "@/lib/features/cart/cartSlice";
 import PageTitle from "@/components/PageTitle";
-import Loading from "@/components/Loading";
 import DashboardSidebar from "@/components/DashboardSidebar";
 
 const PLACEHOLDER_IMAGE = "/placeholder.png";
@@ -38,8 +37,15 @@ const getProduct = (item) => {
   };
 };
 
+const getProductPath = (product) => {
+  if (!product) return null;
+  if (!product.slug) return null;
+  return `/product/${product.slug}`;
+};
+
 function WishlistAuthed() {
-  const { user, isSignedIn, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const isSignedIn = !!user;
   const router = useRouter();
   const dispatch = useDispatch();
 
@@ -60,17 +66,48 @@ function WishlistAuthed() {
       const data = JSON.parse(
         localStorage.getItem("guestWishlist") || "[]"
       );
-      setWishlist(Array.isArray(data) ? data : []);
+      const normalized = Array.isArray(data) ? data : [];
+      setWishlist(normalized);
+
+      // Hydrate missing slugs for old guest wishlist entries
+      const missingSlugIds = [...new Set(
+        normalized
+          .filter((item) => item && !item.slug)
+          .map((item) => item.productId || item.id)
+          .filter(Boolean)
+      )];
+
+      if (missingSlugIds.length > 0) {
+        axios
+          .post('/api/products/batch', { productIds: missingSlugIds })
+          .then(({ data: batchData }) => {
+            const map = new Map((batchData?.products || []).map((p) => [String(p._id), p.slug]));
+            const hydrated = normalized.map((item) => {
+              if (!item) return item;
+              if (item.slug) return item;
+              const pid = item.productId || item.id;
+              const slug = map.get(String(pid));
+              return slug ? { ...item, slug } : item;
+            });
+            setWishlist(hydrated);
+            localStorage.setItem('guestWishlist', JSON.stringify(hydrated));
+            window.dispatchEvent(new Event('wishlistUpdated'));
+          })
+          .catch(() => {
+            // ignore slug hydration failures
+          });
+      }
     } catch {
       setWishlist([]);
     } finally {
       setLoading(false);
+      window.dispatchEvent(new Event('wishlistUpdated'));
     }
   };
 
   const loadUserWishlist = async () => {
     try {
-      const token = await user.getIdToken(true);
+      const token = await user.getIdToken();
       const { data } = await axios.get("/api/wishlist", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -79,6 +116,7 @@ function WishlistAuthed() {
       setWishlist([]);
     } finally {
       setLoading(false);
+      window.dispatchEvent(new Event('wishlistUpdated'));
     }
   };
 
@@ -93,10 +131,11 @@ function WishlistAuthed() {
       localStorage.setItem("guestWishlist", JSON.stringify(updated));
       setWishlist(updated);
       setSelected((s) => s.filter((x) => x !== pid));
+      window.dispatchEvent(new Event('wishlistUpdated'));
       return;
     }
 
-    const token = await user.getIdToken(true);
+    const token = await user.getIdToken();
     await axios.post(
       "/api/wishlist",
       { productId: pid, action: "remove" },
@@ -105,6 +144,7 @@ function WishlistAuthed() {
 
     setWishlist((w) => w.filter((i) => i.productId !== pid));
     setSelected((s) => s.filter((x) => x !== pid));
+    window.dispatchEvent(new Event('wishlistUpdated'));
   };
 
   const toggleSelect = (pid) => {
@@ -121,15 +161,48 @@ function WishlistAuthed() {
     );
   };
 
-  const addSelectedToCart = () => {
+  const addSelectedItemsToCart = () => {
+    let added = 0;
     selected.forEach((pid) => {
       const item = wishlist.find(
         (i) => (i.productId || i.id) === pid
       );
       const product = getProduct(item);
-      if (product) dispatch(addToCart({ product }));
+      if (product) {
+        const productId = product._id || product.productId || product._pid || item?.productId || item?.id;
+        if (!productId) return;
+        dispatch(addToCart({ productId, price: Number(product.price) || 0 }));
+        added += 1;
+      }
     });
-    router.push("/cart");
+    return added;
+  };
+
+  const goToCartWithSelected = () => {
+    const added = addSelectedItemsToCart();
+    if (added > 0) router.push("/cart");
+  };
+
+  const goToCheckoutWithSelected = () => {
+    const added = addSelectedItemsToCart();
+    if (added > 0) router.push("/checkout");
+  };
+
+  const resolveProductPath = async (product) => {
+    const direct = getProductPath(product);
+    if (direct) return direct;
+
+    const pid = product?._id || product?.productId || product?._pid || product?.id;
+    if (!pid) return null;
+
+    try {
+      const { data } = await axios.post('/api/products/batch', { productIds: [pid] });
+      const slug = data?.products?.[0]?.slug;
+      if (slug) return `/product/${slug}`;
+    } catch {
+      // ignore
+    }
+    return null;
   };
 
   const total = selected.reduce((sum, pid) => {
@@ -140,13 +213,24 @@ function WishlistAuthed() {
     return sum + Number(product?.price || 0);
   }, 0);
 
-  if (authLoading || loading) return <Loading />;
+  if (authLoading || loading) {
+    return (
+      <>
+        <PageTitle title="My Wishlist" />
+        <div className="max-w-[1250px] mx-auto px-4 sm:px-6 py-10">
+          <div className="flex items-center justify-center py-16">
+            <div className="h-10 w-10 rounded-full border-4 border-orange-200 border-t-orange-500 animate-spin" />
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
       <PageTitle title="My Wishlist" />
 
-      <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-[4fr_1fr] gap-6">
+      <div className="max-w-[1250px] mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-[4fr_1fr] gap-6">
         {isSignedIn && <DashboardSidebar />}
 
         {/* ------------------ LEFT (80%) ------------------ */}
@@ -202,13 +286,6 @@ function WishlistAuthed() {
                         isSelected ? 'border-orange-500 shadow-lg' : 'border-gray-200 hover:border-orange-200'
                       }`}
                     >
-                      {/* Discount Badge */}
-                      {discount > 0 && (
-                        <div className="absolute top-2 left-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-md z-10">
-                          {discount}% OFF
-                        </div>
-                      )}
-
                       {/* SELECT */}
                       <button
                         onClick={() => toggleSelect(product._pid)}
@@ -230,9 +307,10 @@ function WishlistAuthed() {
                       {/* IMAGE */}
                       <div
                         className="aspect-square p-4 cursor-pointer bg-gray-50 group-hover:bg-gray-100 transition-colors"
-                        onClick={() =>
-                          router.push(`/product/${product.slug}`)
-                        }
+                        onClick={async () => {
+                          const productPath = await resolveProductPath(product);
+                          if (productPath) router.push(productPath);
+                        }}
                       >
                         <Image
                           src={img}
@@ -258,12 +336,20 @@ function WishlistAuthed() {
                               ₹{product.mrp.toLocaleString()}
                             </span>
                           )}
+                          {discount > 0 && (
+                            <span className="inline-flex items-center text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded-full text-white bg-green-500">
+                              {discount}% OFF
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex gap-2 mt-4">
                           <button
                             onClick={() =>
-                              dispatch(addToCart({ product }))
+                              dispatch(addToCart({
+                                productId: product._id || product.productId || product._pid,
+                                price: Number(product.price) || 0,
+                              }))
                             }
                             className="flex-1 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 hover:shadow-md"
                             style={{ backgroundColor: '#DC013C' }}
@@ -315,17 +401,31 @@ function WishlistAuthed() {
               </div>
             </div>
 
-            <button
-              disabled={selected.length === 0}
-              onClick={addSelectedToCart}
-              className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-                selected.length === 0
-                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  : "bg-gradient-to-r from-orange-500 to-red-500 text-white hover:from-orange-600 hover:to-red-600 shadow-lg hover:shadow-xl transform hover:scale-105"
-              }`}
-            >
-              {selected.length === 0 ? 'Select Items' : 'Go to Checkout'}
-            </button>
+            <div className="space-y-3">
+              <button
+                disabled={selected.length === 0}
+                onClick={goToCartWithSelected}
+                className={`w-full py-3 rounded-xl font-bold text-base transition-all ${
+                  selected.length === 0
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    : "bg-white border-2 border-orange-400 text-orange-600 hover:bg-orange-50"
+                }`}
+              >
+                {selected.length === 0 ? 'Select Items' : 'Go to Cart'}
+              </button>
+
+              <button
+                disabled={selected.length === 0}
+                onClick={goToCheckoutWithSelected}
+                className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
+                  selected.length === 0
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-orange-500 to-red-500 text-white hover:from-orange-600 hover:to-red-600 shadow-lg hover:shadow-xl transform hover:scale-105"
+                }`}
+              >
+                {selected.length === 0 ? 'Select Items' : 'Go to Checkout'}
+              </button>
+            </div>
             
             {selected.length > 0 && (
               <p className="text-xs text-gray-500 text-center mt-3">
@@ -344,13 +444,21 @@ function WishlistAuthed() {
               <p className="text-xs text-gray-500 font-medium">{selected.length} {selected.length === 1 ? 'item' : 'items'} selected</p>
               <p className="font-bold text-xl text-gray-900">₹{total.toLocaleString()}</p>
             </div>
-            <button
-              onClick={addSelectedToCart}
-              className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-8 py-3.5 rounded-xl font-bold hover:from-orange-600 hover:to-red-600 transition-all shadow-lg flex items-center gap-2"
-            >
-              <ShoppingCartIcon size={20} />
-              Checkout
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={goToCartWithSelected}
+                className="bg-white border-2 border-orange-400 text-orange-600 px-4 py-3 rounded-xl font-semibold hover:bg-orange-50 transition-all"
+              >
+                Cart
+              </button>
+              <button
+                onClick={goToCheckoutWithSelected}
+                className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-5 py-3.5 rounded-xl font-bold hover:from-orange-600 hover:to-red-600 transition-all shadow-lg flex items-center gap-2"
+              >
+                <ShoppingCartIcon size={20} />
+                Checkout
+              </button>
+            </div>
           </div>
         </div>
       )}

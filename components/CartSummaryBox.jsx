@@ -1,7 +1,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 
-export default function CartSummaryBox({ subtotal, shipping, total }) {
+export default function CartSummaryBox({ subtotal, shipping, total, checkoutDisabled = false, checkoutNote = "" }) {
   const router = useRouter();
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full">
@@ -24,6 +24,9 @@ export default function CartSummaryBox({ subtotal, shipping, total }) {
           <span>₹ {total.toLocaleString()}</span>
         </div>
       </div>
+      {checkoutNote && (
+        <p className="text-xs text-red-600 mb-3">{checkoutNote}</p>
+      )}
       <button
         className="w-full border border-gray-300 rounded-md py-2 font-semibold text-gray-800 mb-3 hover:bg-gray-100 transition"
         onClick={() => router.push("/products")}
@@ -31,10 +34,14 @@ export default function CartSummaryBox({ subtotal, shipping, total }) {
         Continue Shopping
       </button>
       <button
-        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-md transition"
-        onClick={() => router.push("/checkout")}
+        className={`w-full text-white font-bold py-2 rounded-md transition ${checkoutDisabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
+        onClick={() => {
+          if (checkoutDisabled) return;
+          router.push("/checkout");
+        }}
+        disabled={checkoutDisabled}
       >
-        Checkout
+        {checkoutDisabled ? 'Checkout Unavailable' : 'Checkout'}
       </button>
     </div>
   );

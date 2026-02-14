@@ -10,9 +10,17 @@ export async function GET(request) {
         return NextResponse.json({ error: "Missing slug" }, { status: 400 });
     }
     // Only select needed fields for performance
-    const product = await Product.findOne({ slug })
-        .select('name slug description shortDescription mrp price images category sku inStock stockQuantity hasVariants variants attributes hasBulkPricing bulkPricing fastDelivery allowReturn allowReplacement storeId imageAspectRatio createdAt updatedAt')
+    const selectFields = 'name slug description shortDescription mrp price images category sku inStock stockQuantity hasVariants variants attributes hasBulkPricing bulkPricing fastDelivery allowReturn allowReplacement storeId imageAspectRatio createdAt updatedAt';
+    let product = await Product.findOne({ slug })
+        .select(selectFields)
         .lean();
+
+    // Fallback: support product id in slug param for old links/data
+    if (!product && /^[a-fA-F0-9]{24}$/.test(slug)) {
+        product = await Product.findById(slug)
+            .select(selectFields)
+            .lean();
+    }
     if (!product) {
         return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }

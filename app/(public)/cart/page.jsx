@@ -64,22 +64,26 @@ export default function Cart() {
 
         for (const [key, value] of Object.entries(cartItems || {})) {
             const product = products.find((p) => String(p._id) === String(key));
-            const qty = typeof value === 'number' ? value : 0;
+            const qty = typeof value === 'number' ? value : value?.quantity || 0;
             
             if (product && qty > 0) {
-                const unitPrice = product.price ?? 0;
+                const unitPrice = (typeof value === 'object' ? value?.price : undefined) ?? product.price ?? 0;
                 arr.push({ ...product, quantity: qty, _cartPrice: unitPrice });
-                total += unitPrice * qty;
+                const isOutOfStock = product.inStock === false || (typeof product.stockQuantity === 'number' && product.stockQuantity <= 0);
+                if (!isOutOfStock) {
+                    total += unitPrice * qty;
+                }
             } else if (!product && qty > 0) {
                 // Product not found - could be still loading or deleted
                 // Don't delete it, just skip display for now
                 console.warn('[Cart Page] Product not found in list:', key, 'qty:', qty);
+                invalidKeys.push(key);
             }
         }
 
-        // Only delete if we have a reasonable number of products loaded
+        // Only delete after products are confirmed loaded
         // (to avoid deleting valid items during initial load)
-        if (products.length > 50 && invalidKeys.length > 0) {
+        if (productsLoaded && invalidKeys.length > 0) {
             invalidKeys.forEach((key) => dispatch(deleteItemFromCart({ productId: key })));
         }
 
@@ -91,7 +95,7 @@ export default function Cart() {
         if (products.length > 0) {
             createCartArray();
         }
-    }, [cartItems, products]);
+    }, [cartItems, products, productsLoaded]);
 
     useEffect(() => {
         async function loadShipping() {
@@ -152,6 +156,16 @@ export default function Cart() {
         dispatch(deleteItemFromCart({ productId }));
     };
 
+    const getMaxQty = (item) => {
+        if (item?.inStock === false) return 0;
+        if (typeof item?.stockQuantity === 'number') return Math.max(0, item.stockQuantity);
+        return null;
+    };
+
+    const inStockCartArray = cartArray.filter((item) => getMaxQty(item) !== 0);
+    const outOfStockCartArray = cartArray.filter((item) => getMaxQty(item) === 0);
+    const checkoutDisabled = inStockCartArray.length === 0;
+
     return (
         <div>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -163,8 +177,11 @@ export default function Cart() {
 
                         <div className="flex gap-6 max-lg:flex-col">
                             <div className="flex-1 space-y-4">
-                                {cartArray.map((item, index) => (
+                                {inStockCartArray.map((item, index) => (
                                     <div key={index} className="rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow" style={{ background: "inherit" }}>
+                                        {(() => {
+                                            const maxQty = getMaxQty(item);
+                                            return (
                                         <div className="flex gap-4">
                                             <div className="w-24 h-24 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
                                                 <Image
@@ -184,7 +201,7 @@ export default function Cart() {
                                                         <p className="text-lg font-bold text-orange-600">{currency} {(item._cartPrice ?? item.price ?? 0).toLocaleString()}</p>
                                                     </div>
                                                     <div className="flex items-center gap-3">
-                                                        <Counter productId={item._id} />
+                                                        <Counter productId={item._id} maxQty={maxQty} />
                                                     </div>
                                                 </div>
 
@@ -209,8 +226,69 @@ export default function Cart() {
                                                 <p className="text-lg font-bold text-gray-900">{currency}{((item._cartPrice ?? item.price ?? 0) * item.quantity).toLocaleString()}</p>
                                             </div>
                                         </div>
+                                            );
+                                        })()}
                                     </div>
                                 ))}
+
+                                {outOfStockCartArray.length > 0 && (
+                                    <>
+                                        <div className="pt-2 mt-2 border-t border-gray-200">
+                                            <h2 className="text-lg md:text-xl font-bold text-red-600">Out of Stock Products</h2>
+                                            <p className="text-xs text-gray-500 mt-1">These items are kept in cart but excluded from checkout.</p>
+                                        </div>
+                                        {outOfStockCartArray.map((item, index) => (
+                                            <div key={`oos-${index}`} className="rounded-lg p-4 shadow-sm border border-red-100 bg-red-50/40">
+                                                <div className="flex gap-4">
+                                                    <div className="w-24 h-24 flex-shrink-0 bg-white rounded-lg overflow-hidden">
+                                                        <Image
+                                                            src={item.images[0]}
+                                                            alt={item.name}
+                                                            width={96}
+                                                            height={96}
+                                                            className="w-full h-full object-contain p-2"
+                                                        />
+                                                    </div>
+
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="font-semibold text-gray-900 text-sm md:text-base line-clamp-2 mb-1">{item.name}</h3>
+                                                        <p className="text-xs text-gray-500 mb-1">{item.category}</p>
+                                                        <p className="text-xs font-semibold text-red-600 mb-2">Out of Stock</p>
+
+                                                        <div className="flex items-center justify-between mt-3">
+                                                            <div>
+                                                                <p className="text-lg font-bold text-orange-600">{currency} {(item._cartPrice ?? item.price ?? 0).toLocaleString()}</p>
+                                                            </div>
+                                                            <div className="flex items-center gap-3">
+                                                                <Counter productId={item._id} maxQty={0} />
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center justify-between mt-3 md:hidden">
+                                                            <p className="text-sm font-semibold text-gray-900">Total: {currency}{((item._cartPrice ?? item.price ?? 0) * item.quantity).toLocaleString()}</p>
+                                                            <button
+                                                                onClick={() => handleDeleteItemFromCart(item._id)}
+                                                                className="text-red-500 hover:text-red-700 text-sm font-medium"
+                                                            >
+                                                                REMOVE
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="hidden md:flex flex-col items-end justify-between">
+                                                        <button
+                                                            onClick={() => handleDeleteItemFromCart(item._id)}
+                                                            className="text-gray-400 hover:text-red-500 transition-colors"
+                                                        >
+                                                            <Trash2Icon size={20} />
+                                                        </button>
+                                                        <p className="text-lg font-bold text-gray-900">{currency}{((item._cartPrice ?? item.price ?? 0) * item.quantity).toLocaleString()}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
                             </div>
 
                             <div className="lg:w-[380px]">
@@ -219,6 +297,8 @@ export default function Cart() {
                                         subtotal={totalPrice}
                                         shipping={shippingFee}
                                         total={totalPrice + shippingFee}
+                                        checkoutDisabled={checkoutDisabled}
+                                        checkoutNote={outOfStockCartArray.length > 0 ? `${outOfStockCartArray.length} out-of-stock item(s) are excluded from checkout.` : ''}
                                     />
                                 </div>
                             </div>
