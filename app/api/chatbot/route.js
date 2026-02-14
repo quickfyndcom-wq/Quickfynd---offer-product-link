@@ -49,10 +49,89 @@ export async function POST(request) {
             return text.length > max ? `${text.slice(0, max - 1)}…` : text;
         };
 
+        const normalizeText = (input = '') => String(input || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        const tokenize = (input = '') => normalizeText(input).split(' ').filter(Boolean);
+
+        const levenshteinDistance = (a = '', b = '') => {
+            const s = String(a);
+            const t = String(b);
+            if (s === t) return 0;
+            if (!s.length) return t.length;
+            if (!t.length) return s.length;
+
+            const dp = Array.from({ length: s.length + 1 }, () => new Array(t.length + 1).fill(0));
+            for (let i = 0; i <= s.length; i += 1) dp[i][0] = i;
+            for (let j = 0; j <= t.length; j += 1) dp[0][j] = j;
+
+            for (let i = 1; i <= s.length; i += 1) {
+                for (let j = 1; j <= t.length; j += 1) {
+                    const cost = s[i - 1] === t[j - 1] ? 0 : 1;
+                    dp[i][j] = Math.min(
+                        dp[i - 1][j] + 1,
+                        dp[i][j - 1] + 1,
+                        dp[i - 1][j - 1] + cost
+                    );
+                }
+            }
+            return dp[s.length][t.length];
+        };
+
+        const similarityRatio = (a = '', b = '') => {
+            const s = normalizeText(a);
+            const t = normalizeText(b);
+            if (!s || !t) return 0;
+            const maxLen = Math.max(s.length, t.length);
+            if (maxLen === 0) return 1;
+            return 1 - (levenshteinDistance(s, t) / maxLen);
+        };
+
+        const hasFuzzyKeyword = (input = '', keywords = []) => {
+            const tokens = tokenize(input);
+            if (tokens.length === 0) return false;
+
+            return keywords.some((kw) => {
+                const key = normalizeText(kw);
+                if (!key) return false;
+                if (normalizeText(input).includes(key)) return true;
+                return tokens.some((token) => {
+                    if (Math.abs(token.length - key.length) > 2) return false;
+                    return levenshteinDistance(token, key) <= 1;
+                });
+            });
+        };
+
+        const scoreIntent = (input = '', keywords = [], fuzzyKeywords = []) => {
+            const text = normalizeText(input);
+            if (!text) return 0;
+
+            let score = 0;
+            for (const kw of keywords) {
+                if (text.includes(normalizeText(kw))) score += 2;
+            }
+            if (hasFuzzyKeyword(input, fuzzyKeywords)) score += 1;
+            return score;
+        };
+
         const productIntentRegex = /(product|item|details|detail|spec|specs|feature|features|price|cost|mrp|buy|suggest|recommend|show|tell me about|about|compare|which one|best|phone|mobile|laptop|headphone|watch|shoe|shoes|dress|shirt|kitchen|beauty|skincare|gadget)/i;
-        const isProductQuery = productIntentRegex.test(String(message || ''));
         const orderIntentRegex = /(order|track|tracking|awb|shipment|shipped|delivery status|where is my order|order status|courier|consignment)/i;
-        const isOrderQuery = orderIntentRegex.test(String(message || ''));
+
+        const productIntentScore = scoreIntent(message,
+            ['product', 'details', 'price', 'spec', 'feature', 'buy', 'recommend', 'compare', 'mobile', 'laptop', 'shoe', 'beauty'],
+            ['prodct', 'detials', 'prce', 'recomend', 'moblie', 'leptop']
+        );
+
+        const orderIntentScore = scoreIntent(message,
+            ['order', 'track', 'tracking', 'status', 'shipment', 'courier', 'awb', 'where is my order'],
+            ['tracklign', 'trakcing', 'oder', 'shippment', 'curier']
+        );
+
+        const isProductQuery = productIntentRegex.test(String(message || '')) || productIntentScore >= 2;
+        const isOrderQuery = orderIntentRegex.test(String(message || '')) || orderIntentScore >= 2;
 
         const extractOrderIdentifier = (input = '') => {
             const text = String(input || '').trim();
@@ -68,10 +147,70 @@ export async function POST(request) {
             return '';
         };
 
+        const extractEmail = (input = '') => {
+            const text = String(input || '').trim();
+            const emailMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+            return emailMatch ? emailMatch[0].toLowerCase() : '';
+        };
+
+        const normalizeDigits = (value = '') => String(value || '').replace(/\D/g, '');
+
+        const extractPhone = (input = '') => {
+            const text = String(input || '').trim();
+            const candidates = text.match(/\+?\d[\d\s\-()]{6,}\d/g) || [];
+            for (const candidate of candidates) {
+                const digits = normalizeDigits(candidate);
+                if (digits.length >= 7 && digits.length <= 15) return digits;
+            }
+            return '';
+        };
+
+        const extractOrderContact = (order = {}) => {
+            const orderEmail = String(
+                order?.guestEmail || order?.shippingAddress?.email || ''
+            ).toLowerCase().trim();
+
+            const phoneCandidates = [
+                order?.guestPhone,
+                order?.alternatePhone,
+                order?.shippingAddress?.phone,
+                order?.shippingAddress?.alternatePhone,
+            ].filter(Boolean).map((p) => normalizeDigits(p));
+
+            const uniquePhones = [...new Set(phoneCandidates.filter((p) => p.length >= 7))];
+            return { orderEmail, orderPhones: uniquePhones };
+        };
+
+        const verifyOrderContact = (order = {}, email = '', phone = '') => {
+            if (!email && !phone) return true;
+            const { orderEmail, orderPhones } = extractOrderContact(order);
+
+            if (email) {
+                if (!orderEmail || orderEmail !== String(email).toLowerCase().trim()) {
+                    return false;
+                }
+            }
+
+            if (phone) {
+                const normPhone = normalizeDigits(phone);
+                const last10 = normPhone.slice(-10);
+                const phoneMatch = orderPhones.some((p) => p === normPhone || p.endsWith(last10) || normPhone.endsWith(p.slice(-10)));
+                if (!phoneMatch) return false;
+            }
+
+            return true;
+        };
+
         const formatOrderLookupForContext = (lookup) => {
             if (!lookup?.found) {
+                if (lookup?.contactMismatch) {
+                    return `Order was found but contact verification failed for the provided email/phone.`;
+                }
                 if (lookup?.identifier) {
                     return `Order lookup attempted for identifier "${lookup.identifier}", but no order was found.`;
+                }
+                if (lookup?.email || lookup?.phone) {
+                    return `Order lookup attempted using contact details (email/phone), but no order was found.`;
                 }
                 return 'No order identifier found in the current customer message.';
             }
@@ -87,6 +226,7 @@ export async function POST(request) {
 - Tracking ID: ${order?.trackingId || 'Not assigned yet'}
 - Courier: ${order?.courier || 'N/A'}
 - Tracking URL: ${order?.trackingUrl || 'N/A'}
+- Matched By: ${lookup?.matchedBy || 'N/A'}
 - Created At: ${order?.createdAt || 'N/A'}
 - Items Count: ${itemsCount}
 - Live Tracking Note: ${lookup?.liveTrackingNote || 'No live courier sync in this request.'}`;
@@ -108,36 +248,122 @@ export async function POST(request) {
                 .slice(0, 8);
         };
 
+        const scoreProductMatch = (query = '', product = {}, terms = []) => {
+            const q = normalizeText(query);
+            const name = normalizeText(product?.name || '');
+            const desc = normalizeText(product?.description || '');
+            const cat = normalizeText(product?.category || '');
+            if (!q || !name) return 0;
+
+            let score = 0;
+
+            // Exact/partial string signals
+            if (name.includes(q)) score += 5;
+            if (q.includes(name)) score += 3;
+            if (desc.includes(q)) score += 2;
+            if (cat && q.includes(cat)) score += 1.5;
+
+            // Token overlap signals
+            for (const term of terms) {
+                if (name.includes(term)) score += 1.2;
+                if (desc.includes(term)) score += 0.6;
+                if (cat.includes(term)) score += 0.8;
+            }
+
+            // Typo tolerance signal
+            const nameTokens = tokenize(name).slice(0, 8);
+            const queryTokens = tokenize(q).slice(0, 8);
+            for (const qt of queryTokens) {
+                if (qt.length < 3) continue;
+                let best = 0;
+                for (const nt of nameTokens) {
+                    const sim = similarityRatio(qt, nt);
+                    if (sim > best) best = sim;
+                }
+                if (best >= 0.82) score += 0.9;
+                else if (best >= 0.7) score += 0.45;
+            }
+
+            return score;
+        };
+
+        const extractedIdentifier = extractOrderIdentifier(message);
+        const extractedEmail = extractEmail(message);
+        const extractedPhone = extractPhone(message);
+        const hasTrackingInputs = Boolean(extractedIdentifier || extractedEmail || extractedPhone);
+
+        if (isOrderQuery && !hasTrackingInputs) {
+            return NextResponse.json({
+                message: `Absolutely — I can track it for you 🚚\n\nPlease fill the input with any ONE detail:\n• Order ID\n• Tracking ID / AWB\n• Registered Email\n• Registered Phone Number\n\nExample: Track my order | Email: yourname@gmail.com`,
+                timestamp: new Date().toISOString(),
+                requiresTrackingInput: true
+            });
+        }
+
         try {
             // Fetch products and store info for context
             await dbConnect();
 
             if (isOrderQuery) {
-                const identifier = extractOrderIdentifier(message);
-                liveOrderLookup = { identifier, found: false, order: null, liveTrackingNote: '' };
+                const identifier = extractedIdentifier;
+                const email = extractedEmail;
+                const phone = extractedPhone;
+                liveOrderLookup = { identifier, email, phone, found: false, contactMismatch: false, matchedBy: '', order: null, liveTrackingNote: '' };
 
-                if (identifier) {
+                if (identifier || email || phone) {
                     let order = null;
 
                     if (/^[a-fA-F0-9]{24}$/.test(identifier)) {
                         order = await Order.findById(identifier)
                             .select('_id shortOrderNumber status paymentMethod paymentStatus isPaid total trackingId courier trackingUrl createdAt orderItems')
                             .lean();
+                        if (order) liveOrderLookup.matchedBy = 'orderId';
                     }
 
                     if (!order && /^\d{4,10}$/.test(identifier)) {
                         order = await Order.findOne({ shortOrderNumber: Number(identifier) })
                             .select('_id shortOrderNumber status paymentMethod paymentStatus isPaid total trackingId courier trackingUrl createdAt orderItems')
                             .lean();
+                        if (order) liveOrderLookup.matchedBy = 'shortOrderNumber';
                     }
 
-                    if (!order) {
+                    if (!order && identifier) {
                         order = await Order.findOne({ trackingId: identifier })
                             .select('_id shortOrderNumber status paymentMethod paymentStatus isPaid total trackingId courier trackingUrl createdAt orderItems')
                             .lean();
+                        if (order) liveOrderLookup.matchedBy = 'trackingId';
+                    }
+
+                    if (!order && (email || phone)) {
+                        const contactOr = [];
+                        if (email) {
+                            contactOr.push({ guestEmail: new RegExp(`^${escapeRegex(email)}$`, 'i') });
+                            contactOr.push({ 'shippingAddress.email': new RegExp(`^${escapeRegex(email)}$`, 'i') });
+                        }
+                        if (phone) {
+                            const p = normalizeDigits(phone);
+                            const last10 = p.slice(-10);
+                            const phoneRegex = new RegExp(`${escapeRegex(last10)}$`);
+                            contactOr.push({ guestPhone: phoneRegex });
+                            contactOr.push({ alternatePhone: phoneRegex });
+                            contactOr.push({ 'shippingAddress.phone': phoneRegex });
+                            contactOr.push({ 'shippingAddress.alternatePhone': phoneRegex });
+                        }
+
+                        if (contactOr.length > 0) {
+                            order = await Order.findOne({ $or: contactOr })
+                                .sort({ createdAt: -1 })
+                                .select('_id shortOrderNumber status paymentMethod paymentStatus isPaid total trackingId courier trackingUrl createdAt orderItems guestEmail guestPhone alternatePhone shippingAddress')
+                                .lean();
+                            if (order) liveOrderLookup.matchedBy = email && phone ? 'email+phone' : (email ? 'email' : 'phone');
+                        }
                     }
 
                     if (order) {
+                        const contactVerified = verifyOrderContact(order, email, phone);
+                        if (!contactVerified) {
+                            liveOrderLookup.contactMismatch = true;
+                        } else {
                         liveOrderLookup.found = true;
                         liveOrderLookup.order = order;
 
@@ -151,6 +377,7 @@ export async function POST(request) {
                             } catch (trackingErr) {
                                 liveOrderLookup.liveTrackingNote = 'Live tracking sync failed; showing stored order status.';
                             }
+                        }
                         }
                     }
                 }
@@ -187,14 +414,29 @@ export async function POST(request) {
                     ]))
                 ];
 
-                matchedProducts = await Product.find({
+                const regexMatches = await Product.find({
                     inStock: true,
                     $or: orClauses
                 })
                     .select('_id name slug description price mrp category inStock stockQuantity fastDelivery')
                     .sort({ fastDelivery: -1, price: 1 })
-                    .limit(6)
+                    .limit(20)
                     .lean();
+
+                // Hybrid ranking algorithm: DB regex + similarity scoring
+                const byId = new Map();
+                for (const p of [...regexMatches, ...products]) {
+                    if (p?._id) byId.set(String(p._id), p);
+                }
+
+                const ranked = [...byId.values()]
+                    .map((p) => ({ product: p, score: scoreProductMatch(message, p, terms) + (p.fastDelivery ? 0.15 : 0) }))
+                    .filter((x) => x.score > 0.6)
+                    .sort((a, b) => b.score - a.score)
+                    .slice(0, 6)
+                    .map((x) => x.product);
+
+                matchedProducts = ranked;
             }
 
             const matchedProductsContext = matchedProducts.length > 0
@@ -217,17 +459,26 @@ export async function POST(request) {
 **LANGUAGE: ${languageInstruction}**
 
 **CRITICAL - Sound Human:**
-- Talk naturally like you're having a real conversation, not giving automated responses
-- Don't use corporate speak, bullet points, or overly structured answers
-- Vary your responses - sometimes short, sometimes longer, but always natural
-- Use casual phrases based on the language
-- Show personality - be excited, sympathetic, casual, funny when appropriate
-- Don't always be perfectly helpful - sometimes ask back, joke around, or chat casually
-- Mix up your greeting style - don't start every message the same way
-- Use emojis naturally (but not in every sentence)
-- Sometimes use lowercase, sometimes not - be human about it
-- Don't end every message with a question - let conversation flow naturally
-- Remember the conversation context - if they answered a question, acknowledge it naturally
+- Talk naturally like a real support person, not like a robotic assistant.
+- Be clear, polite, and easy to understand.
+- Keep tone friendly but professional.
+- Use conversation context and acknowledge what customer already shared.
+- Ask follow-up questions only when needed to solve the issue.
+- Give direct, actionable answers instead of generic text.
+
+**DOUBT-RESOLUTION RULES (VERY IMPORTANT):**
+- First understand the exact customer doubt, then answer that doubt directly.
+- If customer asks a specific question, start with the direct answer in first line.
+- If information is missing, ask only the minimum required detail.
+- Never ignore customer concern; always give a clear next step.
+- For product doubts, explain key details simply (price, availability, feature, delivery).
+- For order doubts, explain current status and what the customer should do next.
+
+**STYLE - ATTRACTIVE CHATBOT REPLIES:**
+- Keep replies visually clean and easy to read.
+- Use short sections, smart spacing, and relevant emojis (not overused).
+- Give one clear next step at the end when user needs to act.
+- Sound modern and premium, like a polished AI shopping assistant.
 
 **PRODUCT RESPONSE RULES (VERY IMPORTANT):**
 - If the customer asks about a product (casual or specific), always provide product details.
@@ -240,7 +491,10 @@ export async function POST(request) {
 **ORDER TRACKING RULES (VERY IMPORTANT):**
 - If customer asks about order tracking/status, use the "LIVE ORDER LOOKUP" section first.
 - If live lookup has an order, provide exact order status, payment status, tracking ID, and next step.
-- If no order identifier is found, ask customer to share Order ID / short order number / tracking ID.
+- Accept tracking using any of: Order ID, short order number, tracking ID, registered phone number, or email.
+- If user asks tracking but hasn't provided valid details, ask them to fill input with email / phone / order ID / tracking ID.
+- If phone/email returns multiple possible matches, prefer the latest order and ask customer to share order ID for exact verification.
+- If contact verification fails for provided email/phone, ask customer to re-check contact details.
 - If identifier was provided but no order matched, clearly say not found and ask to re-check the ID.
 
 **STORE INFORMATION:**
@@ -469,22 +723,30 @@ IMPORTANT: Use ALL this information to answer customer questions accurately. If 
                         const o = liveOrderLookup.order;
                         const itemsCount = Array.isArray(o.orderItems) ? o.orderItems.length : 0;
                         return NextResponse.json({
-                            message: `I found your order.\n\nOrder ID: ${o._id}\nStatus: ${o.status || 'N/A'}\nPayment: ${o.paymentMethod || 'N/A'} (${o.isPaid ? 'Paid' : 'Pending'})\nTracking ID: ${o.trackingId || 'Not assigned yet'}\nCourier: ${o.courier || 'N/A'}\nItems: ${itemsCount}\nTotal: ₹${Number(o.total || 0)}\n\n${liveOrderLookup.liveTrackingNote || 'I can also help you with return/cancellation for this order.'}`,
+                            message: `I found your order.\n\nOrder ID: ${o._id}\nStatus: ${o.status || 'N/A'}\nPayment: ${o.paymentMethod || 'N/A'} (${o.isPaid ? 'Paid' : 'Pending'})\nTracking ID: ${o.trackingId || 'Not assigned yet'}\nCourier: ${o.courier || 'N/A'}\nItems: ${itemsCount}\nTotal: ₹${Number(o.total || 0)}\nMatched by: ${liveOrderLookup.matchedBy || 'N/A'}\n\n${liveOrderLookup.liveTrackingNote || 'I can also help you with return/cancellation for this order.'}`,
                             timestamp: new Date().toISOString(),
                             isFallback: true
                         });
                     }
 
-                    if (!liveOrderLookup?.identifier) {
+                    if (liveOrderLookup?.contactMismatch) {
                         return NextResponse.json({
-                            message: "Sure — I can track your order. Please share any one of these: Order ID, short order number, or Tracking ID (AWB).",
+                            message: "I found an order, but the provided email/phone doesn't match that order. Please re-check your contact details or share the exact Order ID.",
+                            timestamp: new Date().toISOString(),
+                            isFallback: true
+                        });
+                    }
+
+                    if (!liveOrderLookup?.identifier && !liveOrderLookup?.email && !liveOrderLookup?.phone) {
+                        return NextResponse.json({
+                            message: "Sure — I can track your order. Please share any one of these: Order ID, short order number, Tracking ID (AWB), registered phone number, or email.",
                             timestamp: new Date().toISOString(),
                             isFallback: true
                         });
                     }
 
                     return NextResponse.json({
-                        message: `I couldn't find an order for \"${liveOrderLookup.identifier}\". Please re-check the Order ID / Tracking ID and send it again.`,
+                        message: `I couldn't find an order with the details provided${liveOrderLookup.identifier ? ` (ID: \"${liveOrderLookup.identifier}\")` : ''}. Please re-check Order ID / Tracking ID / phone / email and send again.`,
                         timestamp: new Date().toISOString(),
                         isFallback: true
                     });

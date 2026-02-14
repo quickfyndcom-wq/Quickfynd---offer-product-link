@@ -36,10 +36,10 @@ export async function POST(request){
         // Track abandoned carts by product store
         if (cart && Object.keys(cart).length > 0) {
             try {
-                const cartItems = Object.entries(cart).map(([productId, quantity]) => ({
+                const cartItems = Object.entries(cart).map(([productId, entry]) => ({
                     productId,
-                    quantity
-                }));
+                    quantity: typeof entry === 'number' ? entry : Number(entry?.quantity || 0)
+                })).filter((it) => it.quantity > 0);
 
                 const productIds = cartItems.map(it => it.productId);
                 const products = await Product.find({ _id: { $in: productIds } })
@@ -128,6 +128,45 @@ export async function GET(request){
         }
 
         return NextResponse.json({ cart: user.cart || {} });
+    } catch (error) {
+        console.error(error);
+        return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+}
+
+// Delete one item from user cart
+export async function DELETE(request) {
+    try {
+        const authHeader = request.headers.get("authorization");
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const idToken = authHeader.split(" ")[1];
+        let decodedToken;
+        try {
+            decodedToken = await getAuth().verifyIdToken(idToken);
+        } catch (e) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const userId = decodedToken.uid;
+        const { productId } = await request.json();
+        const productKey = String(productId || "").trim();
+
+        if (!productKey) {
+            return NextResponse.json({ error: "productId is required" }, { status: 400 });
+        }
+
+        await dbConnect();
+
+        const updatedUser = await User.findOneAndUpdate(
+            { _id: userId },
+            { $unset: { [`cart.${productKey}`]: 1 } },
+            { new: true }
+        );
+
+        return NextResponse.json({ cart: updatedUser?.cart || {} });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: error.message }, { status: 400 });

@@ -23,7 +23,7 @@ const UserSchema = new mongoose.Schema({
   image: String,
   cart: {
     type: Map,
-    of: Number,
+    of: mongoose.Schema.Types.Mixed,
     default: {}
   },
   // Location tracking
@@ -53,5 +53,9 @@ const UserSchema = new mongoose.Schema({
   }
   // Add other fields as needed
 }, { timestamps: true, _id: false }); // Disable auto ObjectId generation
+
+if (process.env.NODE_ENV === "development" && mongoose.models.User) {
+  delete mongoose.models.User;
+}
 
 export default mongoose.models.User || mongoose.model("User", UserSchema);

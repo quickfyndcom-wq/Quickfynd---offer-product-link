@@ -13,6 +13,7 @@ import DashboardSidebar from '@/components/DashboardSidebar'
 
 export default function DashboardProfilePage() {
   const [user, setUser] = useState(undefined)
+  const [dbPhone, setDbPhone] = useState('')
   const [activeTab, setActiveTab] = useState('profile')
   const [isEditing, setIsEditing] = useState(false)
   const [addresses, setAddresses] = useState([])
@@ -25,6 +26,22 @@ export default function DashboardProfilePage() {
     const unsub = onAuthStateChanged(auth, (u) => setUser(u ?? null))
     return () => unsub()
   }, [])
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user) return
+      try {
+        const token = await auth.currentUser.getIdToken(true)
+        const { data } = await axios.get('/api/profile', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        setDbPhone(data?.profile?.phone || '')
+      } catch {
+        setDbPhone('')
+      }
+    }
+    loadProfile()
+  }, [user])
 
   // load saved addresses for the user
   useEffect(() => {
@@ -88,17 +105,16 @@ export default function DashboardProfilePage() {
                       <span className="font-medium text-slate-700">Email: </span>{user.email || '—'}
                     </div>
                     <div className="text-slate-600">
-                      <span className="font-medium text-slate-700">Phone: </span>{user.phoneNumber || '—'}
+                      <span className="font-medium text-slate-700">Phone: </span>{dbPhone || user.phoneNumber || '—'}
                     </div>
                     <div className="text-slate-600">
                       <span className="font-medium text-slate-700">Account Created: </span>{new Date(user.metadata?.creationTime || Date.now()).toLocaleString()}
                     </div>
-                    <div className="text-slate-500">UID: {user.uid}</div>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8 items-start">
                 {/* Edit-only section */}
                 <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
                   <h2 className="text-lg font-semibold text-slate-800 mb-2">Edit Profile</h2>
@@ -111,11 +127,22 @@ export default function DashboardProfilePage() {
                         e.preventDefault()
                         const formData = new FormData(e.currentTarget)
                         const displayName = formData.get('displayName')?.toString() || ''
+                        const phone = formData.get('phone')?.toString().trim() || ''
                         const photoURL = formData.get('photoURL')?.toString() || user.photoURL || ''
                         try {
                           await updateProfile(auth.currentUser, { displayName, photoURL })
+                          const token = await auth.currentUser.getIdToken(true)
+                          await axios.patch('/api/profile', {
+                            name: displayName,
+                            phone,
+                            image: photoURL,
+                            email: user.email || '',
+                          }, {
+                            headers: { Authorization: `Bearer ${token}` },
+                          })
                           toast.success('Profile updated')
                           setUser({ ...user, displayName, photoURL })
+                          setDbPhone(phone)
                           setIsEditing(false)
                         } catch (err) {
                           toast.error(err?.message || 'Failed to update profile')
@@ -128,6 +155,14 @@ export default function DashboardProfilePage() {
                         defaultValue={user.displayName || ''}
                         className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
                         placeholder="Your name"
+                      />
+                      <label className="text-xs text-slate-700 font-medium mt-1">Phone</label>
+                      <input
+                        name="phone"
+                        defaultValue={dbPhone || user.phoneNumber || ''}
+                        maxLength={15}
+                        className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        placeholder="Enter phone number"
                       />
                       <label className="text-xs text-slate-700 font-medium mt-1">Profile Photo</label>
                       <div className="flex items-center gap-3">
@@ -162,6 +197,16 @@ export default function DashboardProfilePage() {
                               
                               if (data.url) {
                                 await updateProfile(auth.currentUser, { photoURL: data.url })
+                                const latestPhone = (document.querySelector('input[name="phone"]')?.value || dbPhone || '').trim()
+                                const token2 = await auth.currentUser.getIdToken(true)
+                                await axios.patch('/api/profile', {
+                                  name: user.displayName || '',
+                                  phone: latestPhone,
+                                  image: data.url,
+                                  email: user.email || '',
+                                }, {
+                                  headers: { Authorization: `Bearer ${token2}` },
+                                })
                                 setUser({ ...user, photoURL: data.url })
                                 toast.success('Photo uploaded successfully')
                               }
@@ -176,6 +221,32 @@ export default function DashboardProfilePage() {
                         />
                       </div>
                       {uploading && <p className="text-xs text-blue-600">Uploading...</p>}
+                      {user.photoURL && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await updateProfile(auth.currentUser, { photoURL: '' })
+                              const token = await auth.currentUser.getIdToken(true)
+                              await axios.patch('/api/profile', {
+                                name: user.displayName || '',
+                                phone: dbPhone || '',
+                                image: '',
+                                email: user.email || '',
+                              }, {
+                                headers: { Authorization: `Bearer ${token}` },
+                              })
+                              setUser({ ...user, photoURL: '' })
+                              toast.success('Profile photo removed')
+                            } catch (err) {
+                              toast.error(err?.response?.data?.error || 'Failed to remove photo')
+                            }
+                          }}
+                          className="w-fit text-xs px-3 py-1.5 rounded-md bg-red-50 text-red-600 hover:bg-red-100"
+                        >
+                          Remove Photo
+                        </button>
+                      )}
                       <input type="hidden" name="photoURL" value={user.photoURL || ''} />
                       <div className="flex gap-2 mt-2">
                         <button type="submit" className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
@@ -186,21 +257,21 @@ export default function DashboardProfilePage() {
                 </div>
 
                 {/* Saved addresses */}
-                <div id="addresses" className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 max-h-96 flex flex-col">
+                <div id="addresses" className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="text-lg font-semibold text-slate-800">Saved Addresses</h2>
                     <button onClick={() => { setAddrToEdit(null); setShowAddrModal(true) }} className="text-xs text-blue-600 hover:underline font-medium">Add New</button>
                   </div>
                   {addrLoading ? (
-                    <div className="flex items-center justify-center py-3">
-                      <Loading />
+                    <div className="flex items-center justify-center py-6">
+                      <div className="w-7 h-7 rounded-full border-2 border-slate-300 border-t-blue-500 animate-spin" />
                     </div>
                   ) : addresses.length === 0 ? (
                     <div className="flex items-center justify-center py-4">
                       <p className="text-slate-500 text-center text-sm">No saved addresses yet.<br/><span className="text-xs">Click "Add New" to create one.</span></p>
                     </div>
                   ) : (
-                    <ul className="space-y-2 overflow-y-auto flex-1">
+                    <ul className="space-y-2 overflow-y-auto max-h-96">
                       {addresses.map((a) => (
                         <li key={a.id || a._id} className="border border-slate-200 rounded-lg p-3 text-xs text-slate-700 hover:border-slate-300 transition">
                           <div className="flex items-start justify-between gap-2">

@@ -17,7 +17,7 @@ import Truck from '../assets/delivery.png';
 import WalletIcon from '../assets/common/wallet.svg';
 import SignInModal from './SignInModal';
 import NavbarMenuBar from './NavbarMenuBar';
-import { clearCart, fetchCart } from '@/lib/features/cart/cartSlice';
+import { clearCart, fetchCart, uploadCart } from '@/lib/features/cart/cartSlice';
 
 const Navbar = () => {
   const dispatch = useDispatch();
@@ -349,6 +349,17 @@ const Navbar = () => {
     });
     return () => unsubscribe();
   }, [dispatch]);
+
+  // Keep signed-in cart synced to DB so navbar count and refresh remain accurate
+  useEffect(() => {
+    if (!firebaseUser) return;
+
+    const timer = setTimeout(() => {
+      dispatch(uploadCart({ getToken: async () => firebaseUser.getIdToken() }));
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [cartItems, firebaseUser, dispatch]);
 
   const fetchWalletCoins = async () => {
     try {

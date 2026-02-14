@@ -1,22 +1,22 @@
 
 "use client";
 
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch, useSelector, useStore } from "react-redux";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import Counter from "@/components/Counter";
 import CartSummaryBox from "@/components/CartSummaryBox";
 import ProductCard from "@/components/ProductCard";
-import { deleteItemFromCart, fetchCart } from "@/lib/features/cart/cartSlice";
+import { deleteItemFromCart, fetchCart, uploadCart } from "@/lib/features/cart/cartSlice";
 import { PackageIcon, Trash2Icon } from "lucide-react";
 import Image from "next/image";
-import { calculateShipping, fetchShippingSettings } from "@/lib/shipping";
 import { useAuth } from "@/lib/useAuth";
 
 export const dynamic = "force-dynamic";
 
 export default function Cart() {
     const dispatch = useDispatch();
+    const store = useStore();
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "₹";
     const { user, getToken } = useAuth();
     const isSignedIn = !!user;
@@ -29,8 +29,8 @@ export default function Cart() {
     const [totalPrice, setTotalPrice] = useState(0);
     const [recentOrders, setRecentOrders] = useState([]);
     const [loadingOrders, setLoadingOrders] = useState(true);
-    const [shippingSetting, setShippingSetting] = useState(null);
-    const [shippingFee, setShippingFee] = useState(0);
+    const shippingFee = 0;
+    const [deletingKeys, setDeletingKeys] = useState({});
 
 
     // Ensure products list is loaded for cart display
@@ -67,7 +67,7 @@ export default function Cart() {
             
             if (product && qty > 0) {
                 const unitPrice = (typeof value === 'object' ? value?.price : undefined) ?? product.price ?? 0;
-                arr.push({ ...product, quantity: qty, _cartPrice: unitPrice });
+                arr.push({ ...product, quantity: qty, _cartPrice: unitPrice, _cartKey: key });
                 const isOutOfStock = product.inStock === false || (typeof product.stockQuantity === 'number' && product.stockQuantity <= 0);
                 if (!isOutOfStock) {
                     total += unitPrice * qty;
@@ -84,6 +84,7 @@ export default function Cart() {
         // (to avoid deleting valid items during initial load)
         if (productsLoaded && invalidKeys.length > 0) {
             invalidKeys.forEach((key) => dispatch(deleteItemFromCart({ productId: key })));
+            dispatch(uploadCart({ getToken }));
         }
 
         setCartArray(arr);
@@ -95,22 +96,6 @@ export default function Cart() {
             createCartArray();
         }
     }, [cartItems, products, productsLoaded]);
-
-    useEffect(() => {
-        async function loadShipping() {
-            const setting = await fetchShippingSettings();
-            setShippingSetting(setting);
-        }
-        loadShipping();
-    }, []);
-
-    useEffect(() => {
-        if (shippingSetting && cartArray.length > 0) {
-            setShippingFee(calculateShipping({ cartItems: cartArray, shippingSetting }));
-        } else {
-            setShippingFee(0);
-        }
-    }, [shippingSetting, cartArray]);
 
     const fetchRecentOrders = async () => {
         if (!isSignedIn) {
@@ -167,8 +152,46 @@ export default function Cart() {
         return <div className="text-center py-16 text-gray-400">Loading cart…</div>;
     }
 
-    const handleDeleteItemFromCart = (productId) => {
-        dispatch(deleteItemFromCart({ productId }));
+    const handleDeleteItemFromCart = async (cartKey) => {
+        const key = String(cartKey || '');
+        if (!key) return;
+
+        setDeletingKeys((prev) => ({ ...prev, [key]: true }));
+        dispatch(deleteItemFromCart({ productId: key }));
+
+        if (isSignedIn) {
+            try {
+                const token = await getToken();
+                if (token) {
+                    await axios.delete('/api/cart', {
+                        headers: { Authorization: `Bearer ${token}` },
+                        data: { productId: key },
+                    });
+
+                    // Force DB cart to exactly match current Redux cart (extra safety)
+                    const latestCart = store.getState()?.cart?.cartItems || {};
+                    await axios.post('/api/cart', { cart: latestCart }, {
+                        headers: { Authorization: `Bearer ${token}` },
+                    });
+                } else {
+                    await dispatch(uploadCart({ getToken }));
+                }
+                await dispatch(fetchCart({ getToken }));
+            } finally {
+                setDeletingKeys((prev) => {
+                    const next = { ...prev };
+                    delete next[key];
+                    return next;
+                });
+            }
+            return;
+        }
+
+        setDeletingKeys((prev) => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+        });
     };
 
     const getMaxQty = (item) => {
@@ -182,7 +205,7 @@ export default function Cart() {
     const checkoutDisabled = inStockCartArray.length === 0;
 
     return (
-        <div>
+        <div className="min-h-[40dvh]">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                 {cartArray.length > 0 ? (
                     <>
@@ -193,7 +216,7 @@ export default function Cart() {
                         <div className="flex gap-6 max-lg:flex-col">
                             <div className="flex-1 space-y-4">
                                 {inStockCartArray.map((item, index) => (
-                                    <div key={index} className="rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow" style={{ background: "inherit" }}>
+                                    <div key={item._cartKey || index} className="rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow" style={{ background: "inherit" }}>
                                         {(() => {
                                             const maxQty = getMaxQty(item);
                                             return (
@@ -216,24 +239,28 @@ export default function Cart() {
                                                         <p className="text-lg font-bold text-orange-600">{currency} {(item._cartPrice ?? item.price ?? 0).toLocaleString()}</p>
                                                     </div>
                                                     <div className="flex items-center gap-3">
-                                                        <Counter productId={item._id} maxQty={maxQty} />
+                                                        <Counter productId={item._cartKey || item._id} maxQty={maxQty} />
                                                     </div>
                                                 </div>
 
                                                 <div className="flex items-center justify-between mt-3 md:hidden">
                                                     <p className="text-sm font-semibold text-gray-900">Total: {currency}{((item._cartPrice ?? item.price ?? 0) * item.quantity).toLocaleString()}</p>
                                                     <button
-                                                        onClick={() => handleDeleteItemFromCart(item._id)}
+                                                        onClick={() => handleDeleteItemFromCart(item._cartKey || item._id)}
+                                                        disabled={!!deletingKeys[item._cartKey]}
+                                                        type="button"
                                                         className="text-red-500 hover:text-red-700 text-sm font-medium"
                                                     >
-                                                        REMOVE
+                                                        {deletingKeys[item._cartKey] ? 'REMOVING...' : 'REMOVE'}
                                                     </button>
                                                 </div>
                                             </div>
 
                                             <div className="hidden md:flex flex-col items-end justify-between">
                                                 <button
-                                                    onClick={() => handleDeleteItemFromCart(item._id)}
+                                                    onClick={() => handleDeleteItemFromCart(item._cartKey || item._id)}
+                                                    disabled={!!deletingKeys[item._cartKey]}
+                                                    type="button"
                                                     className="text-gray-400 hover:text-red-500 transition-colors"
                                                 >
                                                     <Trash2Icon size={20} />
@@ -253,7 +280,7 @@ export default function Cart() {
                                             <p className="text-xs text-gray-500 mt-1">These items are kept in cart but excluded from checkout.</p>
                                         </div>
                                         {outOfStockCartArray.map((item, index) => (
-                                            <div key={`oos-${index}`} className="rounded-lg p-4 shadow-sm border border-red-100 bg-red-50/40">
+                                            <div key={`oos-${item._cartKey || index}`} className="rounded-lg p-4 shadow-sm border border-red-100 bg-red-50/40">
                                                 <div className="flex gap-4">
                                                     <div className="w-24 h-24 flex-shrink-0 bg-white rounded-lg overflow-hidden">
                                                         <Image
@@ -275,24 +302,28 @@ export default function Cart() {
                                                                 <p className="text-lg font-bold text-orange-600">{currency} {(item._cartPrice ?? item.price ?? 0).toLocaleString()}</p>
                                                             </div>
                                                             <div className="flex items-center gap-3">
-                                                                <Counter productId={item._id} maxQty={0} />
+                                                                <Counter productId={item._cartKey || item._id} maxQty={0} />
                                                             </div>
                                                         </div>
 
                                                         <div className="flex items-center justify-between mt-3 md:hidden">
                                                             <p className="text-sm font-semibold text-gray-900">Total: {currency}{((item._cartPrice ?? item.price ?? 0) * item.quantity).toLocaleString()}</p>
                                                             <button
-                                                                onClick={() => handleDeleteItemFromCart(item._id)}
+                                                                onClick={() => handleDeleteItemFromCart(item._cartKey || item._id)}
+                                                                disabled={!!deletingKeys[item._cartKey]}
+                                                                type="button"
                                                                 className="text-red-500 hover:text-red-700 text-sm font-medium"
                                                             >
-                                                                REMOVE
+                                                                {deletingKeys[item._cartKey] ? 'REMOVING...' : 'REMOVE'}
                                                             </button>
                                                         </div>
                                                     </div>
 
                                                     <div className="hidden md:flex flex-col items-end justify-between">
                                                         <button
-                                                            onClick={() => handleDeleteItemFromCart(item._id)}
+                                                            onClick={() => handleDeleteItemFromCart(item._cartKey || item._id)}
+                                                            disabled={!!deletingKeys[item._cartKey]}
+                                                            type="button"
                                                             className="text-gray-400 hover:text-red-500 transition-colors"
                                                         >
                                                             <Trash2Icon size={20} />
@@ -310,8 +341,9 @@ export default function Cart() {
                                 <div className="lg:sticky lg:top-6 space-y-6">
                                     <CartSummaryBox
                                         subtotal={totalPrice}
-                                        shipping={shippingFee}
-                                        total={totalPrice + shippingFee}
+                                        shipping={0}
+                                        total={totalPrice}
+                                        showShipping={false}
                                         checkoutDisabled={checkoutDisabled}
                                         checkoutNote={outOfStockCartArray.length > 0 ? `${outOfStockCartArray.length} out-of-stock item(s) are excluded from checkout.` : ''}
                                     />
