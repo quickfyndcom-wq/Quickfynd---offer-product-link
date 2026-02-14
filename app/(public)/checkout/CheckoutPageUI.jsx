@@ -549,6 +549,15 @@ export default function CheckoutPage() {
   const walletBalance = walletInfo?.rupeesValue ? Number(walletInfo.rupeesValue) : Number(walletInfo?.coins || 0);
   const walletCanCoverTotal = walletBalance >= Math.ceil(total);
   const walletCanUse = user && walletBalance > 0;
+  const selectedAddressForView = form.addressId ? addressList.find((a) => a._id === form.addressId) : null;
+  const shouldShowPhoneRequired =
+    !!user &&
+    addressList.length > 0 &&
+    !!form.addressId &&
+    !hasValidPhone(form.phone) &&
+    !hasValidPhone(selectedAddressForView?.phone) &&
+    !hasValidPhone(user?.phoneNumber || user?.phone);
+  const isPincodeError = /pincode/i.test(String(formError || ''));
 
   // Load shipping settings - refetch on page load and when products change
   useEffect(() => {
@@ -1024,16 +1033,6 @@ export default function CheckoutPage() {
         router.push(`/order-failed?reason=${encodeURIComponent('Order creation failed')}`);
       }
 
-      const selectedAddress = form.addressId ? addressList.find((a) => a._id === form.addressId) : null;
-      const shouldShowPhoneRequired =
-        !!user &&
-        addressList.length > 0 &&
-        !!form.addressId &&
-        !hasValidPhone(form.phone) &&
-        !hasValidPhone(selectedAddress?.phone) &&
-        !hasValidPhone(user?.phoneNumber || user?.phone);
-
-      const isPincodeError = /pincode/i.test(String(formError || ''));
     } catch (err) {
       const errorMsg = err.message || "Order failed. Please try again.";
       setFormError(errorMsg);
