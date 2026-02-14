@@ -84,6 +84,7 @@ export default function CheckoutPage() {
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
   const [storeId, setStoreId] = useState(null);
+  const [formError, setFormError] = useState("");
 
   const cleanDigits = (value) => (value ? String(value).replace(/\D/g, '') : '');
   const sanitizePincode = (value) => cleanDigits(value).trim();
@@ -734,7 +735,6 @@ export default function CheckoutPage() {
     }
   };
 
-  const [formError, setFormError] = useState("");
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError("");
