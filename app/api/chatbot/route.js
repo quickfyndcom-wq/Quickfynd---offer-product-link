@@ -3,7 +3,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import dbConnect from "@/lib/mongodb";
 import Product from "@/models/Product";
 import Coupon from "@/models/Coupon";
-import { getExpectedTAT, checkPincodeServiceability } from "@/lib/delhivery";
+import Order from "@/models/Order";
+import { getExpectedTAT, checkPincodeServiceability, fetchNormalizedDelhiveryTracking } from "@/lib/delhivery";
 
 // Validate API key exists
 if (!process.env.GEMINI_API_KEY) {
@@ -37,13 +38,129 @@ export async function POST(request) {
 
         const languageInstruction = languageInstructions[language] || languageInstructions.english;
 
+        let productsCache = [];
+        let couponsCache = [];
+        let liveOrderLookup = null;
+
+        const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const toShortText = (value = '', max = 160) => {
+            const text = String(value || '').replace(/\s+/g, ' ').trim();
+            if (!text) return 'Description not available.';
+            return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+        };
+
+        const productIntentRegex = /(product|item|details|detail|spec|specs|feature|features|price|cost|mrp|buy|suggest|recommend|show|tell me about|about|compare|which one|best|phone|mobile|laptop|headphone|watch|shoe|shoes|dress|shirt|kitchen|beauty|skincare|gadget)/i;
+        const isProductQuery = productIntentRegex.test(String(message || ''));
+        const orderIntentRegex = /(order|track|tracking|awb|shipment|shipped|delivery status|where is my order|order status|courier|consignment)/i;
+        const isOrderQuery = orderIntentRegex.test(String(message || ''));
+
+        const extractOrderIdentifier = (input = '') => {
+            const text = String(input || '').trim();
+            const objectIdMatch = text.match(/\b[a-fA-F0-9]{24}\b/);
+            if (objectIdMatch) return objectIdMatch[0];
+
+            const trackingLikeMatch = text.match(/\b[A-Z0-9-]{8,24}\b/i);
+            if (trackingLikeMatch) return trackingLikeMatch[0];
+
+            const shortOrderMatch = text.match(/\b\d{4,10}\b/);
+            if (shortOrderMatch) return shortOrderMatch[0];
+
+            return '';
+        };
+
+        const formatOrderLookupForContext = (lookup) => {
+            if (!lookup?.found) {
+                if (lookup?.identifier) {
+                    return `Order lookup attempted for identifier "${lookup.identifier}", but no order was found.`;
+                }
+                return 'No order identifier found in the current customer message.';
+            }
+
+            const order = lookup.order;
+            const itemsCount = Array.isArray(order?.orderItems) ? order.orderItems.length : 0;
+            return `Order found.
+- Order ID: ${order?._id || 'N/A'}
+- Short Order Number: ${order?.shortOrderNumber || 'N/A'}
+- Status: ${order?.status || 'N/A'}
+- Payment: ${order?.paymentMethod || 'N/A'} | Paid: ${order?.isPaid ? 'Yes' : 'No'}
+- Total: ₹${Number(order?.total || 0)}
+- Tracking ID: ${order?.trackingId || 'Not assigned yet'}
+- Courier: ${order?.courier || 'N/A'}
+- Tracking URL: ${order?.trackingUrl || 'N/A'}
+- Created At: ${order?.createdAt || 'N/A'}
+- Items Count: ${itemsCount}
+- Live Tracking Note: ${lookup?.liveTrackingNote || 'No live courier sync in this request.'}`;
+        };
+
+        const extractSearchTerms = (input = '') => {
+            const stopWords = new Set([
+                'the', 'a', 'an', 'for', 'and', 'with', 'from', 'this', 'that', 'these', 'those',
+                'please', 'show', 'tell', 'about', 'want', 'need', 'give', 'me', 'you', 'can', 'i',
+                'what', 'which', 'is', 'are', 'to', 'of', 'in', 'on', 'at', 'my', 'your', 'details'
+            ]);
+
+            return String(input || '')
+                .toLowerCase()
+                .replace(/[^a-z0-9\s-]/g, ' ')
+                .split(/\s+/)
+                .filter(Boolean)
+                .filter((word) => word.length >= 3 && !stopWords.has(word))
+                .slice(0, 8);
+        };
+
         try {
             // Fetch products and store info for context
             await dbConnect();
+
+            if (isOrderQuery) {
+                const identifier = extractOrderIdentifier(message);
+                liveOrderLookup = { identifier, found: false, order: null, liveTrackingNote: '' };
+
+                if (identifier) {
+                    let order = null;
+
+                    if (/^[a-fA-F0-9]{24}$/.test(identifier)) {
+                        order = await Order.findById(identifier)
+                            .select('_id shortOrderNumber status paymentMethod paymentStatus isPaid total trackingId courier trackingUrl createdAt orderItems')
+                            .lean();
+                    }
+
+                    if (!order && /^\d{4,10}$/.test(identifier)) {
+                        order = await Order.findOne({ shortOrderNumber: Number(identifier) })
+                            .select('_id shortOrderNumber status paymentMethod paymentStatus isPaid total trackingId courier trackingUrl createdAt orderItems')
+                            .lean();
+                    }
+
+                    if (!order) {
+                        order = await Order.findOne({ trackingId: identifier })
+                            .select('_id shortOrderNumber status paymentMethod paymentStatus isPaid total trackingId courier trackingUrl createdAt orderItems')
+                            .lean();
+                    }
+
+                    if (order) {
+                        liveOrderLookup.found = true;
+                        liveOrderLookup.order = order;
+
+                        const courier = String(order?.courier || '').toLowerCase();
+                        if (order?.trackingId && (courier.includes('delhivery') || !order?.trackingUrl)) {
+                            try {
+                                const normalized = await fetchNormalizedDelhiveryTracking(String(order.trackingId));
+                                if (normalized) {
+                                    liveOrderLookup.liveTrackingNote = `Live status: ${normalized.status || 'N/A'}${normalized.expectedDate ? ` | Expected: ${normalized.expectedDate}` : ''}`;
+                                }
+                            } catch (trackingErr) {
+                                liveOrderLookup.liveTrackingNote = 'Live tracking sync failed; showing stored order status.';
+                            }
+                        }
+                    }
+                }
+            }
+
             const products = await Product.find({ inStock: true })
-                .select('_id name description price mrp category inStock fastDelivery')
+                .select('_id name slug description price mrp category inStock stockQuantity fastDelivery')
                 .limit(50)
                 .lean();
+            productsCache = products;
 
             // Fetch active coupons
             const coupons = await Coupon.find({
@@ -52,6 +169,47 @@ export async function POST(request) {
             })
                 .select('code discountValue discountType description minOrderValue forNewUser forMember')
                 .lean();
+            couponsCache = coupons;
+
+            let matchedProducts = [];
+            if (isProductQuery) {
+                const terms = extractSearchTerms(message);
+                const nameRegex = new RegExp(escapeRegex(String(message || '').trim()).slice(0, 80), 'i');
+                const termRegexes = terms.map((term) => new RegExp(escapeRegex(term), 'i'));
+
+                const orClauses = [
+                    { name: nameRegex },
+                    { description: nameRegex },
+                    ...termRegexes.flatMap((rgx) => ([
+                        { name: rgx },
+                        { description: rgx },
+                        { category: rgx }
+                    ]))
+                ];
+
+                matchedProducts = await Product.find({
+                    inStock: true,
+                    $or: orClauses
+                })
+                    .select('_id name slug description price mrp category inStock stockQuantity fastDelivery')
+                    .sort({ fastDelivery: -1, price: 1 })
+                    .limit(6)
+                    .lean();
+            }
+
+            const matchedProductsContext = matchedProducts.length > 0
+                ? matchedProducts.map((p, i) => {
+                    const price = Number(p.price || 0);
+                    const mrp = Number(p.mrp || 0);
+                    const discount = mrp > price && mrp > 0 ? Math.round(((mrp - price) / mrp) * 100) : 0;
+                    const inStockText = p.inStock === false || (typeof p.stockQuantity === 'number' && p.stockQuantity <= 0)
+                        ? 'Out of stock'
+                        : 'In stock';
+                    return `${i + 1}. ${p.name}\n- Price: ₹${price}${mrp > price ? ` (MRP ₹${mrp}, ${discount}% off)` : ''}\n- Category: ${p.category || 'General'}\n- Availability: ${inStockText}\n- Fast Delivery: ${p.fastDelivery ? 'Yes' : 'No'}\n- Slug: ${p.slug || 'N/A'}\n- Description: ${toShortText(p.description)}`;
+                }).join('\n\n')
+                : 'No direct product match found for current message.';
+
+            const orderLookupContext = formatOrderLookupForContext(liveOrderLookup);
 
             // Build context for AI
             const systemContext = `You're chatting for Quickfynd store. Act like a real person who works here and genuinely wants to help. Don't sound like an AI assistant - talk like you're texting a friend who asked for shopping advice.
@@ -70,6 +228,20 @@ export async function POST(request) {
 - Sometimes use lowercase, sometimes not - be human about it
 - Don't end every message with a question - let conversation flow naturally
 - Remember the conversation context - if they answered a question, acknowledge it naturally
+
+**PRODUCT RESPONSE RULES (VERY IMPORTANT):**
+- If the customer asks about a product (casual or specific), always provide product details.
+- Prefer exact matched products from "BEST PRODUCT MATCHES" section.
+- For each suggested product, include: name, price, discount/MRP (if any), stock status, fast-delivery availability, and 1-line description.
+- If customer message is casual like "show products" or "what do you have", show 3-5 relevant products with details.
+- If no exact match exists, say that naturally and suggest closest category options from inventory.
+- Keep tone friendly and assistant-like, but informative and actionable.
+
+**ORDER TRACKING RULES (VERY IMPORTANT):**
+- If customer asks about order tracking/status, use the "LIVE ORDER LOOKUP" section first.
+- If live lookup has an order, provide exact order status, payment status, tracking ID, and next step.
+- If no order identifier is found, ask customer to share Order ID / short order number / tracking ID.
+- If identifier was provided but no order matched, clearly say not found and ask to re-check the ID.
 
 **STORE INFORMATION:**
 Store Name: QuickFynd
@@ -150,6 +322,12 @@ Available: Electronics, Fashion (Men/Women/Kids), Home & Kitchen, Beauty & Perso
 **CURRENT INVENTORY (${products.length} products in stock):**
 ${products.slice(0, 30).map(p => `${p.name} - ₹${p.price}${p.mrp > p.price ? ` (was ₹${p.mrp})` : ''} - ${p.category}${p.fastDelivery ? ' ⚡ Fast Delivery' : ''}`).join('\n')}
 
+**BEST PRODUCT MATCHES FOR CURRENT MESSAGE:**
+${matchedProductsContext}
+
+**LIVE ORDER LOOKUP FOR CURRENT MESSAGE:**
+${orderLookupContext}
+
 **ACTIVE DISCOUNTS & COUPONS:**
 ${coupons.length > 0 ? coupons.slice(0, 10).map(c => 
     `${c.code}: ${c.discountType === 'percentage' ? c.discountValue + '%' : '₹' + c.discountValue} off${c.minOrderValue ? ' (min order ₹' + c.minOrderValue + ')' : ''}${c.forNewUser ? ' [New Customers Only]' : ''}${c.forMember ? ' [Members Only]' : ''} - ${c.description || 'Limited time offer'}`
@@ -195,8 +373,8 @@ IMPORTANT: Use ALL this information to answer customer questions accurately. If 
                 : '';
 
             const fullPrompt = conversationContext 
-                ? `${systemContext}\n\n**Current Conversation:**\n${conversationContext}\n\n[Respond to the customer's last message naturally, remembering everything said before]`
-                : `${systemContext}\n\nCustomer: ${message}\n\n[Respond naturally]`;
+                ? `${systemContext}\n\n**Current Conversation:**\n${conversationContext}\n\n**Latest Customer Message:** ${message}\n\n[Respond naturally, include product details when product-related, and use live order lookup when order-related]`
+                : `${systemContext}\n\nCustomer: ${message}\n\n[Respond naturally, include product details when product-related, and use live order lookup when order-related]`;
 
             console.log('[Chatbot] Sending request to Gemini AI...');
 
@@ -286,6 +464,32 @@ IMPORTANT: Use ALL this information to answer customer questions accurately. If 
 
                 const langResponses = fallbackResponses[language] || fallbackResponses.english;
 
+                if (isOrderQuery) {
+                    if (liveOrderLookup?.found && liveOrderLookup?.order) {
+                        const o = liveOrderLookup.order;
+                        const itemsCount = Array.isArray(o.orderItems) ? o.orderItems.length : 0;
+                        return NextResponse.json({
+                            message: `I found your order.\n\nOrder ID: ${o._id}\nStatus: ${o.status || 'N/A'}\nPayment: ${o.paymentMethod || 'N/A'} (${o.isPaid ? 'Paid' : 'Pending'})\nTracking ID: ${o.trackingId || 'Not assigned yet'}\nCourier: ${o.courier || 'N/A'}\nItems: ${itemsCount}\nTotal: ₹${Number(o.total || 0)}\n\n${liveOrderLookup.liveTrackingNote || 'I can also help you with return/cancellation for this order.'}`,
+                            timestamp: new Date().toISOString(),
+                            isFallback: true
+                        });
+                    }
+
+                    if (!liveOrderLookup?.identifier) {
+                        return NextResponse.json({
+                            message: "Sure — I can track your order. Please share any one of these: Order ID, short order number, or Tracking ID (AWB).",
+                            timestamp: new Date().toISOString(),
+                            isFallback: true
+                        });
+                    }
+
+                    return NextResponse.json({
+                        message: `I couldn't find an order for \"${liveOrderLookup.identifier}\". Please re-check the Order ID / Tracking ID and send it again.`,
+                        timestamp: new Date().toISOString(),
+                        isFallback: true
+                    });
+                }
+
                 // Match user question to fallback response
                 const msgLower = message.toLowerCase();
                 let response = langResponses.default;
@@ -310,6 +514,25 @@ IMPORTANT: Use ALL this information to answer customer questions accurately. If 
                 else if (msgLower.includes('coupon') || msgLower.includes('code') || msgLower.includes('discount') || msgLower.includes('offer') || msgLower.includes('deal')) response = langResponses.coupon;
                 else if (msgLower.includes('policy') || msgLower.includes('policies') || msgLower.includes('terms') || msgLower.includes('conditions')) response = langResponses.policy;
                 else if (msgLower.includes('account') || msgLower.includes('login') || msgLower.includes('profile') || msgLower.includes('password') || msgLower.includes('sign')) response = langResponses.account;
+
+                const fallbackTerms = extractSearchTerms(message);
+                const fallbackMatches = productsCache
+                    .filter((p) => {
+                        const hay = `${p?.name || ''} ${p?.description || ''} ${p?.category || ''}`.toLowerCase();
+                        return fallbackTerms.length > 0 && fallbackTerms.some((t) => hay.includes(t));
+                    })
+                    .slice(0, 4);
+
+                if (isProductQuery && fallbackMatches.length > 0 && language === 'english') {
+                    const productLines = fallbackMatches.map((p) => {
+                        const price = Number(p.price || 0);
+                        const mrp = Number(p.mrp || 0);
+                        const discount = mrp > price && mrp > 0 ? Math.round(((mrp - price) / mrp) * 100) : 0;
+                        return `• ${p.name} — ₹${price}${mrp > price ? ` (MRP ₹${mrp}, ${discount}% off)` : ''} | ${p.fastDelivery ? 'Fast Delivery' : 'Standard Delivery'}\n  ${toShortText(p.description, 120)}`;
+                    }).join('\n');
+
+                    response = `Sure — here are some matching products with details:\n\n${productLines}\n\nIf you want, tell me your budget and I’ll suggest the best one.`;
+                }
 
                 return NextResponse.json({
                     message: response,
