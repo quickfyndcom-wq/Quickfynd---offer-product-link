@@ -105,6 +105,16 @@ export default function CheckoutPage() {
       setCouponError("Enter a coupon code to see discount.");
       return;
     }
+
+    if (isWalletOnly) {
+      setCouponError('Coupons cannot be used when wallet covers the full amount.');
+      return;
+    }
+
+    if (form.payment !== 'card') {
+      setCouponError('Coupons are available only for card payments.');
+      return;
+    }
     
     if (!user) {
       setCouponError("Please sign in to use coupons.");
@@ -604,6 +614,14 @@ export default function CheckoutPage() {
       setForm((f) => ({ ...f, payment: '' }));
     }
   }, [isWalletOnly, form.payment]);
+
+  useEffect(() => {
+    if (appliedCoupon && (isWalletOnly || form.payment !== 'card')) {
+      setAppliedCoupon(null);
+      setCoupon('');
+      setCouponError('Coupons are available only for card payments.');
+    }
+  }, [appliedCoupon, isWalletOnly, form.payment]);
 
   // Load shipping settings - refetch on page load and when products change
   useEffect(() => {
@@ -2392,11 +2410,21 @@ export default function CheckoutPage() {
                 />
                 <button
                   type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition whitespace-nowrap w-full sm:w-auto"
+                  disabled={isWalletOnly || form.payment !== 'card'}
+                  className={`font-semibold px-6 py-3 rounded-lg transition whitespace-nowrap w-full sm:w-auto ${
+                    isWalletOnly || form.payment !== 'card'
+                      ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
                 >
                   Apply
                 </button>
               </form>
+              {(isWalletOnly || form.payment !== 'card') && (
+                <div className="text-xs text-amber-600 mt-2">
+                  Coupons are available only for card payments.
+                </div>
+              )}
               {couponError && <div className="text-red-500 text-xs mt-2">{couponError}</div>}
             </div>
 
@@ -2426,8 +2454,14 @@ export default function CheckoutPage() {
                   
                   const cartProductIds = cartItemsArray.map(item => item.productId);
                   
+                  const canUseCoupons = !isWalletOnly && form.payment === 'card';
                   let isEligible = true;
                   let ineligibleReason = '';
+
+                  if (!canUseCoupons) {
+                    isEligible = false;
+                    ineligibleReason = 'Only for card payments';
+                  }
                   
                   // Check if expired
                   if (cpn.isExpired) {
