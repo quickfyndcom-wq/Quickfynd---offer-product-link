@@ -579,6 +579,7 @@ export default function CheckoutPage() {
   const safeRedeemCoins = Math.min(Math.floor(redeemCoins || 0), maxRedeemableCoins);
   const walletDiscount = Number((safeRedeemCoins * 1).toFixed(2));
   const totalAfterWallet = Math.max(0, Number((total - walletDiscount).toFixed(2)));
+  const isWalletOnly = totalAfterWallet === 0 && safeRedeemCoins > 0;
   const needsPaymentSelection = totalAfterWallet > 0;
   const maxCODAmount = shippingSetting?.maxCODAmount || 0;
   const isCODDisabledForOrder = shippingSetting?.enableCOD === false || (maxCODAmount > 0 && totalAfterWallet > maxCODAmount);
@@ -597,6 +598,12 @@ export default function CheckoutPage() {
     !hasValidPhone(selectedAddressForView?.phone) &&
     !hasValidPhone(user?.phoneNumber || user?.phone);
   const isPincodeError = /pincode/i.test(String(formError || ''));
+
+  useEffect(() => {
+    if (isWalletOnly && form.payment) {
+      setForm((f) => ({ ...f, payment: '' }));
+    }
+  }, [isWalletOnly, form.payment]);
 
   // Load shipping settings - refetch on page load and when products change
   useEffect(() => {
@@ -847,7 +854,11 @@ export default function CheckoutPage() {
     }
     
     // For card payment, trigger Razorpay (allows guest checkout)
-    if (form.payment === 'card') {
+    if (form.payment === 'card' && !isWalletOnly) {
+      if (totalAfterWallet <= 0) {
+        setFormError('Wallet covers the full amount. No card payment is needed.');
+        return;
+      }
       setPlacingOrder(true);
       // Validate phone number
       if (!cleanedPhone || cleanedPhone.length < 7 || cleanedPhone.length > 15) {
@@ -1104,9 +1115,13 @@ export default function CheckoutPage() {
         const createdOrderId = data._id || data.id;
         const orderTotal = data.total || totalAfterWallet;
         dispatch(clearCart());
-        setUpsellOrderId(createdOrderId);
-        setUpsellOrderTotal(orderTotal);
-        setShowPrepaidModal(true);
+        if (totalAfterWallet <= 0) {
+          router.push(`/order-success?orderId=${createdOrderId}`);
+        } else {
+          setUpsellOrderId(createdOrderId);
+          setUpsellOrderTotal(orderTotal);
+          setShowPrepaidModal(true);
+        }
       } else {
         // No order ID returned - treat as failure
         setFormError("Order creation failed. Please try again.");
@@ -1914,13 +1929,18 @@ export default function CheckoutPage() {
 
               <div className="flex flex-col gap-2 mb-4">
                 {/* Credit Card Option */}
-                <label className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg cursor-pointer transition-all hover:border-blue-400 hover:bg-blue-50/30 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                <label className={`flex items-center gap-3 p-4 border-2 rounded-lg transition-all ${
+                  isWalletOnly
+                    ? 'opacity-50 cursor-not-allowed border-gray-300 bg-gray-50'
+                    : 'cursor-pointer border-gray-200 hover:border-blue-400 hover:bg-blue-50/30 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50'
+                }`}>
                   <input
                     type="radio"
                     name="payment"
                     value="card"
                     checked={form.payment === 'card'}
                     onChange={handleChange}
+                    disabled={isWalletOnly}
                     className="accent-blue-600 w-5 h-5"
                   />
                   <div className="flex-1 flex items-center justify-between">
@@ -1947,7 +1967,7 @@ export default function CheckoutPage() {
                 {(() => {
                   const maxCODAmount = shippingSetting?.maxCODAmount || 0;
                   const remainingAmount = total - walletDiscount;
-                  const isCODDisabled = shippingSetting?.enableCOD === false || 
+                  const isCODDisabled = isWalletOnly || shippingSetting?.enableCOD === false || 
                     (maxCODAmount > 0 && remainingAmount > maxCODAmount);
                   
                   return (
@@ -1977,6 +1997,9 @@ export default function CheckoutPage() {
                         </div>
                         {isCODDisabled && maxCODAmount > 0 && remainingAmount > maxCODAmount && (
                           <span className="text-xs text-red-600 ml-8">Max limit ₹{maxCODAmount}</span>
+                        )}
+                        {isWalletOnly && (
+                          <span className="text-xs text-gray-500 ml-8">Covered by wallet</span>
                         )}
                       </div>
                     </label>

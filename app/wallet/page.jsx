@@ -114,7 +114,7 @@ export default function WalletPage() {
             </div>
           </div>
           <div className="relative z-10 mt-4 flex flex-wrap gap-2">
-            <span className="text-xs font-semibold bg-white/15 px-3 py-1 rounded-full">10 wallet = ₹5</span>
+            <span className="text-xs font-semibold bg-white/15 px-3 py-1 rounded-full">10 wallet = ₹10</span>
             <span className="text-xs font-semibold bg-white/15 px-3 py-1 rounded-full">10 wallet every order</span>
             <span className="text-xs font-semibold bg-white/15 px-3 py-1 rounded-full">+20 wallet on registration</span>
           </div>
@@ -137,7 +137,7 @@ export default function WalletPage() {
                 <span>Redeem Rate</span>
                 <span className="font-semibold text-rose-600">10 Wallet = ₹10</span>
               </div>
-            </div>
+            </div>  
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-base font-semibold text-slate-900 mb-1">Earn Wallet</h2>
