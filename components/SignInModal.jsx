@@ -17,6 +17,13 @@ const SignInModal = ({ open, onClose, defaultMode = 'login', bonusMessage = '' }
   const [countryCode, setCountryCode] = useState('+91');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
   const [loading, setLoading] = useState(false);
   const [scrollPos, setScrollPos] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
@@ -57,11 +64,51 @@ const SignInModal = ({ open, onClose, defaultMode = 'login', bonusMessage = '' }
     }
   }, [open, defaultMode]);
 
+  // Clear errors when switching between login and register
+  React.useEffect(() => {
+    setError('');
+    setFieldErrors({
+      name: '',
+      phone: '',
+      email: '',
+      password: '',
+      confirmPassword: ''
+    });
+  }, [isRegister]);
+
   if (!open) return null;
 
   const validateEmail = (email) => {
     // Simple email regex
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const validateName = (name) => {
+    // Name should be at least 2 characters and contain only letters and spaces
+    return name.trim().length >= 2 && /^[a-zA-Z\s]+$/.test(name.trim());
+  };
+
+  const validatePhoneNumber = (phone, countryCode) => {
+    const cleaned = phone.replace(/\D/g, '');
+    // For India (+91), require exactly 10 digits
+    if (countryCode === '+91') {
+      return cleaned.length === 10;
+    }
+    // For other countries, allow 7-15 digits
+    return cleaned.length >= 7 && cleaned.length <= 15;
+  };
+
+  const validatePassword = (password) => {
+    // Password should be at least 6 characters
+    return password.length >= 6;
+  };
+
+  const validatePasswordStrength = (password) => {
+    // Check for strong password: at least 8 chars, contains letters and numbers
+    if (password.length < 8) return 'Password should be at least 8 characters';
+    if (!/[a-zA-Z]/.test(password)) return 'Password should contain letters';
+    if (!/[0-9]/.test(password)) return 'Password should contain numbers';
+    return null;
   };
 
   const trackLoginLocation = async (token) => {
@@ -130,16 +177,76 @@ const SignInModal = ({ open, onClose, defaultMode = 'login', bonusMessage = '' }
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    
     if (isRegister) {
+      // Validate name
+      if (!name.trim()) {
+        setError('Please enter your full name.');
+        return;
+      }
+      if (!validateName(name)) {
+        setError('Name should contain only letters and be at least 2 characters.');
+        return;
+      }
+      
+      // Validate phone number
+      if (!phoneNumber.trim()) {
+        setError('Please enter your phone number.');
+        return;
+      }
+      if (!validatePhoneNumber(phoneNumber, countryCode)) {
+        if (countryCode === '+91') {
+          setError('Indian phone number must be exactly 10 digits.');
+        } else {
+          setError('Please enter a valid phone number (7-15 digits).');
+        }
+        return;
+      }
+      
+      // Validate email
       if (!validateEmail(email)) {
         setError('Please enter a valid email address.');
         return;
       }
+      
+      // Validate password
+      if (!validatePassword(password)) {
+        setError('Password should be at least 6 characters.');
+        return;
+      }
+      
+      // Check password strength (warning, not blocking)
+      const strengthError = validatePasswordStrength(password);
+      if (strengthError) {
+        setError(strengthError + '. We recommend a stronger password.');
+        // Don't return here - it's just a warning
+      }
+      
+      // Validate password match
       if (password !== confirmPassword) {
         setError('Passwords do not match.');
         return;
       }
+    } else {
+      // Login validation
+      if (!email.trim()) {
+        setError('Please enter your email.');
+        return;
+      }
+      if (!validateEmail(email)) {
+        setError('Please enter a valid email address.');
+        return;
+      }
+      if (!password.trim()) {
+        setError('Please enter your password.');
+        return;
+      }
+      if (password.length < 6) {
+        setError('Password must be at least 6 characters.');
+        return;
+      }
     }
+    
     setLoading(true);
     try {
       if (isRegister) {
@@ -211,13 +318,12 @@ const SignInModal = ({ open, onClose, defaultMode = 'login', bonusMessage = '' }
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
       <div 
-        className="bg-white w-full sm:max-w-lg rounded-2xl shadow-2xl overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
+        className="bg-white w-full sm:max-w-lg max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
       >
         {/* Top Section - Image */}
-        <div className="w-full bg-gradient-to-br from-amber-200 via-amber-100 to-yellow-100 relative overflow-hidden h-32 sm:h-40">
+        <div className="w-full bg-gradient-to-br from-amber-200 via-amber-100 to-yellow-100 relative overflow-hidden h-32 sm:h-40 flex-shrink-0">
           {/* Image Container - Continuous Scrolling */}
           <div 
             className="absolute inset-0 flex"
@@ -258,7 +364,26 @@ const SignInModal = ({ open, onClose, defaultMode = 'login', bonusMessage = '' }
         </div>
 
         {/* Bottom Section - Form */}
-        <div className="w-full p-4 sm:p-6 relative">
+        <div className="w-full p-4 sm:p-6 relative overflow-y-auto custom-scrollbar flex-1">
+          <style jsx>{`
+            .custom-scrollbar::-webkit-scrollbar {
+              width: 6px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-track {
+              background: transparent;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb {
+              background: transparent;
+              border-radius: 3px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+              background: rgba(0, 0, 0, 0.1);
+            }
+            .custom-scrollbar {
+              scrollbar-width: none;
+              -ms-overflow-style: none;
+            }
+          `}</style>
           <button
             className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-100"
             onClick={onClose}
@@ -303,74 +428,236 @@ const SignInModal = ({ open, onClose, defaultMode = 'login', bonusMessage = '' }
           {/* Form */}
           <form className="flex flex-col gap-2.5 sm:gap-3" onSubmit={handleSubmit}>
             {isRegister && (
-              <input
-                type="text"
-                placeholder="Full Name"
-                className="border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-xs sm:text-sm"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                required
-              />
-            )}
-            {isRegister && (
-              <div className="flex gap-2">
-                <select
-                  value={countryCode}
-                  onChange={(e) => setCountryCode(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-2 sm:px-3 py-2 sm:py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-xs sm:text-sm w-24"
-                  required
-                >
-                  {countryCodes.map((country) => (
-                    <option key={country.code} value={country.code}>
-                      {country.code}
-                    </option>
-                  ))}
-                </select>
+              <div>
                 <input
-                  type="tel"
-                  placeholder="Phone Number"
-                  className="flex-1 border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-xs sm:text-sm"
-                  value={phoneNumber}
-                  onChange={e => setPhoneNumber(e.target.value)}
+                  type="text"
+                  placeholder="Full Name"
+                  className={`border rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-xs sm:text-sm w-full ${
+                    fieldErrors.name ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  value={name}
+                  onChange={e => {
+                    const value = e.target.value;
+                    setName(value);
+                    
+                    // Real-time validation
+                    if (!value.trim()) {
+                      setFieldErrors(prev => ({ ...prev, name: 'Name is required' }));
+                    } else if (!/^[a-zA-Z\s]+$/.test(value.trim())) {
+                      setFieldErrors(prev => ({ ...prev, name: 'Name should contain only letters' }));
+                    } else if (value.trim().length < 2) {
+                      setFieldErrors(prev => ({ ...prev, name: 'Name should be at least 2 characters' }));
+                    } else {
+                      setFieldErrors(prev => ({ ...prev, name: '' }));
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!name.trim()) {
+                      setFieldErrors(prev => ({ ...prev, name: 'Name is required' }));
+                    }
+                  }}
                   required
                 />
+                {fieldErrors.name && (
+                  <div className="text-red-600 text-xs mt-1">{fieldErrors.name}</div>
+                )}
               </div>
             )}
-            <input
-              type={isRegister ? "email" : "text"}
-              placeholder={isRegister ? "Email" : "Email or mobile number"}
-              className="border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-xs sm:text-sm"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-            />
-            <div className="relative">
+            {isRegister && (
+              <div>
+                <div className="flex gap-2">
+                  <select
+                    value={countryCode}
+                    onChange={(e) => {
+                      setCountryCode(e.target.value);
+                      // Clear phone number when country code changes
+                      setPhoneNumber('');
+                      setFieldErrors(prev => ({ ...prev, phone: '' }));
+                    }}
+                    className="border border-gray-300 rounded-lg px-2 sm:px-3 py-2 sm:py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-xs sm:text-sm w-24"
+                    required
+                  >
+                    {countryCodes.map((country) => (
+                      <option key={country.code} value={country.code}>
+                        {country.code}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="tel"
+                    placeholder="Phone Number"
+                    className={`flex-1 border rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-xs sm:text-sm ${
+                      fieldErrors.phone ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    value={phoneNumber}
+                    onChange={e => {
+                      // Limit based on country code
+                      const maxLength = countryCode === '+91' ? 10 : 15;
+                      const value = e.target.value.replace(/\D/g, '').slice(0, maxLength);
+                      setPhoneNumber(value);
+                      
+                      // Real-time validation
+                      if (!value) {
+                        setFieldErrors(prev => ({ ...prev, phone: 'Phone number is required' }));
+                      } else if (countryCode === '+91' && value.length !== 10) {
+                        setFieldErrors(prev => ({ ...prev, phone: 'Indian phone number must be 10 digits' }));
+                      } else if (countryCode !== '+91' && value.length < 7) {
+                        setFieldErrors(prev => ({ ...prev, phone: 'Phone number must be at least 7 digits' }));
+                      } else if (countryCode !== '+91' && value.length > 15) {
+                        setFieldErrors(prev => ({ ...prev, phone: 'Phone number too long' }));
+                      } else {
+                        setFieldErrors(prev => ({ ...prev, phone: '' }));
+                      }
+                    }}
+                    onBlur={() => {
+                      if (!phoneNumber) {
+                        setFieldErrors(prev => ({ ...prev, phone: 'Phone number is required' }));
+                      } else if (countryCode === '+91' && phoneNumber.length !== 10) {
+                        setFieldErrors(prev => ({ ...prev, phone: 'Indian phone number must be 10 digits' }));
+                      }
+                    }}
+                    maxLength={countryCode === '+91' ? 10 : 15}
+                    required
+                  />
+                </div>
+                {fieldErrors.phone ? (
+                  <div className="text-red-600 text-xs mt-1">{fieldErrors.phone}</div>
+                ) : (
+                  <div className="text-gray-500 text-xs mt-1">
+                    {countryCode === '+91' ? '10 digits required' : '7-15 digits required'}
+                  </div>
+                )}
+              </div>
+            )}
+            <div>
               <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Password"
-                className="border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-xs sm:text-sm w-full"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
+                type="email"
+                placeholder="Email"
+                className={`border rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-xs sm:text-sm w-full ${
+                  fieldErrors.email ? 'border-red-500' : 'border-gray-300'
+                }`}
+                value={email}
+                onChange={e => {
+                  setEmail(e.target.value);
+                  
+                  // Real-time validation for email in both login and register
+                  const emailValue = e.target.value;
+                  if (!emailValue) {
+                    setFieldErrors(prev => ({ ...prev, email: 'Email is required' }));
+                  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
+                    setFieldErrors(prev => ({ ...prev, email: 'Please enter a valid email' }));
+                  } else {
+                    setFieldErrors(prev => ({ ...prev, email: '' }));
+                  }
+                }}
+                onBlur={() => {
+                  if (!email) {
+                    setFieldErrors(prev => ({ ...prev, email: 'Email is required' }));
+                  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    setFieldErrors(prev => ({ ...prev, email: 'Please enter a valid email' }));
+                  }
+                }}
                 required
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+              {fieldErrors.email && (
+                <div className="text-red-600 text-xs mt-1">{fieldErrors.email}</div>
+              )}
+            </div>
+            <div>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  className={`border rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-xs sm:text-sm w-full ${
+                    fieldErrors.password ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  value={password}
+                  onChange={e => {
+                    setPassword(e.target.value);
+                    
+                    // Real-time validation for both login and register
+                    const pwdValue = e.target.value;
+                    if (!pwdValue) {
+                      setFieldErrors(prev => ({ ...prev, password: 'Password is required' }));
+                    } else if (pwdValue.length < 6) {
+                      setFieldErrors(prev => ({ ...prev, password: 'Password must be at least 6 characters' }));
+                    } else if (isRegister && pwdValue.length < 8) {
+                      setFieldErrors(prev => ({ ...prev, password: 'Weak password. Use 8+ characters' }));
+                    } else if (isRegister && (!/[0-9]/.test(pwdValue) || !/[a-zA-Z]/.test(pwdValue))) {
+                      setFieldErrors(prev => ({ ...prev, password: 'Use both letters and numbers for stronger password' }));
+                    } else {
+                      setFieldErrors(prev => ({ ...prev, password: '' }));
+                    }
+                  }}
+                  onBlur={() => {
+                    const pwdValue = password;
+                    if (!pwdValue) {
+                      setFieldErrors(prev => ({ ...prev, password: 'Password is required' }));
+                    } else if (pwdValue.length < 6) {
+                      setFieldErrors(prev => ({ ...prev, password: 'Password must be at least 6 characters' }));
+                    }
+                  }}
+                  minLength={6}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              {fieldErrors.password && (
+                <div className="text-red-600 text-xs mt-1">{fieldErrors.password}</div>
+              )}
             </div>
             {isRegister && (
-              <input
-                type="password"
-                placeholder="Confirm Password"
-                className="border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-xs sm:text-sm"
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                required
-              />
+              <div>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm Password"
+                    className={`border rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-xs sm:text-sm w-full ${
+                      fieldErrors.confirmPassword ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    value={confirmPassword}
+                    onChange={e => {
+                      setConfirmPassword(e.target.value);
+                      
+                      // Real-time validation
+                      const confirmValue = e.target.value;
+                      if (!confirmValue) {
+                        setFieldErrors(prev => ({ ...prev, confirmPassword: 'Please confirm your password' }));
+                      } else if (confirmValue !== password) {
+                        setFieldErrors(prev => ({ ...prev, confirmPassword: 'Passwords do not match' }));
+                      } else {
+                        setFieldErrors(prev => ({ ...prev, confirmPassword: '' }));
+                      }
+                    }}
+                    onBlur={() => {
+                      if (!confirmPassword) {
+                        setFieldErrors(prev => ({ ...prev, confirmPassword: 'Please confirm your password' }));
+                      } else if (confirmPassword !== password) {
+                        setFieldErrors(prev => ({ ...prev, confirmPassword: 'Passwords do not match' }));
+                      }
+                    }}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {fieldErrors.confirmPassword && (
+                  <div className="text-red-600 text-xs mt-1">{fieldErrors.confirmPassword}</div>
+                )}
+              </div>
             )}
             
             {error && (

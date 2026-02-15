@@ -165,8 +165,28 @@ export default function CourierConsolePage() {
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-800">TAT Estimate</h2>
           <div className="grid gap-2 md:grid-cols-2">
-            <input value={tatOrigin} onChange={(e) => setTatOrigin(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Origin pin" />
-            <input value={tatDestination} onChange={(e) => setTatDestination(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Destination pin" />
+            <input 
+              value={tatOrigin} 
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                setTatOrigin(value);
+              }} 
+              maxLength={6}
+              pattern="[0-9]{6}"
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm" 
+              placeholder="Origin pincode (6 digits)" 
+            />
+            <input 
+              value={tatDestination} 
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                setTatDestination(value);
+              }} 
+              maxLength={6}
+              pattern="[0-9]{6}"
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm" 
+              placeholder="Destination pincode (6 digits)" 
+            />
             <input value={tatMot} onChange={(e) => setTatMot(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="MOT" />
             <input value={tatPdt} onChange={(e) => setTatPdt(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="PDT" />
           </div>
@@ -182,7 +202,17 @@ export default function CourierConsolePage() {
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-800">Pincode Serviceability</h2>
           <div className="grid gap-2 md:grid-cols-2">
-            <input value={pincode} onChange={(e) => setPincode(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Pincode" />
+            <input 
+              value={pincode} 
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                setPincode(value);
+              }} 
+              maxLength={6}
+              pattern="[0-9]{6}"
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm" 
+              placeholder="Pincode (6 digits)" 
+            />
             <input value={pincodeWeight} onChange={(e) => setPincodeWeight(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Weight" />
           </div>
           <button

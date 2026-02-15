@@ -186,7 +186,13 @@ export default function AddressesPage() {
                   name="phone"
                   placeholder="Phone Number"
                   value={formData.phone}
-                  onChange={handleInputChange}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 15);
+                    handleInputChange({ target: { name: 'phone', value } });
+                  }}
+                  maxLength="15"
+                  pattern="[0-9]{7,15}"
+                  title="Phone number must be 7-15 digits"
                   required
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                 />
@@ -235,7 +241,12 @@ export default function AddressesPage() {
                   name="pincode"
                   placeholder="Pincode"
                   value={formData.pincode}
-                  onChange={handleInputChange}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                    handleInputChange({ target: { name: 'pincode', value } });
+                  }}
+                  maxLength={6}
+                  pattern="[0-9]{6}"
                   required
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                 />

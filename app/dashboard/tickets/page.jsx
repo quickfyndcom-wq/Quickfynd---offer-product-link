@@ -8,13 +8,22 @@ import Link from 'next/link'
 import DashboardSidebar from '@/components/DashboardSidebar'
 import axios from 'axios'
 import toast from 'react-hot-toast'
-import { MessageSquare, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { MessageSquare, Clock, CheckCircle, XCircle, AlertCircle, X } from 'lucide-react'
 
 export default function TicketsPage() {
   const [user, setUser] = useState(undefined)
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, open, closed
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [formData, setFormData] = useState({
+    subject: '',
+    category: 'general',
+    description: '',
+    priority: 'normal',
+    orderId: ''
+  })
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUser(u ?? null))
@@ -42,6 +51,37 @@ export default function TicketsPage() {
       toast.error('Failed to load tickets')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleCreateTicket = async (e) => {
+    e.preventDefault()
+    if (!formData.subject || !formData.description) {
+      toast.error('Please fill in subject and description')
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      const token = await auth.currentUser.getIdToken(true)
+      await axios.post('/api/tickets', formData, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      toast.success('Ticket created successfully!')
+      setShowCreateModal(false)
+      setFormData({
+        subject: '',
+        category: 'general',
+        description: '',
+        priority: 'normal',
+        orderId: ''
+      })
+      fetchTickets()
+    } catch (error) {
+      console.error('Failed to create ticket:', error)
+      toast.error(error.response?.data?.error || 'Failed to create ticket')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -113,12 +153,12 @@ export default function TicketsPage() {
       <main className="md:col-span-3">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-semibold text-slate-800">Support Tickets</h1>
-          <Link
-            href="/help"
+          <button
+            onClick={() => setShowCreateModal(true)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
           >
             Create New Ticket
-          </Link>
+          </button>
         </div>
 
         {/* Filter tabs */}
@@ -169,12 +209,12 @@ export default function TicketsPage() {
                 ? "You haven't created any support tickets yet." 
                 : `No ${filter} tickets found.`}
             </p>
-            <Link
-              href="/help"
-              className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer"
             >
               Create Your First Ticket
-            </Link>
+            </button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -214,6 +254,110 @@ export default function TicketsPage() {
           </div>
         )}
       </main>
+
+      {/* Create Ticket Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-slate-800">Create Support Ticket</h2>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateTicket} className="p-6 space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Subject *</label>
+                <input
+                  type="text"
+                  value={formData.subject}
+                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                  placeholder="Brief description of your issue"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
+                  required
+                />
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Category *</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
+                  >
+                    <option value="general">General Inquiry</option>
+                    <option value="order">Order Issue</option>
+                    <option value="payment">Payment Problem</option>
+                    <option value="return">Return/Refund</option>
+                    <option value="shipping">Shipping Delay</option>
+                    <option value="product">Product Quality</option>
+                    <option value="account">Account Issue</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Priority *</label>
+                  <select
+                    value={formData.priority}
+                    onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
+                  >
+                    <option value="low">Low</option>
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Order Number (Optional)</label>
+                <input
+                  type="text"
+                  value={formData.orderId}
+                  onChange={(e) => setFormData({ ...formData, orderId: e.target.value })}
+                  placeholder="If related to an order"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Description *</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Describe your issue in detail..."
+                  rows="6"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition resize-none"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="flex-1 px-6 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-400 transition font-medium"
+                >
+                  {submitting ? 'Creating...' : 'Create Ticket'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

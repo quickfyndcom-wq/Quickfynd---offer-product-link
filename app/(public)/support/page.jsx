@@ -1,21 +1,39 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import axios from 'axios'
+import { auth } from '@/lib/firebase'
+import { onAuthStateChanged } from 'firebase/auth'
 
 export default function SupportPage() {
+  const [user, setUser] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     orderNumber: '',
     subject: '',
     message: '',
-    issue: 'general'
+    issue: 'general',
+    priority: 'normal'
   })
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u ?? null)
+      if (u) {
+        setFormData(prev => ({
+          ...prev,
+          name: u.displayName || '',
+          email: u.email || ''
+        }))
+      }
+    })
+    return () => unsub()
+  }, [])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -34,12 +52,43 @@ export default function SupportPage() {
     setSuccess(false)
 
     try {
-      const response = await axios.post('/api/support/ticket', formData)
+      // Prepare ticket data matching the API format
+      const ticketData = {
+        subject: formData.subject,
+        category: formData.issue, // Map issue to category
+        description: formData.message,
+        priority: formData.priority || 'normal',
+        orderId: formData.orderNumber || undefined
+      }
+
+      // If user is logged in, use authenticated endpoint
+      if (user) {
+        const token = await auth.currentUser.getIdToken(true)
+        await axios.post('/api/tickets', ticketData, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      } else {
+        // For guest users, create a support request (you may need to create this endpoint)
+        // For now, we'll require login
+        setError('Please sign in to submit a support ticket')
+        setLoading(false)
+        return
+      }
+
       setSuccess(true)
-      setFormData({ name: '', email: '', orderNumber: '', subject: '', message: '', issue: 'general' })
+      setFormData({ 
+        name: user?.displayName || '', 
+        email: user?.email || '', 
+        orderNumber: '', 
+        subject: '', 
+        message: '', 
+        issue: 'general',
+        priority: 'normal'
+      })
       setTimeout(() => setSuccess(false), 5000)
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to submit support ticket. Please try again.')
+      console.error('Submit error:', err)
+      setError(err.response?.data?.error || 'Failed to submit support ticket. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -81,9 +130,15 @@ export default function SupportPage() {
           <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm">
             <h2 className="text-2xl font-bold text-slate-800 mb-6">Submit a Ticket</h2>
             
+            {!user && (
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-800">
+                ℹ️ Please <Link href="/" className="font-semibold underline">sign in</Link> to submit a support ticket
+              </div>
+            )}
+
             {success && (
               <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
-                ✓ Thank you! We've received your message and will respond soon.
+                ✓ Thank you! We've received your message and will respond soon. <Link href="/dashboard/tickets" className="font-semibold underline">View your tickets</Link>
               </div>
             )}
 
@@ -103,7 +158,8 @@ export default function SupportPage() {
                     value={formData.name}
                     onChange={handleChange}
                     placeholder="Your name"
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
+                    readOnly={!!user}
+                    className={`w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition ${user ? 'bg-slate-50 cursor-not-allowed' : ''}`}
                   />
                 </div>
                 <div>
@@ -114,27 +170,45 @@ export default function SupportPage() {
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="your@email.com"
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
+                    readOnly={!!user}
+                    className={`w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition ${user ? 'bg-slate-50 cursor-not-allowed' : ''}`}
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Issue Type *</label>
-                <select
-                  name="issue"
-                  value={formData.issue}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
-                >
-                  <option value="general">General Inquiry</option>
-                  <option value="order">Order Issue</option>
-                  <option value="payment">Payment Problem</option>
-                  <option value="return">Return/Refund</option>
-                  <option value="shipping">Shipping Delay</option>
-                  <option value="product">Product Quality</option>
-                  <option value="account">Account Issue</option>
-                </select>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Issue Type *</label>
+                  <select
+                    name="issue"
+                    value={formData.issue}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
+                  >
+                    <option value="general">General Inquiry</option>
+                    <option value="order">Order Issue</option>
+                    <option value="payment">Payment Problem</option>
+                    <option value="return">Return/Refund</option>
+                    <option value="shipping">Shipping Delay</option>
+                    <option value="product">Product Quality</option>
+                    <option value="account">Account Issue</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Priority *</label>
+                  <select
+                    name="priority"
+                    value={formData.priority}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
+                  >
+                    <option value="low">Low</option>
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -175,10 +249,10 @@ export default function SupportPage() {
 
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-semibold py-3 rounded-lg transition"
+                disabled={loading || !user}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition"
               >
-                {loading ? 'Submitting...' : 'Submit Support Ticket'}
+                {!user ? 'Please Sign In to Submit' : loading ? 'Submitting...' : 'Submit Support Ticket'}
               </button>
             </form>
           </div>

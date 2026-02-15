@@ -387,12 +387,17 @@ const AddressModal = ({ open, setShowAddressModal, onAddressAdded, initialAddres
                         <div className="relative">
                             <input 
                                 name="zip" 
-                                onChange={handlePincodeSearch}
+                                onChange={(e) => {
+                                    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                    e.target.value = value;
+                                    handlePincodeSearch(e);
+                                }}
                                 value={address.zip}
                                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition" 
                                 type="text" 
                                 placeholder="Enter 6-digit pincode (e.g., 673571)" 
                                 maxLength="6"
+                                pattern="[0-9]{6}"
                                 inputMode="numeric"
                             />
                             {pincodeLoading && (
@@ -535,8 +540,8 @@ const AddressModal = ({ open, setShowAddressModal, onAddressAdded, initialAddres
                                 ref={phoneInputRef}
                                 name="phone" 
                                 onChange={(e) => {
-                                    // Only allow numbers
-                                    const value = e.target.value.replace(/[^0-9]/g, '');
+                                    // Only allow numbers, max 15 digits
+                                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 15);
                                     e.target.value = value;
                                     setAddress({
                                         ...address,
@@ -548,6 +553,9 @@ const AddressModal = ({ open, setShowAddressModal, onAddressAdded, initialAddres
                                 type="text"
                                 inputMode="numeric"
                                 placeholder="9876543210" 
+                                maxLength="15"
+                                pattern="[0-9]{7,15}"
+                                title="Phone number must be 7-15 digits"
                                 required 
                                 autoComplete="off"
                             />
@@ -571,7 +579,7 @@ const AddressModal = ({ open, setShowAddressModal, onAddressAdded, initialAddres
                             <input
                                 name="alternatePhone"
                                 onChange={(e) => {
-                                    const value = e.target.value.replace(/[^0-9]/g, '');
+                                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 15);
                                     e.target.value = value;
                                     setAddress({
                                         ...address,
@@ -583,6 +591,9 @@ const AddressModal = ({ open, setShowAddressModal, onAddressAdded, initialAddres
                                 type="text"
                                 inputMode="numeric"
                                 placeholder="Alternate contact number"
+                                maxLength="15"
+                                pattern="[0-9]{7,15}"
+                                title="Phone number must be 7-15 digits"
                                 autoComplete="off"
                             />
                         </div>

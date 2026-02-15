@@ -5,7 +5,7 @@ import { countryCodes } from "@/assets/countryCodes";
 import { indiaStatesAndDistricts } from "@/assets/indiaStatesAndDistricts";
 import { useSelector, useDispatch } from "react-redux";
 import { fetchAddress } from "@/lib/features/address/addressSlice";
-import { clearCart } from "@/lib/features/cart/cartSlice";
+import { clearCart, addToCart, removeFromCart, deleteItemFromCart } from "@/lib/features/cart/cartSlice";
 import { fetchProducts } from "@/lib/features/product/productSlice";
 import { fetchShippingSettings, calculateShipping } from "@/lib/shipping";
 import FbqInitiateCheckout from "@/components/FbqInitiateCheckout";
@@ -482,6 +482,37 @@ export default function CheckoutPage() {
     }
   };
 
+  const handleAutoFillClick = async () => {
+    const pincode = form.pincode?.trim();
+    
+    // If pincode is already filled and valid, fetch directly
+    if (pincode && pincode.length === 6 && /^\d{6}$/.test(pincode)) {
+      try {
+        const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+        const data = await response.json();
+
+        if (data[0]?.Status === "Success" && data[0]?.PostOffice?.length > 0) {
+          const postOffice = data[0].PostOffice[0];
+          handlePincodeSubmit({
+            pincode: pincode,
+            city: postOffice.Name || postOffice.Region || postOffice.Division,
+            district: postOffice.District,
+            state: postOffice.State,
+            country: "India"
+          });
+          toast.success("Address auto-filled successfully!");
+        } else {
+          toast.error("Invalid pincode. Please enter a valid pincode.");
+        }
+      } catch (err) {
+        toast.error("Failed to fetch pincode details. Please try again.");
+      }
+    } else {
+      // Open modal if pincode is empty or invalid
+      setShowPincodeModal(true);
+    }
+  };
+
   const handleDeleteAddress = async (addressId) => {
     const confirmed = window.confirm("Are you sure you want to delete this address? This action cannot be undone.");
     if (!confirmed) return;
@@ -548,6 +579,12 @@ export default function CheckoutPage() {
   const safeRedeemCoins = Math.min(Math.floor(redeemCoins || 0), maxRedeemableCoins);
   const walletDiscount = Number((safeRedeemCoins * 1).toFixed(2));
   const totalAfterWallet = Math.max(0, Number((total - walletDiscount).toFixed(2)));
+  const needsPaymentSelection = totalAfterWallet > 0;
+  const maxCODAmount = shippingSetting?.maxCODAmount || 0;
+  const isCODDisabledForOrder = shippingSetting?.enableCOD === false || (maxCODAmount > 0 && totalAfterWallet > maxCODAmount);
+  const isPaymentMissing = needsPaymentSelection && !form.payment;
+  const isInvalidPaymentSelection = form.payment === 'cod' && isCODDisabledForOrder;
+  const isPlaceOrderDisabled = placingOrder || isPaymentMissing || isInvalidPaymentSelection;
   const walletBalance = walletInfo?.rupeesValue ? Number(walletInfo.rupeesValue) : Number(walletInfo?.coins || 0);
   const walletCanCoverTotal = walletBalance >= Math.ceil(total);
   const walletCanUse = user && walletBalance > 0;
@@ -908,6 +945,25 @@ export default function CheckoutPage() {
         setPlacingOrder(false);
         return;
       }
+
+      // Validate COD limit
+      if (form.payment === 'cod') {
+        const maxCODAmount = shippingSetting?.maxCODAmount || 0;
+        const remainingAmount = totalAfterWallet;
+        
+        if (shippingSetting?.enableCOD === false) {
+          setFormError("Cash on Delivery is not available.");
+          setPlacingOrder(false);
+          return;
+        }
+        
+        if (maxCODAmount > 0 && remainingAmount > maxCODAmount) {
+          setFormError(`COD is not available for orders above ₹${maxCODAmount}. Your order amount after wallet is ₹${remainingAmount.toFixed(2)}. Please use online payment.`);
+          setPlacingOrder(false);
+          return;
+        }
+      }
+
       // Build order payload
       let payload;
       
@@ -1184,7 +1240,23 @@ export default function CheckoutPage() {
     );
   }
   
-  if (!cartItems || Object.keys(cartItems).length === 0) {
+  if ((!cartItems || Object.keys(cartItems).length === 0) && !showPrepaidModal && !navigatingToSuccess) {
+    return (
+      <div className="py-20 text-center min-h-[50vh] flex flex-col items-center justify-center">
+        <div className="text-6xl mb-4">🛒</div>
+        <div className="text-2xl font-bold text-gray-900 mb-2">Your cart is empty</div>
+        <div className="text-gray-600 mb-6">Add some products to your cart and come back!</div>
+        <button 
+          onClick={() => router.push('/shop')}
+          className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
+        >
+          Continue Shopping
+        </button>
+      </div>
+    );
+  }
+
+  if (showPrepaidModal || navigatingToSuccess) {
     // If we just placed a COD order, show the prepaid upsell modal even though cart is empty
     if (showPrepaidModal || navigatingToSuccess) {
       return (
@@ -1259,19 +1331,39 @@ export default function CheckoutPage() {
                     </div>
                     <div className="flex flex-col items-center gap-1">
                       <div className="flex items-center gap-1">
-                        <button type="button" className="px-2 py-0.5 rounded bg-gray-200 text-gray-700 hover:bg-gray-300" onClick={() => {
-                          if (item.quantity > 1) {
-                            dispatch({ type: 'cart/removeFromCart', payload: { productId: item._cartKey || item._id } });
-                          }
-                        }}>-</button>
+                        <button 
+                          type="button" 
+                          className="px-2 py-0.5 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 active:bg-gray-400" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (item.quantity > 1) {
+                              dispatch(removeFromCart({ productId: item._cartKey || item._id }));
+                            } else {
+                              dispatch(deleteItemFromCart({ productId: item._cartKey || item._id }));
+                            }
+                          }}
+                        >-</button>
                         <span className="px-2 text-sm">{item.quantity}</span>
-                        <button type="button" className="px-2 py-0.5 rounded bg-gray-200 text-gray-700 hover:bg-gray-300" onClick={() => {
-                          dispatch({ type: 'cart/addToCart', payload: { productId: item._cartKey || item._id, price: item._cartPrice ?? item.price } });
-                        }}>+</button>
+                        <button 
+                          type="button" 
+                          className="px-2 py-0.5 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 active:bg-gray-400" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            dispatch(addToCart({ productId: item._cartKey || item._id, price: item._cartPrice ?? item.price }));
+                          }}
+                        >+</button>
                       </div>
-                      <button type="button" className="text-xs text-red-500 hover:underline mt-1" onClick={() => {
-                        dispatch({ type: 'cart/deleteItemFromCart', payload: { productId: item._cartKey || item._id } });
-                      }}>Remove</button>
+                      <button 
+                        type="button" 
+                        className="text-xs text-red-500 hover:text-red-700 hover:underline mt-1 active:text-red-800" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          dispatch(deleteItemFromCart({ productId: item._cartKey || item._id }));
+                        }}
+                      >Remove</button>
                     </div>
                   </div>
                 ))}
@@ -1670,12 +1762,17 @@ export default function CheckoutPage() {
                       name="pincode"
                       placeholder="Pincode"
                       value={form.pincode || ''}
-                      onChange={handleChange}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                        handleChange({ target: { name: 'pincode', value } });
+                      }}
+                      maxLength={6}
+                      pattern="[0-9]{6}"
                       required={form.country === 'India'}
                     />
                     <button
                       type="button"
-                      onClick={() => setShowPincodeModal(true)}
+                      onClick={handleAutoFillClick}
                       className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 whitespace-nowrap text-sm font-semibold"
                     >
                       Auto-fill
@@ -2013,8 +2110,8 @@ export default function CheckoutPage() {
           <button
             type="submit"
             form="checkout-form"
-            className={`hidden md:block relative w-full text-white font-bold py-3 rounded text-lg transition shadow-md hover:shadow-lg ${placingOrder ? 'bg-red-600 cursor-not-allowed opacity-95 animate-bounce' : 'bg-red-600 hover:bg-red-700'}`}
-            disabled={placingOrder}
+            className={`hidden md:block relative w-full text-white font-bold py-3 rounded text-lg transition shadow-md hover:shadow-lg ${isPlaceOrderDisabled ? 'bg-gray-400 cursor-not-allowed opacity-75' : 'bg-red-600 hover:bg-red-700'} ${placingOrder ? 'animate-bounce' : ''}`}
+            disabled={isPlaceOrderDisabled}
             aria-busy={placingOrder}
           >
             {placingOrder ? (
@@ -2110,7 +2207,7 @@ export default function CheckoutPage() {
             type="submit"
             form="checkout-form"
             className={`relative w-full text-white font-bold py-4 rounded-lg text-base transition shadow-md hover:shadow-lg flex items-center justify-between px-6 ${
-              (!form.addressId && !(form.name && form.phone && form.pincode && form.city && form.state && form.street)) || placingOrder 
+              (!form.addressId && !(form.name && form.phone && form.pincode && form.city && form.state && form.street)) || isPlaceOrderDisabled 
                 ? 'bg-gray-400 cursor-not-allowed opacity-75' 
                 : form.payment === 'cod' 
                   ? 'bg-green-600 hover:bg-green-700' 
@@ -2120,7 +2217,7 @@ export default function CheckoutPage() {
                       ? 'bg-green-600 hover:bg-green-700'
                     : 'bg-red-600 hover:bg-red-700'
             } ${placingOrder ? 'animate-bounce' : ''}`}
-            disabled={(!form.addressId && !(form.name && form.phone && form.pincode && form.city && form.state && form.street)) || placingOrder}
+            disabled={(!form.addressId && !(form.name && form.phone && form.pincode && form.city && form.state && form.street)) || isPlaceOrderDisabled}
             aria-busy={placingOrder}
           >
             <span className="text-lg font-bold">₹ {totalAfterWallet.toLocaleString()}</span>

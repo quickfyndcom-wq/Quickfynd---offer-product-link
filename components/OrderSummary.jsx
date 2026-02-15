@@ -481,7 +481,13 @@ const OrderSummary = ({ totalPrice, items }) => {
                                 type="tel"
                                 placeholder="Phone Number *"
                                 value={guestInfo.phone}
-                                onChange={e => setGuestInfo({...guestInfo, phone: e.target.value})}
+                                onChange={e => {
+                                    const value = e.target.value.replace(/\D/g, '').slice(0, 15);
+                                    setGuestInfo({...guestInfo, phone: value});
+                                }}
+                                maxLength="15"
+                                pattern="[0-9]{7,15}"
+                                title="Phone number must be 7-15 digits"
                                 className='border border-slate-300 p-2.5 w-full rounded-lg outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm'
                             />
                             <textarea
@@ -513,7 +519,12 @@ const OrderSummary = ({ totalPrice, items }) => {
                                 type="text"
                                 placeholder="PIN Code *"
                                 value={guestInfo.pincode}
-                                onChange={e => setGuestInfo({...guestInfo, pincode: e.target.value})}
+                                onChange={e => {
+                                    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                    setGuestInfo({...guestInfo, pincode: value});
+                                }}
+                                maxLength={6}
+                                pattern="[0-9]{6}"
                                 className='border border-slate-300 p-2.5 w-full rounded-lg outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm'
                             />
                             <input
@@ -551,7 +562,13 @@ const OrderSummary = ({ totalPrice, items }) => {
                                 type="tel"
                                 placeholder="Phone Number *"
                                 value={guestInfo.phone}
-                                onChange={e => setGuestInfo({...guestInfo, phone: e.target.value})}
+                                onChange={e => {
+                                    const value = e.target.value.replace(/\D/g, '').slice(0, 15);
+                                    setGuestInfo({...guestInfo, phone: value});
+                                }}
+                                maxLength="15"
+                                pattern="[0-9]{7,15}"
+                                title="Phone number must be 7-15 digits"
                                 className='border border-slate-300 p-2.5 w-full rounded-lg outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm'
                             />
                             <textarea
@@ -583,7 +600,12 @@ const OrderSummary = ({ totalPrice, items }) => {
                                 type="text"
                                 placeholder="PIN Code *"
                                 value={guestInfo.pincode}
-                                onChange={e => setGuestInfo({...guestInfo, pincode: e.target.value})}
+                                onChange={e => {
+                                    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                    setGuestInfo({...guestInfo, pincode: value});
+                                }}
+                                maxLength={6}
+                                pattern="[0-9]{6}"
                                 className='border border-slate-300 p-2.5 w-full rounded-lg outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm'
                             />
                             <input
