@@ -13,9 +13,9 @@ const SLIDE_INTERVAL = 5000;
 const SKELETON_TIMEOUT = 3000; // Increased for mobile - shows skeleton until images load 
 
 const slides = [
-  { image: BannerC, link: '/offers', bg: '#420608' },
+  // { image: BannerC, link: '/offers', bg: '#420608' },
   { image: WideBanner1, link: '/offers', bg: '#0071A4' },
-  { image: Banner3, link: '/offers', bg: '#8a1114' },
+  // { image: Banner3, link: '/offers', bg: '#8a1114' },
   { image: WideBanner2, link: '/offers', bg: '#00D5C3' },
 ];
 
