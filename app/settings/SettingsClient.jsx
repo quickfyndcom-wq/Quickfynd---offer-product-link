@@ -17,6 +17,9 @@ export default function SettingsClient() {
   })
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deletingAccount, setDeletingAccount] = useState(false)
   const searchParams = useSearchParams()
 
   useEffect(() => {
@@ -118,6 +121,39 @@ export default function SettingsClient() {
     }
   }
 
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') return
+    try {
+      setDeletingAccount(true)
+      const token = await auth.currentUser?.getIdToken(true)
+      const response = await fetch('/api/account/delete', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to delete account')
+      }
+      setMessage({
+        type: 'success',
+        text: 'Your account has been deleted successfully.'
+      })
+      setShowDeleteModal(false)
+      setDeleteConfirmText('')
+      await auth.signOut()
+      window.location.href = '/'
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: error?.message || 'Failed to delete account'
+      })
+    } finally {
+      setDeletingAccount(false)
+    }
+  }
+
   if (user === undefined) return <Loading />
 
   if (user === null) {
@@ -209,13 +245,66 @@ export default function SettingsClient() {
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
               <h2 className="text-lg font-semibold text-slate-800 mb-4">⚠️ Danger Zone</h2>
               <p className="text-slate-600 text-sm mb-4">Permanently delete your account and all associated data.</p>
-              <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
                 Delete Account
               </button>
             </div>
           </div>
         </main>
       </div>
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
+            <div className="border-b border-slate-200 p-6">
+              <h3 className="text-xl font-semibold text-slate-800">Confirm Account Deletion</h3>
+              <p className="text-sm text-slate-600 mt-2">
+                This will permanently delete your account and data. This action cannot be undone.
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Type DELETE to confirm
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="DELETE"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-red-500 focus:ring-2 focus:ring-red-200 outline-none transition"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false)
+                    setDeleteConfirmText('')
+                  }}
+                  className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50"
+                  disabled={deletingAccount}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteAccount}
+                  className={`px-4 py-2 rounded-lg text-white ${
+                    deleteConfirmText === 'DELETE' && !deletingAccount
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-red-300 cursor-not-allowed'
+                  }`}
+                  disabled={deleteConfirmText !== 'DELETE' || deletingAccount}
+                >
+                  {deletingAccount ? 'Deleting...' : 'Delete Account'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

@@ -1,8 +1,48 @@
 import { NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import connectDB from '@/lib/mongodb';
 import Ticket from '@/models/Ticket';
 import { getAuth } from '@/lib/firebase-admin';
 import { sendTicketCreatedEmail } from '@/lib/emailService';
+
+const CATEGORY_LABELS = new Set([
+  'Order Issue',
+  'Product Question',
+  'Payment Issue',
+  'Account Issue',
+  'Other'
+]);
+
+const normalizeCategory = (value) => {
+  if (!value) return null;
+  if (CATEGORY_LABELS.has(value)) return value;
+  const key = String(value).trim().toLowerCase();
+  const map = {
+    general: 'Other',
+    other: 'Other',
+    order: 'Order Issue',
+    'order issue': 'Order Issue',
+    product: 'Product Question',
+    'product question': 'Product Question',
+    payment: 'Payment Issue',
+    'payment problem': 'Payment Issue',
+    'payment issue': 'Payment Issue',
+    account: 'Account Issue',
+    'account issue': 'Account Issue',
+    return: 'Other',
+    refund: 'Other',
+    shipping: 'Other',
+    'shipping delay': 'Other'
+  };
+  return map[key] || null;
+};
+
+const normalizeOrderId = (value) => {
+  if (!value) return undefined;
+  const trimmed = String(value).trim();
+  if (!trimmed) return undefined;
+  return mongoose.Types.ObjectId.isValid(trimmed) ? trimmed : null;
+};
 
 // GET - Fetch user's tickets
 export async function GET(request) {
@@ -58,25 +98,36 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
+    const normalizedCategory = normalizeCategory(category);
+    if (!normalizedCategory) {
+      return NextResponse.json({
+        error: 'Invalid category. Please choose a valid category.'
+      }, { status: 400 });
+    }
+
+    const normalizedOrderId = normalizeOrderId(orderId);
+    if (orderId && normalizedOrderId === null) {
+      return NextResponse.json({
+        error: 'Order number is invalid. Please enter a valid order ID.'
+      }, { status: 400 });
+    }
+
     const ticket = await Ticket.create({
       userId,
       userEmail,
       userName,
       subject,
-      category,
+      category: normalizedCategory,
       description,
       priority: priority || 'normal',
-      orderId: orderId || undefined,
+      orderId: normalizedOrderId,
       status: 'open'
     });
 
-    // Send email notifications
-    try {
-      await sendTicketCreatedEmail(ticket);
-    } catch (emailError) {
+    // Send email notifications without blocking the response
+    sendTicketCreatedEmail(ticket).catch((emailError) => {
       console.error('Email notification failed:', emailError);
-      // Continue even if email fails
-    }
+    });
 
     return NextResponse.json({ 
       success: true, 

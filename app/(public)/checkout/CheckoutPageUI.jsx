@@ -939,8 +939,10 @@ export default function CheckoutPage() {
       // If logged in and no address selected, skip address creation for now
       // Orders can work without addressId
       
-      // Validate payment method
-      if (!form.payment) {
+      const isWalletOnly = totalAfterWallet === 0 && safeRedeemCoins > 0;
+
+      // Validate payment method for remaining balance
+      if (!form.payment && !isWalletOnly) {
         setFormError("Please select a payment method.");
         setPlacingOrder(false);
         return;
@@ -978,11 +980,15 @@ export default function CheckoutPage() {
         return { id: item._id, quantity: qty, ...(variantOptions ? { variantOptions } : {}) };
       }).filter(i => i.quantity > 0);
       
+      const finalPaymentMethod = isWalletOnly
+        ? 'WALLET'
+        : (form.payment === 'cod' ? 'COD' : form.payment.toUpperCase());
+
       if (user) {
         console.log('Building logged-in user payload...');
         payload = {
           items: itemsFromState,
-          paymentMethod: form.payment === 'cod' ? 'COD' : form.payment.toUpperCase(),
+          paymentMethod: finalPaymentMethod,
           shippingFee: shipping,
           shippingMethod: shippingMethod,
         };
@@ -1019,11 +1025,10 @@ export default function CheckoutPage() {
           };
         }
       } else {
-        // Guest COD checkout
-        console.log('Building guest COD payload...');
+        console.log('Building guest checkout payload...');
         payload = {
           items: itemsFromState,
-          paymentMethod: form.payment === 'cod' ? 'COD' : form.payment.toUpperCase(),
+          paymentMethod: finalPaymentMethod,
           shippingFee: shipping,
           shippingMethod: shippingMethod,
           isGuest: true,

@@ -343,8 +343,8 @@ function ProductsContent() {
                     <div className="flex-1">
                         {filteredProducts.length > 0 && (
                             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {filteredProducts.map(product => (
-                                    <ProductCard key={product.id} product={product} />
+                                {filteredProducts.map((product) => (
+                                    <ProductCard key={product._id || product.id || product.slug} product={product} />
                                 ))}
                             </div>
                         )}

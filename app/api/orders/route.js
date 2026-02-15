@@ -245,7 +245,7 @@ export async function POST(request) {
                 wallet = await Wallet.create({ userId, coins: 0 });
             }
             const availableCoins = Number(wallet.coins || 0);
-            redeemableCoins = Math.max(0, Math.min(100, Math.floor(Number(coinsToRedeem)), availableCoins));
+            redeemableCoins = Math.max(0, Math.min(Math.floor(Number(coinsToRedeem)), availableCoins));
         }
 
         // Order creation

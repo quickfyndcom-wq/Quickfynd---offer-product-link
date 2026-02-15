@@ -112,9 +112,12 @@ export default function Cart() {
             if (data.orders && data.orders.length > 0) {
                 for (const order of data.orders) {
                     for (const item of order.orderItems) {
-                        if (!seen.has(item.product._id) && recentProducts.length < 8) {
-                            seen.add(item.product._id);
-                            recentProducts.push(item.product);
+                        const product = item?.product;
+                        const productId = product?._id || item?.productId;
+                        if (!product || !productId) continue;
+                        if (!seen.has(productId) && recentProducts.length < 8) {
+                            seen.add(productId);
+                            recentProducts.push(product);
                         }
                     }
                     if (recentProducts.length >= 8) break;

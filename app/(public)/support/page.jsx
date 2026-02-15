@@ -14,7 +14,7 @@ export default function SupportPage() {
     orderNumber: '',
     subject: '',
     message: '',
-    issue: 'general',
+    issue: 'Other',
     priority: 'normal'
   })
   const [loading, setLoading] = useState(false)
@@ -53,6 +53,12 @@ export default function SupportPage() {
 
     try {
       // Prepare ticket data matching the API format
+      if (formData.orderNumber && !/^[a-fA-F0-9]{24}$/.test(formData.orderNumber.trim())) {
+        setError('Order number must be a valid ID')
+        setLoading(false)
+        return
+      }
+
       const ticketData = {
         subject: formData.subject,
         category: formData.issue, // Map issue to category
@@ -82,7 +88,7 @@ export default function SupportPage() {
         orderNumber: '', 
         subject: '', 
         message: '', 
-        issue: 'general',
+        issue: 'Other',
         priority: 'normal'
       })
       setTimeout(() => setSuccess(false), 5000)
@@ -185,13 +191,11 @@ export default function SupportPage() {
                     onChange={handleChange}
                     className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
                   >
-                    <option value="general">General Inquiry</option>
-                    <option value="order">Order Issue</option>
-                    <option value="payment">Payment Problem</option>
-                    <option value="return">Return/Refund</option>
-                    <option value="shipping">Shipping Delay</option>
-                    <option value="product">Product Quality</option>
-                    <option value="account">Account Issue</option>
+                    <option value="Order Issue">Order Issue</option>
+                    <option value="Product Question">Product Question</option>
+                    <option value="Payment Issue">Payment Issue</option>
+                    <option value="Account Issue">Account Issue</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
 

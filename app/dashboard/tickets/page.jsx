@@ -19,7 +19,7 @@ export default function TicketsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     subject: '',
-    category: 'general',
+    category: 'Other',
     description: '',
     priority: 'normal',
     orderId: ''
@@ -61,6 +61,11 @@ export default function TicketsPage() {
       return
     }
 
+    if (formData.orderId && !/^[a-fA-F0-9]{24}$/.test(formData.orderId.trim())) {
+      toast.error('Order number must be a valid ID')
+      return
+    }
+
     try {
       setSubmitting(true)
       const token = await auth.currentUser.getIdToken(true)
@@ -71,7 +76,7 @@ export default function TicketsPage() {
       setShowCreateModal(false)
       setFormData({
         subject: '',
-        category: 'general',
+        category: 'Other',
         description: '',
         priority: 'normal',
         orderId: ''
@@ -290,13 +295,11 @@ export default function TicketsPage() {
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
                   >
-                    <option value="general">General Inquiry</option>
-                    <option value="order">Order Issue</option>
-                    <option value="payment">Payment Problem</option>
-                    <option value="return">Return/Refund</option>
-                    <option value="shipping">Shipping Delay</option>
-                    <option value="product">Product Quality</option>
-                    <option value="account">Account Issue</option>
+                    <option value="Order Issue">Order Issue</option>
+                    <option value="Product Question">Product Question</option>
+                    <option value="Payment Issue">Payment Issue</option>
+                    <option value="Account Issue">Account Issue</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
 

@@ -373,7 +373,7 @@ const Navbar = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        setWalletCoins(Number(data.coins || 0));
+        setWalletCoins(Number(data.rupeesValue ?? data.coins ?? 0));
       }
     } catch {
       // ignore
@@ -381,7 +381,33 @@ const Navbar = () => {
   };
 
   useEffect(() => {
+    if (!firebaseUser) {
+      setWalletCoins(0);
+      return;
+    }
+
     fetchWalletCoins();
+
+    const handleFocus = () => fetchWalletCoins();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchWalletCoins();
+    };
+    const handleWalletUpdate = () => fetchWalletCoins();
+
+    const intervalId = setInterval(() => {
+      fetchWalletCoins();
+    }, 10000);
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('walletUpdated', handleWalletUpdate);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('walletUpdated', handleWalletUpdate);
+      clearInterval(intervalId);
+    };
   }, [firebaseUser]);
 
   // Listen for custom event to open sign in modal
@@ -929,7 +955,7 @@ const Navbar = () => {
                     className="mt-0 inline-flex items-center gap-1 px-2 py-0 bg-emerald-500 rounded-full text-white text-[10px] font-bold hover:bg-emerald-600 transition w-fit shadow-sm"
                   >
                     <Image src={WalletIcon} alt="Wallet" width={14} height={14} />
-                    <span>Wallet: {walletCoins}</span>
+                    <span>Wallet: ₹{Number(walletCoins || 0).toLocaleString()}</span>
                   </Link>
                 </div>
                 {/* Dashboard button for seller */}

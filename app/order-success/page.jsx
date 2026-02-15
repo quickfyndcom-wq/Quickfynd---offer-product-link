@@ -74,9 +74,14 @@ function OrderSuccessContent() {
   // Use shippingFee from order if available
   const shipping = typeof order?.shippingFee === 'number' ? order.shippingFee : 0;
   const discount = order?.coupon?.discount ? (order.coupon.discountType === 'percentage' ? (order.coupon.discount / 100 * subtotal) : Math.min(order.coupon.discount, subtotal)) : 0;
-  const total = subtotal + shipping - discount;
+  const walletDiscount = Number(order?.walletDiscount || 0);
+  const total = typeof order?.total === 'number' ? order.total : (subtotal + shipping - discount - walletDiscount);
   const orderDate = order?.createdAt ? new Date(order.createdAt).toLocaleDateString() : new Date().toLocaleDateString();
   const currency = order?.currency || '₹';
+  const paymentMethod = String(order?.paymentMethod || 'COD').toUpperCase();
+  const isPaid = order?.isPaid === true || paymentMethod === 'WALLET' || paymentMethod === 'CARD' || paymentMethod === 'STRIPE';
+  const paidAmount = isPaid ? total : 0;
+  const dueAmount = isPaid ? 0 : total;
 
   // Meta Pixel Purchase event with attribution data
   useEffect(() => {
@@ -136,7 +141,9 @@ function OrderSuccessContent() {
               </div>
               <div className='text-sm'>
                 <div><span className='font-semibold'>Total:</span> {currency} {total.toLocaleString()}</div>
-                <div><span className='font-semibold'>Payment method:</span> {order?.paymentMethod || 'COD'}</div>
+                <div><span className='font-semibold'>Payment method:</span> {paymentMethod}</div>
+                <div><span className='font-semibold'>Paid:</span> {currency} {paidAmount.toLocaleString()}</div>
+                <div><span className='font-semibold'>To pay:</span> {currency} {dueAmount.toLocaleString()}</div>
               </div>
             </div>
             <div className='bg-gray-50 rounded-lg p-4'>
@@ -175,6 +182,12 @@ function OrderSuccessContent() {
                 <div className='text-right'>-{currency} {discount ? discount.toLocaleString() : '0'}</div>
                 <div className='text-gray-600'>Shipping &amp; handling</div>
                 <div className='text-right'>{currency} {shipping.toLocaleString()}</div>
+                {walletDiscount > 0 && (
+                  <>
+                    <div className='text-gray-600'>Wallet discount</div>
+                    <div className='text-right'>-{currency} {walletDiscount.toLocaleString()}</div>
+                  </>
+                )}
                 <div className='font-semibold text-gray-900'>Total</div>
                 <div className='font-semibold text-right'>{currency} {total.toLocaleString()}</div>
               </div>

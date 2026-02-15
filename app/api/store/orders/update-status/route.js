@@ -93,8 +93,8 @@ export async function POST(request) {
         }
 
         if (normalizedStatus === 'DELIVERED' && order.userId && !order.rewardsCredited) {
-            // Earn 5 coins per ₹100 spent (5% earning rate)
-            const coinsEarned = Math.floor((order.total || 0) * 0.05);
+            // Fixed reward per delivered order
+            const coinsEarned = 10;
 
             if (coinsEarned > 0) {
                 await Wallet.findOneAndUpdate(

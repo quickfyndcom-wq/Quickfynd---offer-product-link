@@ -135,7 +135,7 @@ export default function WalletPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span>Redeem Rate</span>
-                <span className="font-semibold text-rose-600">10 = ₹5</span>
+                <span className="font-semibold text-rose-600">10 Wallet = ₹10</span>
               </div>
             </div>
           </div>
