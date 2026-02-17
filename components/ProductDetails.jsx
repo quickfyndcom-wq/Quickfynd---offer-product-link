@@ -12,7 +12,7 @@ import { addToCart, uploadCart } from "@/lib/features/cart/cartSlice";
 import MobileProductActions from "./MobileProductActions";
 import { useAuth } from '@/lib/useAuth';
 
-const ProductDetails = ({ product, reviews = [] }) => {
+const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = null }) => {
   // Assume product loading state from redux if available
   const loading = useSelector(state => state.product?.status === 'loading');
   const currency = '₹';
@@ -71,6 +71,12 @@ const ProductDetails = ({ product, reviews = [] }) => {
   // Fetch FBT products
   useEffect(() => {
     const fetchFbtProducts = async () => {
+      // Only fetch if product has a valid ID
+      if (!product?._id) {
+        console.warn('No product ID available for FBT fetch');
+        return;
+      }
+      
       try {
         setLoadingFbt(true);
         const { data } = await axios.get(`/api/products/${product._id}/fbt`);
@@ -89,10 +95,12 @@ const ProductDetails = ({ product, reviews = [] }) => {
         }
       } catch (error) {
         console.error('Failed to fetch FBT products:', error);
+        // Silently fail - FBT is optional feature
       } finally {
         setLoadingFbt(false);
       }
     };
+    
     fetchFbtProducts();
   }, [product._id]);
 
@@ -116,8 +124,31 @@ const ProductDetails = ({ product, reviews = [] }) => {
       })
   ) || null;
 
-  const effPrice = selectedVariant?.price ?? product.price;
-  const effMrp = selectedVariant?.mrp ?? product.mrp;
+  const basePrice = selectedVariant?.price ?? product.price;
+  const baseMrp = selectedVariant?.mrp ?? product.mrp ?? basePrice;
+  const isSpecialOffer = !!product.specialOffer?.isSpecialOffer;
+  const specialDiscountPercent = Number(product.specialOffer?.discountPercent);
+  let effPrice = basePrice;
+  let effMrp = baseMrp;
+
+  if (isSpecialOffer && Number.isFinite(specialDiscountPercent) && specialDiscountPercent > 0) {
+    const offerBase = Number(basePrice) > 0 ? Number(basePrice) : Number(baseMrp) || 0;
+    const discounted = offerBase * (1 - (specialDiscountPercent / 100));
+    effMrp = offerBase || effMrp;
+    effPrice = Number.isFinite(discounted) ? Math.round(discounted * 100) / 100 : effPrice;
+  }
+  
+  // Debug logging for special offers
+  if (product.specialOffer?.isSpecialOffer) {
+    console.log('ProductDetails - Special Offer Prices:', {
+      product_price: product.price,
+      product_mrp: product.mrp,
+      effPrice,
+      effMrp,
+      specialOffer: product.specialOffer
+    });
+  }
+  
   const availableStock = (typeof selectedVariant?.stock === 'number')
     ? selectedVariant.stock
     : (typeof product.stockQuantity === 'number' ? product.stockQuantity : 0);
@@ -349,7 +380,7 @@ const ProductDetails = ({ product, reviews = [] }) => {
       qty = 1;
     }
     for (let i = 0; i < qty; i++) {
-      dispatch(addToCart({ 
+      const payload = {
         productId: product._id, 
         price: effPrice,
         variantOptions: {
@@ -357,7 +388,15 @@ const ProductDetails = ({ product, reviews = [] }) => {
           size: selectedSize || null,
           bundleQty: selectedBundleQty || null
         }
-      }));
+      };
+      
+      // If this is a special offer, include the offer token
+      if (product.specialOffer?.offerToken) {
+        payload.offerToken = product.specialOffer.offerToken;
+        payload.discountPercent = product.specialOffer.discountPercent;
+      }
+      
+      dispatch(addToCart(payload));
     }
     // Go directly to checkout (guests can checkout there)
     router.push('/checkout');
@@ -380,6 +419,13 @@ const ProductDetails = ({ product, reviews = [] }) => {
           bundleQty: selectedBundleQty || null
         }
       };
+      
+      // If this is a special offer, include the offer token
+      if (product.specialOffer?.offerToken) {
+        payload.offerToken = product.specialOffer.offerToken;
+        payload.discountPercent = product.specialOffer.discountPercent;
+      }
+      
       dispatch(addToCart(payload));
     }
     
@@ -628,6 +674,13 @@ const ProductDetails = ({ product, reviews = [] }) => {
 
           {/* RIGHT: Product Info */}
           <div className="bg-white rounded-lg p-4 lg:p-6 space-y-5">
+            {/* Special Offer - Countdown Timer */}
+            {offerData?.countdownTimer && (
+              <div className="mb-4">
+                {offerData.countdownTimer}
+              </div>
+            )}
+
             {/* Store Link with Logo */}
             {/* <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gray-200 rounded flex items-center justify-center">
@@ -644,9 +697,23 @@ const ProductDetails = ({ product, reviews = [] }) => {
             </div> */}
 
             {/* Product Title */}
-            <h1 className="text-2xl font-bold text-gray-900 leading-tight">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 leading-tight">
               {product.name}
             </h1>
+
+            {/* Special Offer - Discount Badge */}
+            {offerData?.discountBadge && (
+              <div className="mb-4">
+                {offerData.discountBadge}
+              </div>
+            )}
+
+            {/* Special Offer - Price Comparison */}
+            {offerData?.priceComparison && (
+              <div className="mb-4">
+                {offerData.priceComparison}
+              </div>
+            )}
 
             {/* Short Description */}
             {product.attributes?.shortDescription && (
@@ -755,7 +822,7 @@ const ProductDetails = ({ product, reviews = [] }) => {
                 </div>
               )}
               <div className="flex items-baseline gap-3 flex-wrap">
-                <span className="text-red-600 text-4xl font-bold">
+                <span className={`${isSpecialOffer ? 'text-green-600' : 'text-red-600'} text-4xl font-bold`}>
                   {currency}  {effPrice.toLocaleString()}
                 </span>
                 {effMrp > effPrice && (

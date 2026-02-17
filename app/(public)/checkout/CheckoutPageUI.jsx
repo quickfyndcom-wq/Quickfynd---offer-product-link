@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { countryCodes } from "@/assets/countryCodes";
 import { indiaStatesAndDistricts } from "@/assets/indiaStatesAndDistricts";
 import { useSelector, useDispatch } from "react-redux";
@@ -199,6 +200,53 @@ export default function CheckoutPage() {
       dispatch(fetchProducts({}));
     }
   }, [dispatch, products]);
+
+  // Ensure cart items are resolvable even if they are not in the product list
+  useEffect(() => {
+    const cartKeys = Object.keys(cartItems || {});
+    if (cartKeys.length === 0) return;
+
+    const normalizedIds = cartKeys.filter((id) => {
+      if (typeof id !== 'string') return false;
+      const trimmed = id.trim();
+      return trimmed.length > 0 && trimmed !== 'undefined' && trimmed !== 'null';
+    });
+    if (normalizedIds.length === 0) return;
+
+    const missingIds = normalizedIds.filter(
+      (id) => !products?.some((p) => String(p._id) === String(id))
+    );
+    if (missingIds.length === 0) return;
+
+    let ignore = false;
+    const loadMissingProducts = async () => {
+      try {
+        const { data } = await axios.post('/api/products/batch', {
+          productIds: missingIds,
+        });
+        if (ignore || !data?.products?.length) return;
+
+        const existing = new Set((products || []).map((p) => String(p._id)));
+        const merged = [...(products || [])];
+        data.products.forEach((p) => {
+          if (!existing.has(String(p._id))) {
+            merged.push(p);
+          }
+        });
+        dispatch({ type: 'product/setProduct', payload: merged });
+      } catch (error) {
+        const details = error?.response?.data;
+        if (details || error?.message) {
+          console.warn('Missing cart products fetch skipped:', details || error.message);
+        }
+      }
+    };
+
+    loadMissingProducts();
+    return () => {
+      ignore = true;
+    };
+  }, [cartItems, products, dispatch]);
 
   // Capture abandoned checkout (debounced)
   useEffect(() => {

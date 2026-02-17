@@ -6,7 +6,14 @@ import Product from '@/models/Product';
 export async function GET(request, { params }) {
   try {
     await dbConnect();
-    const { id } = params;
+    
+    // Handle async params in Next.js 15
+    const resolvedParams = await params;
+    const { id } = resolvedParams;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
+    }
 
     const product = await Product.findById(id).select('enableFBT fbtProductIds fbtBundlePrice fbtBundleDiscount');
     
@@ -36,8 +43,11 @@ export async function GET(request, { params }) {
       bundleDiscount: product.fbtBundleDiscount || 0
     });
   } catch (error) {
-    console.error('Error fetching FBT products:', error);
-    return NextResponse.json({ error: 'Failed to fetch FBT products' }, { status: 500 });
+    console.error('Error fetching FBT products:', error.message, error.stack);
+    return NextResponse.json({ 
+      error: 'Failed to fetch FBT products',
+      details: error.message 
+    }, { status: 500 });
   }
 }
 
@@ -45,7 +55,15 @@ export async function GET(request, { params }) {
 export async function PATCH(request, { params }) {
   try {
     await dbConnect();
-    const { id } = params;
+    
+    // Handle async params in Next.js 15
+    const resolvedParams = await params;
+    const { id } = resolvedParams;
+    
+    if (!id) {
+      return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
+    }
+    
     const body = await request.json();
 
     const { enableFBT, fbtProductIds, fbtBundlePrice, fbtBundleDiscount } = body;
@@ -78,7 +96,10 @@ export async function PATCH(request, { params }) {
       product: updatedProduct 
     });
   } catch (error) {
-    console.error('Error updating FBT configuration:', error);
-    return NextResponse.json({ error: 'Failed to update FBT configuration' }, { status: 500 });
+    console.error('Error updating FBT configuration:', error.message, error.stack);
+    return NextResponse.json({ 
+      error: 'Failed to update FBT configuration',
+      details: error.message 
+    }, { status: 500 });
   }
 }

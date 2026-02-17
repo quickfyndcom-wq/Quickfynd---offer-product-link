@@ -295,6 +295,7 @@ model Store {
   ReturnRequest ReturnRequest[]
   user          User            @relation(fields: [userId], references: [id])
   storeUsers    StoreUser[]
+  PersonalizedOffer PersonalizedOffer[]
 }
 
 // Admin-curated selections for homepage sections
@@ -409,4 +410,32 @@ model StoreUser {
   approvedBy User? @relation("ApprovedBy", fields: [approvedById], references: [id])
 
   @@unique([storeId, email])
+}
+
+// Personalized time-limited offers for specific customers
+model PersonalizedOffer {
+  id               String   @id @default(cuid())
+  offerToken       String   @unique
+  customerEmail    String
+  customerPhone    String?
+  customerName     String?
+  productId        String
+  discountPercent  Float // Percentage discount (e.g., 10, 15, 20)
+  expiresAt        DateTime // Countdown deadline
+  isActive         Boolean  @default(true)
+  isUsed           Boolean  @default(false)
+  usedAt           DateTime?
+  orderId          String? // Track if customer made purchase
+  notes            String? // Admin notes
+  storeId          String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([offerToken])
+  @@index([customerEmail])
+  @@index([expiresAt, isActive])
+  @@index([storeId, isActive])
 }

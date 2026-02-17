@@ -11,6 +11,7 @@ import Store from '@/models/Store';
 import Coupon from '@/models/Coupon';
 import GuestUser from '@/models/GuestUser';
 import Wallet from '@/models/Wallet';
+import PersonalizedOffer from '@/models/PersonalizedOffer';
 import { sendOrderConfirmationEmail, sendGuestAccountCreationEmail } from '@/lib/email';
 import { fetchNormalizedDelhiveryTracking } from '@/lib/delhivery';
 
@@ -225,10 +226,59 @@ export async function POST(request) {
             if (availableQty < requestedQty) {
                 return NextResponse.json({ error: 'Insufficient stock', id: item.id, availableQty, requestedQty }, { status: 400 });
             }
+            
+            // Check for personalized offer token and validate
+            let finalPrice = product.price;
+            let appliedOffer = null;
+            
+            if (item.offerToken) {
+                try {
+                    const offer = await PersonalizedOffer.findOne({ 
+                        offerToken: item.offerToken,
+                        productId: item.id 
+                    }).lean();
+                    
+                    if (offer) {
+                        // Validate offer
+                        const now = new Date();
+                        const isValid = offer.isActive && 
+                                       !offer.isUsed && 
+                                       new Date(offer.expiresAt) > now;
+                        
+                        if (isValid) {
+                            // Apply discount
+                            const discountAmount = (product.price * offer.discountPercent) / 100;
+                            finalPrice = Math.round(product.price - discountAmount);
+                            appliedOffer = {
+                                offerId: offer._id,
+                                offerToken: offer.offerToken,
+                                discountPercent: offer.discountPercent,
+                                originalPrice: product.price,
+                                discountedPrice: finalPrice
+                            };
+                            console.log(`Applied personalized offer: ${offer.discountPercent}% off. Price: ${product.price} -> ${finalPrice}`);
+                        } else {
+                            console.warn(`Offer token ${item.offerToken} is invalid or expired`);
+                            // Continue with regular price
+                        }
+                    } else {
+                        console.warn(`Offer token ${item.offerToken} not found`);
+                    }
+                } catch (err) {
+                    console.error('Error validating offer token:', err);
+                    // Continue with regular price
+                }
+            }
+            
             const storeId = product.storeId;
             if (!ordersByStore.has(storeId)) ordersByStore.set(storeId, []);
-            ordersByStore.get(storeId).push({ ...item, quantity: requestedQty, price: product.price });
-            grandSubtotal += Number(product.price) * Number(requestedQty);
+            ordersByStore.get(storeId).push({ 
+                ...item, 
+                quantity: requestedQty, 
+                price: finalPrice,
+                appliedOffer: appliedOffer 
+            });
+            grandSubtotal += Number(finalPrice) * Number(requestedQty);
         }
 
         // Shipping: use from payload, fallback to 0
@@ -462,6 +512,25 @@ export async function POST(request) {
             console.log('ORDER API DEBUG: orderData before Order.create:', JSON.stringify(orderData, null, 2));
             
             const order = await Order.create(orderData);
+
+            // Mark personalized offers as used
+            const usedOfferIds = sellerItems
+                .filter(item => item.appliedOffer && item.appliedOffer.offerId)
+                .map(item => item.appliedOffer.offerId);
+            
+            if (usedOfferIds.length > 0) {
+                await PersonalizedOffer.updateMany(
+                    { _id: { $in: usedOfferIds } },
+                    { 
+                        $set: { 
+                            isUsed: true, 
+                            usedAt: new Date(),
+                            orderId: order._id.toString()
+                        } 
+                    }
+                );
+                console.log(`Marked ${usedOfferIds.length} personalized offer(s) as used for order ${order._id}`);
+            }
 
             // Deduct wallet coins once when applied
             if (coinsRedeemed > 0 && userId) {
