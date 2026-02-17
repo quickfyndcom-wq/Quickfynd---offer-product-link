@@ -59,20 +59,40 @@ export default function SpecialOfferBySlugPage() {
       }
     }
 
+    // No token found, will use slug-based resolution
     setResolvedToken(null);
   }, [token]);
 
+  // Clean URL: Remove token from visible URL after it's been stored safely
+  // Do this AFTER token is stored, to avoid race conditions
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!queryToken || !slug || pathToken) return;
+    
+    // Only clean URL if we've already stored the token
+    if (resolvedToken === token) {
+      // Defer the URL replacement to avoid interfering with data fetch
+      const timer = setTimeout(() => {
+        router.replace(`/offer/${slug}`, { shallow: false });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [queryToken, slug, pathToken, resolvedToken, token, router]);
+
   useEffect(() => {
     if (resolvedToken) {
+      console.log('[Offer Page] Using token-based resolution:', resolvedToken.substring(0, 8) + '...');
       fetchOfferDetails(resolvedToken);
       return;
     }
 
     if (slug && typeof slug === 'string' && !pathToken) {
+      console.log('[Offer Page] Using slug-based resolution:', slug);
       fetchOfferDetailsBySlug(slug);
       return;
     }
 
+    console.log('[Offer Page] No token or valid slug found', { resolvedToken, slug, pathToken });
     setError('Offer token is missing');
     setLoading(false);
   }, [resolvedToken, slug, pathToken]);
@@ -113,42 +133,56 @@ export default function SpecialOfferBySlugPage() {
 
   const fetchOfferDetails = async (activeToken) => {
     try {
+      console.log('[fetchOfferDetails] Validating token:', activeToken.substring(0, 8) + '...');
       setLoading(true);
       const { data } = await axios.get(`/api/personalized-offers/validate/${activeToken}`);
 
       if (data.success && data.product) {
+        console.log('[fetchOfferDetails] Token validated successfully');
         applyOfferData(data, activeToken);
       } else {
+        console.log('[fetchOfferDetails] Token validation returned error:', data.error);
         setError(data.error || "Invalid offer");
         toast.error(data.error || "Invalid offer link");
       }
     } catch (error) {
-      console.error("Error fetching offer:", error);
+      console.error("[fetchOfferDetails] Token validation failed:", error.response?.status, error.message);
+      
+      // If token validation fails with 404, try to use slug-based resolution
+      if (error.response?.status === 404 && slug && !pathToken) {
+        console.log("[fetchOfferDetails] Token not found (404), falling back to slug-based resolution...");
+        setLoading(false);
+        await fetchOfferDetailsBySlug(slug);
+        return;
+      }
+      
       const errorMsg = error.response?.data?.error || "Failed to load offer";
       setError(errorMsg);
       toast.error(errorMsg);
+      setLoading(false);
 
       setTimeout(() => {
         router.push('/');
       }, 3000);
-    } finally {
-      setLoading(false);
     }
   };
 
   const fetchOfferDetailsBySlug = async (productSlug) => {
     try {
+      console.log('[fetchOfferDetailsBySlug] Resolving offer for slug:', productSlug);
       setLoading(true);
       const { data } = await axios.get(`/api/personalized-offers/resolve/${productSlug}`);
 
       if (data.success && data.product && data.offer?.offerToken) {
+        console.log('[fetchOfferDetailsBySlug] Offer resolved successfully');
         applyOfferData(data, data.offer.offerToken);
       } else {
+        console.log('[fetchOfferDetailsBySlug] Slug resolution returned error:', data.error);
         setError(data.error || "Invalid offer");
         toast.error(data.error || "Invalid offer link");
       }
     } catch (error) {
-      console.error("Error resolving offer by slug:", error);
+      console.error("[fetchOfferDetailsBySlug] Slug resolution failed:", error.response?.status, error.message);
       const errorMsg = error.response?.data?.error || "Failed to load offer";
       setError(errorMsg);
       toast.error(errorMsg);
@@ -223,16 +257,16 @@ export default function SpecialOfferBySlugPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen w-full">
       {showTopBanner && (
-        <div className="bg-gradient-to-r from-sky-600 to-blue-700 text-white py-4 px-4 relative overflow-hidden">
-          <div className="max-w-[1450px] mx-auto pr-10 overflow-hidden">
-            <div className="offer-marquee-track flex items-center gap-12 w-max whitespace-nowrap">
+        <div className="bg-gradient-to-r from-sky-600 to-blue-700 text-white py-2 px-3 sm:py-4 sm:px-4 relative overflow-hidden">
+          <div className="max-w-[1250px] mx-auto pr-8 sm:pr-10 overflow-hidden">
+            <div className="offer-marquee-track flex items-center gap-8 sm:gap-12 w-max whitespace-nowrap">
               {marqueeSlides.map((slide, index) => (
-                <div key={`slide-${index}`} className="flex items-center gap-3 text-lg md:text-xl font-bold">
-                  <Sparkles className="animate-pulse" size={20} />
+                <div key={`slide-${index}`} className="flex items-center gap-2 sm:gap-3 text-sm sm:text-lg md:text-xl font-bold">
+                  <Sparkles className="animate-pulse flex-shrink-0" size={16} />
                   <span>{slide}</span>
-                  <Sparkles className="animate-pulse" size={20} />
+                  <Sparkles className="animate-pulse flex-shrink-0" size={16} />
                 </div>
               ))}
             </div>
@@ -268,24 +302,9 @@ export default function SpecialOfferBySlugPage() {
         }
       `}</style>
 
-      <div className="max-w-[1450px] mx-auto px-4 py-8">
-        {offer.customerName && (
-          <div className="bg-blue-50 rounded-lg shadow-md p-4 mb-6 border-l-4 border-blue-500">
-            <div className="flex items-start gap-3">
-              <Gift className="text-blue-500 mt-1" size={24} />
-              <div>
-                <h2 className="font-semibold text-lg text-gray-900">
-                  Hi {offer.customerName}!
-                </h2>
-                <p className="text-gray-600">
-                  We've created this special discount just for you on this amazing product.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+      <div className="w-full">
+        <div className="max-w-[1250px] mx-auto px-2 sm:px-6 pb-24 lg:pb-0">
+          <div>
           <ProductDetails
             product={productWithDiscount}
             offerData={{
@@ -296,69 +315,70 @@ export default function SpecialOfferBySlugPage() {
                 />
               ),
               discountBadge: (
-                <div className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-lg p-6 text-white">
-                  <div className="flex items-center justify-between flex-wrap gap-4">
-                    <div className="flex items-center gap-3">
-                      <Tag size={32} />
+                <div className="bg-green-500 rounded-md p-2 sm:p-2.5 text-white">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1">
+                      <Tag className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       <div>
-                        <div className="text-sm opacity-90">Your Exclusive Discount</div>
-                        <div className="text-4xl font-bold">{offer.discountPercent}% OFF</div>
+                        <div className="text-[9px] sm:text-[10px] opacity-90">Your Exclusive Discount</div>
+                        <div className="text-xl sm:text-2xl font-bold leading-none">{offer.discountPercent}% OFF</div>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm opacity-90">You Save</div>
-                      <div className="text-3xl font-bold">₹{product.savings}</div>
+                      <div className="text-[9px] sm:text-[10px] opacity-90">You Save</div>
+                      <div className="text-xl sm:text-2xl font-bold leading-none">₹{product.savings}</div>
                     </div>
                   </div>
                 </div>
               ),
               priceComparison: (
-                <div className="p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
-                  <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="p-2 sm:p-2.5 bg-yellow-50 border border-yellow-300 rounded-md">
+                  <div className="flex items-center justify-between gap-1.5">
                     <div>
-                      <div className="text-sm text-gray-600">Regular Price</div>
-                      <div className="text-2xl text-gray-500 line-through">₹{product.originalPrice}</div>
+                      <div className="text-[9px] sm:text-[10px] text-gray-600">Regular Price</div>
+                      <div className="text-base sm:text-lg text-gray-500 line-through leading-none">₹{product.originalPrice}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm text-green-600 font-semibold">Your Special Price</div>
-                      <div className="text-4xl font-bold text-green-600">₹{product.discountedPrice}</div>
+                      <div className="text-[9px] sm:text-[10px] text-green-600 font-semibold">Your Special Price</div>
+                      <div className="text-xl sm:text-2xl font-bold text-green-600 leading-none">₹{product.discountedPrice}</div>
                     </div>
                   </div>
                 </div>
               )
             }}
           />
-        </div>
+          </div>
 
-        <ProductDescription product={product} />
+          <ProductDescription product={product} />
 
-        <div className="mt-8 bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="text-amber-600 flex-shrink-0 mt-1" size={20} />
-            <div className="text-sm text-amber-800">
-              <strong>Important:</strong> This is a time-limited exclusive offer.
-              After the countdown ends, this special pricing will no longer be available
-              and the product will return to its regular price.
+          <div className="mt-4 sm:mt-8 bg-amber-50 border border-amber-200 rounded-lg p-3 sm:p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="text-amber-600 flex-shrink-0 mt-1" size={20} />
+              <div className="text-sm text-amber-800">
+                <strong>Important:</strong> This is a time-limited exclusive offer.
+                After the countdown ends, this special pricing will no longer be available
+                and the product will return to its regular price.
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl mb-2">✓</div>
-            <div className="text-sm font-medium">Secure Checkout</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl mb-2">🚚</div>
-            <div className="text-sm font-medium">Fast Delivery</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl mb-2">💯</div>
-            <div className="text-sm font-medium">100% Authentic</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl mb-2">🔒</div>
-            <div className="text-sm font-medium">Safe Payment</div>
+          <div className="mt-4 sm:mt-8 grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 text-center">
+            <div className="bg-white p-3 sm:p-4 rounded-lg shadow">
+              <div className="text-xl sm:text-2xl mb-1 sm:mb-2">✓</div>
+              <div className="text-xs sm:text-sm font-medium">Secure Checkout</div>
+            </div>
+            <div className="bg-white p-3 sm:p-4 rounded-lg shadow">
+              <div className="text-xl sm:text-2xl mb-1 sm:mb-2">🚚</div>
+              <div className="text-xs sm:text-sm font-medium">Fast Delivery</div>
+            </div>
+            <div className="bg-white p-3 sm:p-4 rounded-lg shadow">
+              <div className="text-xl sm:text-2xl mb-1 sm:mb-2">💯</div>
+              <div className="text-xs sm:text-sm font-medium">100% Authentic</div>
+            </div>
+            <div className="bg-white p-3 sm:p-4 rounded-lg shadow">
+              <div className="text-xl sm:text-2xl mb-1 sm:mb-2">🔒</div>
+              <div className="text-xs sm:text-sm font-medium">Safe Payment</div>
+            </div>
           </div>
         </div>
       </div>

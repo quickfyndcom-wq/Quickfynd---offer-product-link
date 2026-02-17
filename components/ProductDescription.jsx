@@ -79,14 +79,14 @@ const ProductDescription = ({ product, reviews = [], loadingReviews = false, onR
     // Remove fetchReviews and handleReviewAdded, use parent handler
 
     return (
-        <div className="my-8">
+        <div className="my-4 sm:my-8">
 
             {/* Product Description Section */}
-            <div className="bg-white border border-gray-200 mb-6">
-                <div className="border-b border-gray-200 px-6 py-4">
-                    <h2 className="text-xl font-bold text-gray-900">Product Description</h2>
+            <div className="bg-white border border-gray-200 mb-4 sm:mb-6">
+                <div className="border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-900">Product Description</h2>
                 </div>
-                <div className="p-6">
+                <div className="p-4 sm:p-6">
                     <div 
                         className="max-w-none
                         [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-gray-900 [&_h1]:mb-4 [&_h1]:mt-4
@@ -124,17 +124,17 @@ const ProductDescription = ({ product, reviews = [], loadingReviews = false, onR
             </div>
 
             {/* Reviews Section */}
-            <div id="reviews" className="bg-white border border-gray-200">
-                <div className="border-b border-gray-200 px-6 py-4">
-                    <h2 className="text-xl font-bold text-gray-900">Reviews</h2>
+            <div id="reviews" className="bg-white border border-gray-200 mt-4 sm:mt-6">
+                <div className="border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-900">Reviews</h2>
                 </div>
-                <div className="p-8">
+                <div className="p-4 sm:p-8">
                     {/* Rating Overview - Horizontal Layout */}
-                    <div className="mb-10">
-                        <div className="flex items-start gap-8 pb-8 border-b border-gray-200">
+                    <div className="mb-6 sm:mb-10">
+                        <div className="flex items-start gap-4 sm:gap-8 pb-4 sm:pb-8 border-b border-gray-200">
                             {/* Left: Large Rating */}
-                            <div className="flex flex-col items-center min-w-[120px]">
-                                <div className="text-6xl font-bold text-gray-900 mb-2">{averageRating}</div>
+                            <div className="flex flex-col items-center min-w-[100px] sm:min-w-[120px]">
+                                <div className="text-5xl sm:text-6xl font-bold text-gray-900 mb-2">{averageRating}</div>
                                 <div className="flex mb-2">
                                     {Array(5).fill('').map((_, i) => (
                                         <StarIcon

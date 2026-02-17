@@ -165,12 +165,12 @@ export async function POST(req) {
     // Calculate discounted price
     const discountedPrice = offer.calculateDiscountedPrice(product.price);
 
-    // Generate offer URL (slug-based, token in query for exact-offer resolution)
+    // Generate offer URL (slug-based, token hidden for security)
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
     const hasProductSlug = Boolean(product.slug);
     const offerPath = hasProductSlug ? encodeURIComponent(product.slug) : offerToken;
-    const tokenQuery = hasProductSlug ? `?token=${encodeURIComponent(offerToken)}` : '';
-    const offerUrl = `${baseUrl}/offer/${offerPath}${tokenQuery}`;
+    // Only expose slug in URL, never expose token in URL for security
+    const offerUrl = `${baseUrl}/offer/${offerPath}`;
 
     return NextResponse.json({
       success: true,

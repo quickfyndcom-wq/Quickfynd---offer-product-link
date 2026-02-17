@@ -8,7 +8,8 @@ export default function MobileProductActions({
   effPrice,
   currency,
   cartCount,
-  isOutOfStock = false
+  isOutOfStock = false,
+  isOrdering = false
 }) {
   return (
     <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white shadow-2xl z-50 safe-area-bottom">
@@ -16,15 +17,16 @@ export default function MobileProductActions({
         {/* Order Now Button */}
         <button
           onClick={onOrderNow}
-          disabled={isOutOfStock}
+          disabled={isOutOfStock || isOrdering}
           className={`flex-1 flex items-center justify-center gap-2 h-12 rounded-lg font-bold text-white transition-all shadow-md ${
-            isOutOfStock 
+            (isOutOfStock || isOrdering)
               ? 'bg-gray-400 cursor-not-allowed opacity-70' 
               : 'bg-red-500 active:bg-red-600'
           }`}
         >
-          <span className="text-base">{isOutOfStock ? 'Out of Stock' : 'Order Now'}</span>
-          {!isOutOfStock && <Plus size={20} strokeWidth={3} />}
+          <span className="text-base">{isOutOfStock ? 'Out of Stock' : isOrdering ? 'Processing...' : 'Order Now'}</span>
+          {!isOutOfStock && !isOrdering && <Plus size={20} strokeWidth={3} />}
+          {isOrdering && <span className="w-4 h-4 border-2 border-white/70 border-t-white rounded-full animate-spin" />}
         </button>
 
         {/* Add to Cart Button - Hidden when out of stock */}

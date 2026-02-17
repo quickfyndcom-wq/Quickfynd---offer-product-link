@@ -25,6 +25,7 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
   const [showWishlistToast, setShowWishlistToast] = useState(false);
   const [wishlistMessage, setWishlistMessage] = useState('');
   const [showCartToast, setShowCartToast] = useState(false);
+  const [isOrderingNow, setIsOrderingNow] = useState(false);
   const { isSignedIn, userId } = useAuth();
   const router = useRouter();
   const dispatch = useDispatch();
@@ -373,33 +374,42 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
   };
 
   const handleOrderNow = () => {
-    if (!isSelectionInStock || maxOrderQty <= 0) return;
+    if (isOrderingNow || !isSelectionInStock || maxOrderQty <= 0) return;
+    setIsOrderingNow(true);
     // Add to cart for both guests and signed-in users
-    let qty = Math.min(quantity, maxOrderQty || 0);
-    if (!Number.isFinite(qty) || qty <= 0) {
-      qty = 1;
-    }
-    for (let i = 0; i < qty; i++) {
-      const payload = {
-        productId: product._id, 
-        price: effPrice,
-        variantOptions: {
-          color: selectedColor || null,
-          size: selectedSize || null,
-          bundleQty: selectedBundleQty || null
-        }
-      };
-      
-      // If this is a special offer, include the offer token
-      if (product.specialOffer?.offerToken) {
-        payload.offerToken = product.specialOffer.offerToken;
-        payload.discountPercent = product.specialOffer.discountPercent;
+    try {
+      let qty = Math.min(quantity, maxOrderQty || 0);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        qty = 1;
       }
-      
-      dispatch(addToCart(payload));
+      for (let i = 0; i < qty; i++) {
+        const payload = {
+          productId: product._id, 
+          price: effPrice,
+          variantOptions: {
+            color: selectedColor || null,
+            size: selectedSize || null,
+            bundleQty: selectedBundleQty || null
+          }
+        };
+        
+        // If this is a special offer, include the offer token
+        if (product.specialOffer?.offerToken) {
+          payload.offerToken = product.specialOffer.offerToken;
+          payload.discountPercent = product.specialOffer.discountPercent;
+        }
+        
+        dispatch(addToCart(payload));
+      }
+      // Go directly to checkout (guests can checkout there)
+      router.push('/checkout');
+    } catch (error) {
+      console.error('Order now failed:', error);
+      setIsOrderingNow(false);
+      return;
     }
-    // Go directly to checkout (guests can checkout there)
-    router.push('/checkout');
+
+    setTimeout(() => setIsOrderingNow(false), 3000);
   };
 
   const handleAddToCart = async () => {
@@ -606,8 +616,8 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
             </div>
 
             {/* Mobile: Main Image Only */}
-            <div className="lg:hidden relative">
-              <div className={`relative ${aspectRatioClass} bg-white border border-gray-200 rounded-lg overflow-hidden`}>
+            <div className="lg:hidden relative -mx-4 sm:mx-0">
+              <div className={`relative w-full ${aspectRatioClass} bg-white border border-gray-200 rounded-none sm:rounded-lg overflow-hidden`}>
                 {/* Used Badge */}
                 {product.attributes?.condition === 'used' && (
                   <div className="absolute top-4 left-4 z-10">
@@ -648,7 +658,7 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
             </div>
 
             {/* Mobile Thumbnail Gallery */}
-            <div className="lg:hidden flex gap-2 overflow-x-auto pb-2 scrollbar-hide cursor-grab active:cursor-grabbing">
+            <div className="lg:hidden -mx-4 sm:mx-0 px-4 sm:px-0 flex gap-2 overflow-x-auto pb-2 scrollbar-hide cursor-grab active:cursor-grabbing">
               {product.images?.map((image, index) => (
                 <button
                   key={index}
@@ -1039,19 +1049,20 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
             <div className="hidden md:flex gap-2 pt-3">
               <button 
                 onClick={handleOrderNow}
-                disabled={!isSelectionInStock}
+                disabled={!isSelectionInStock || isOrderingNow}
                 className={`flex-1 py-3.5 px-6 rounded-lg font-semibold text-base transition flex items-center justify-center gap-2 ${
-                  !isSelectionInStock
+                  (!isSelectionInStock || isOrderingNow)
                     ? 'bg-gray-400 text-white cursor-not-allowed opacity-70'
                     : 'bg-red-500 text-white hover:bg-red-600'
                 }`}
               >
-                {!isSelectionInStock ? 'Out of Stock' : 'Order Now'}
-                {isSelectionInStock && (
+                {!isSelectionInStock ? 'Out of Stock' : isOrderingNow ? 'Processing...' : 'Order Now'}
+                {isSelectionInStock && !isOrderingNow && (
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                   </svg>
                 )}
+                {isOrderingNow && <span className="w-4 h-4 border-2 border-white/70 border-t-white rounded-full animate-spin" />}
               </button>
 
               {isSelectionInStock && (
@@ -1310,6 +1321,7 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
         currency={currency}
         cartCount={cartCount}
         isOutOfStock={!isSelectionInStock}
+        isOrdering={isOrderingNow}
       />
 
       <style jsx>{`

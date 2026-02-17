@@ -204,12 +204,12 @@ export default function PersonalizedOffersAdmin() {
     }
   };
 
-  // Copy offer URL
+  // Copy offer URL (hide token from URL for security)
   const copyOfferUrl = async (token, productSlug) => {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
     const offerPath = productSlug || token;
-    const tokenQuery = productSlug ? `?token=${encodeURIComponent(token)}` : '';
-    const offerUrl = `${baseUrl}/offer/${encodeURIComponent(offerPath)}${tokenQuery}`;
+    // Only include slug in URL, token will be passed as redirect param internally
+    const offerUrl = `${baseUrl}/offer/${encodeURIComponent(offerPath)}`;
     
     try {
       await navigator.clipboard.writeText(offerUrl);
@@ -535,8 +535,7 @@ export default function PersonalizedOffersAdmin() {
                   <button
                     onClick={() => {
                       const offerPath = offer.product?.slug || offer.offerToken;
-                      const tokenQuery = offer.product?.slug ? `?token=${encodeURIComponent(offer.offerToken)}` : '';
-                      window.open(`/offer/${encodeURIComponent(offerPath)}${tokenQuery}`, '_blank');
+                      window.open(`/offer/${encodeURIComponent(offerPath)}`, '_blank');
                     }}
                     className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
                     title="Preview offer"
