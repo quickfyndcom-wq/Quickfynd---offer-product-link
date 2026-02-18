@@ -22,7 +22,10 @@ function getOfferTokenCookie() {
 export default function SpecialOfferBySlugPage() {
   const { slug } = useParams();
   const searchParams = useSearchParams();
-  const queryToken = searchParams.get('token');
+  const queryTokenRaw = searchParams.get('token');
+  const queryToken = typeof queryTokenRaw === 'string' && /^[a-f0-9]{16,}$/i.test(queryTokenRaw)
+    ? queryTokenRaw
+    : null;
   const pathToken = typeof slug === 'string' && /^[a-f0-9]{16,}$/i.test(slug) ? slug : null;
   const token = queryToken || pathToken;
   const router = useRouter();
@@ -43,23 +46,8 @@ export default function SpecialOfferBySlugPage() {
       setOfferTokenCookie(token);
       return;
     }
-
-    if (typeof window !== 'undefined') {
-      const storedToken = sessionStorage.getItem('activeOfferToken');
-      if (storedToken) {
-        setResolvedToken(storedToken);
-        return;
-      }
-
-      const cookieToken = getOfferTokenCookie();
-      if (cookieToken) {
-        sessionStorage.setItem('activeOfferToken', cookieToken);
-        setResolvedToken(cookieToken);
-        return;
-      }
-    }
-
-    // No token found, will use slug-based resolution
+    // No valid token in URL, always resolve by slug to avoid stale token cross-over
+    // (important after login redirects or when multiple offer links are opened)
     setResolvedToken(null);
   }, [token]);
 
@@ -205,13 +193,12 @@ export default function SpecialOfferBySlugPage() {
     }, 3000);
   };
 
-  const offerSlides = [
-    "🎉 Exclusive Offer Just For You!",
-    offer?.discountPercent ? `🔥 Get ${offer.discountPercent}% OFF - limited time only` : "🔥 Limited-time deal is live now",
-    product?.savings ? `💰 You save ₹${product.savings} on this product` : "💰 Save more with this special pricing"
-  ];
-
-  const marqueeSlides = [...offerSlides, ...offerSlides];
+  const customerDisplayName = offer?.customerName?.trim()
+    || offer?.customerEmail?.split('@')?.[0]
+    || 'there';
+  const bannerMessage = offer?.discountPercent
+    ? `Hi ${customerDisplayName}! 🎁 Super Discount: ${offer.discountPercent}% OFF - limited period only.`
+    : `Hi ${customerDisplayName}! 🎁 Exclusive limited-time offer for you.`;
 
   if (loading) {
     return (
@@ -259,16 +246,12 @@ export default function SpecialOfferBySlugPage() {
   return (
     <div className="min-h-screen w-full">
       {showTopBanner && (
-        <div className="bg-gradient-to-r from-sky-600 to-blue-700 text-white py-2 px-3 sm:py-4 sm:px-4 relative overflow-hidden">
-          <div className="max-w-[1250px] mx-auto pr-8 sm:pr-10 overflow-hidden">
-            <div className="offer-marquee-track flex items-center gap-8 sm:gap-12 w-max whitespace-nowrap">
-              {marqueeSlides.map((slide, index) => (
-                <div key={`slide-${index}`} className="flex items-center gap-2 sm:gap-3 text-sm sm:text-lg md:text-xl font-bold">
-                  <Sparkles className="animate-pulse flex-shrink-0" size={16} />
-                  <span>{slide}</span>
-                  <Sparkles className="animate-pulse flex-shrink-0" size={16} />
-                </div>
-              ))}
+        <div className="bg-gradient-to-r from-sky-600 to-blue-700 text-white py-1 px-2 sm:py-1.5 sm:px-3 relative overflow-hidden">
+          <div className="max-w-[1250px] mx-auto pr-6 sm:pr-8 overflow-hidden">
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold whitespace-nowrap">
+              <Sparkles className="animate-pulse flex-shrink-0" size={12} />
+              <span className="truncate">{bannerMessage}</span>
+              <Sparkles className="animate-pulse flex-shrink-0" size={12} />
             </div>
           </div>
 
@@ -276,31 +259,12 @@ export default function SpecialOfferBySlugPage() {
             type="button"
             onClick={() => setShowTopBanner(false)}
             aria-label="Close offer banner"
-            className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/15 hover:bg-white/25 transition"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full bg-white/15 hover:bg-white/25 transition"
           >
-            <X size={18} />
+            <X size={14} />
           </button>
         </div>
       )}
-
-      <style jsx>{`
-        .offer-marquee-track {
-          animation: offerMarquee 16s linear infinite;
-        }
-
-        .offer-marquee-track:hover {
-          animation-play-state: paused;
-        }
-
-        @keyframes offerMarquee {
-          0% {
-            transform: translateX(0);
-          }
-          100% {
-            transform: translateX(-50%);
-          }
-        }
-      `}</style>
 
       <div className="w-full">
         <div className="max-w-[1250px] mx-auto px-2 sm:px-6 pb-24 lg:pb-0">
