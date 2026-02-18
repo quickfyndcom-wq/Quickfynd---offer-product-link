@@ -134,23 +134,26 @@ export default function StoreManageProducts() {
         // Filter by search query
         if (!searchQuery) return true;
         
-        const query = searchQuery.toLowerCase();
+        const query = searchQuery.toLowerCase().trim();
+        // Escape special regex characters and create word boundary regex
+        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const wordBoundaryRegex = new RegExp(`\\b${escapedQuery}\\b`, 'i');
         
         // Search in product name
-        if (product.name?.toLowerCase().includes(query)) return true;
+        if (wordBoundaryRegex.test(product.name?.toLowerCase() || '')) return true;
         
         // Search in SKU
-        if (product.sku?.toLowerCase().includes(query)) return true;
+        if (wordBoundaryRegex.test(product.sku?.toLowerCase() || '')) return true;
         
         // Search in categories
-        if (product.categories?.some(catId => categoryMap[catId]?.toLowerCase().includes(query))) return true;
-        if (product.category && categoryMap[product.category]?.toLowerCase().includes(query)) return true;
+        if (product.categories?.some(catId => wordBoundaryRegex.test(categoryMap[catId]?.toLowerCase() || ''))) return true;
+        if (product.category && wordBoundaryRegex.test(categoryMap[product.category]?.toLowerCase() || '')) return true;
         
         // Search in tags
-        if (product.tags?.some(tag => tag.toLowerCase().includes(query))) return true;
+        if (product.tags?.some(tag => wordBoundaryRegex.test(tag.toLowerCase() || ''))) return true;
         
         // Search in description
-        if (product.description?.toLowerCase().includes(query)) return true;
+        if (wordBoundaryRegex.test(product.description?.toLowerCase() || '')) return true;
         
         return false;
     });

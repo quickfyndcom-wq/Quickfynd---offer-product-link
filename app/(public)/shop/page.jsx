@@ -145,7 +145,12 @@ function ShopContent() {
                     variants,
                 ].join(' ');
 
-                return haystack.includes(searchTerm);
+                // Use word boundary matching instead of partial match
+                // This ensures "car" matches "car" but not "skincare"
+                // Escape special regex characters first
+                const escapedTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const wordBoundaryRegex = new RegExp(`\\b${escapedTerm}\\b`, 'i');
+                return wordBoundaryRegex.test(haystack);
             });
         }
 

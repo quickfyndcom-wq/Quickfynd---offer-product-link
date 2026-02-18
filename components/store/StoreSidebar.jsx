@@ -11,6 +11,7 @@ const StoreSidebar = ({storeInfo}) => {
         { name: 'Categories', href: '/store/categories', icon: FolderIcon },
         { name: 'Add Product', href: '/store/add-product', icon: SquarePlusIcon },
         { name: 'Manage Product', href: '/store/manage-product', icon: SquarePenIcon },
+        { name: 'Home Preferences', href: '/store/home-preferences', icon: Sparkles },
         { name: 'Featured Sections', href: '/store/category-slider', icon: Sparkles },
         { name: 'Navbar Menu', href: '/store/navbar-menu', icon: LayoutListIcon },
         { name: 'Home Categories', href: '/store/storefront/home-menu-categories', icon: FolderIcon },
@@ -50,6 +51,7 @@ const StoreSidebar = ({storeInfo}) => {
         {
             name: 'Storefront',
             links: [
+                '/store/home-preferences',
                 '/store/category-slider',
                 '/store/navbar-menu',
                 '/store/storefront/home-menu-categories',

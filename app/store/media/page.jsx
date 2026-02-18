@@ -66,7 +66,9 @@ export default function StoreMediaPage() {
 
   // Filter products based on search and category
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const searchTerm = searchQuery.toLowerCase().trim()
+    const matchesSearch = searchTerm === '' || 
+      new RegExp(`\\b${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(product.name.toLowerCase())
     const matchesCategory = !filterCategory || 
       (product.category && product.category._id === filterCategory) ||
       (product.categories && product.categories.some(c => c._id === filterCategory))
