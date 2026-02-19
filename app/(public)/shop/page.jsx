@@ -69,7 +69,7 @@ function ShopContent() {
 
         if (categoryParam) {
             setCategoryLoading(true);
-            fetch(`/api/products?category=${encodeURIComponent(categoryParam)}&limit=200&includeOutOfStock=true`)
+            fetch(`/api/products?category=${encodeURIComponent(categoryParam)}&limit=300&includeOutOfStock=true`)
                 .then((res) => res.json())
                 .then((data) => {
                     if (!isActive) return;
@@ -91,7 +91,7 @@ function ShopContent() {
         // Fallback: ensure general list is available when no category filter
         if (!categoryParam && !fetchedRef.current.general && !loading) {
             fetchedRef.current.general = true;
-            dispatch(fetchProducts({ limit: 100 }));
+            dispatch(fetchProducts({ limit: 300 }));
         }
 
         return () => {

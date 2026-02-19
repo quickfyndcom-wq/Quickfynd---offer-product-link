@@ -61,7 +61,7 @@ export async function GET(request){
         const sortBy = searchParams.get('sortBy');
         const parsedLimit = parseInt(searchParams.get('limit') || '20', 10);
         const parsedOffset = parseInt(searchParams.get('offset') || '0', 10);
-        const limit = Math.min(Number.isFinite(parsedLimit) ? parsedLimit : 20, 200); // Default 20, max 200
+        const limit = Math.min(Number.isFinite(parsedLimit) ? parsedLimit : 20, 300); // Default 20, max 300
         const offset = Number.isFinite(parsedOffset) ? parsedOffset : 0;
         const fastDelivery = searchParams.get('fastDelivery');
         const categoryParam = searchParams.get('category');

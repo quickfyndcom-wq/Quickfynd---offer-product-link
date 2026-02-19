@@ -733,11 +733,6 @@ export default function CheckoutPage() {
       setForm(f => ({ ...f, country: value, state: '', district: '', alternatePhoneCode: f.alternatePhoneCode || f.phoneCode }));
       if (value !== 'India') setDistricts([]);
     } else if (name === 'payment') {
-      // If trying to select COD and not logged in, show sign-in instead
-      if (value === 'cod' && !user) {
-        setShowSignIn(true);
-        return; // Don't change the payment method yet
-      }
       setForm(f => ({ ...f, [name]: value }));
     } else if (name === 'pincode') {
       // Keep pincode numeric-only to avoid bad values
