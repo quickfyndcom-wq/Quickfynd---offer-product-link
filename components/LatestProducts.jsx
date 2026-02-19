@@ -47,7 +47,6 @@ const getSalePrice = (product) => {
   )
 }
 
-// Extract the best-guess MRP/compare-at price from common fields
 const getMrpPrice = (product) => {
   return parseAmount(
     product.mrp ??
@@ -64,7 +63,6 @@ const getMrpPrice = (product) => {
   )
 }
 
-// Product Card Component
 const ProductCard = ({ product }) => {
   const [hovered, setHovered] = useState(false)
   const dispatch = useDispatch()
@@ -163,14 +161,20 @@ const ProductCard = ({ product }) => {
   return (
     <Link
       href={`/product/${product.slug || product._id || ''}`}
-      className={`group bg-white rounded-xl shadow-sm ${hasSecondary ? 'hover:shadow-lg' : ''} transition-all duration-300 flex flex-col relative overflow-hidden`}
+      className={`group bg-white rounded-2xl border border-slate-200/80 ${hasSecondary ? 'hover:shadow-xl' : 'hover:shadow-md'} transition-all duration-300 flex flex-col relative overflow-hidden hover:-translate-y-0.5`}
       onMouseEnter={hasSecondary ? () => setHovered(true) : null}
       onMouseLeave={hasSecondary ? () => setHovered(false) : null}
     >
       {/* Image Container */}
       <div className="relative w-full h-36 sm:h-64 overflow-hidden bg-gray-50 aspect-square sm:aspect-auto">
+        <div className="absolute inset-x-0 top-0 z-10 p-2 sm:p-3 pointer-events-none">
+          <div className="inline-flex items-center rounded-full bg-black/70 text-white text-[10px] sm:text-xs font-semibold px-2 py-1 backdrop-blur-sm">
+            Trending Pick
+          </div>
+        </div>
+
         {hasFastDelivery && (
-          <span className="absolute top-2 left-2 z-20 pointer-events-none inline-flex items-center gap-1 text-white text-[10px] sm:text-[8px] lg:text-[12px] font-bold px-2 py-1 sm:px-1.5 sm:py-0.5 lg:px-2.5 lg:py-1.5 rounded-full shadow-md" style={{ backgroundColor: '#006644' }}>
+          <span className="absolute top-2 right-2 z-20 pointer-events-none inline-flex items-center gap-1 text-white text-[10px] sm:text-[8px] lg:text-[12px] font-bold px-2 py-1 sm:px-1.5 sm:py-0.5 lg:px-2.5 lg:py-1.5 rounded-full shadow-md" style={{ backgroundColor: '#006644' }}>
             Fast Delivery
           </span>
         )}
@@ -201,71 +205,69 @@ const ProductCard = ({ product }) => {
             onError={(e) => { e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png' }}
           />
         )}
+
+        <div className="absolute inset-x-0 bottom-0 z-10 h-16 sm:h-20 bg-gradient-to-t from-black/45 via-black/15 to-transparent pointer-events-none" />
+
+        <button 
+          onClick={handleAddToCart}
+          disabled={isOutOfStock}
+          className='absolute bottom-2 right-2 z-20 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shadow-lg transition-all duration-300'
+          style={{ backgroundColor: isOutOfStock ? '#9CA3AF' : (itemQuantity > 0 ? '#262626' : '#DC013C') }}
+          onMouseEnter={(e) => {
+            if (isOutOfStock) return
+            e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#1a1a1a' : '#b8012f'
+          }}
+          onMouseLeave={(e) => {
+            if (isOutOfStock) return
+            e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#262626' : '#DC013C'
+          }}
+        >
+          <ShoppingCartIcon className='text-white' size={16} />
+          {itemQuantity > 0 && (
+            <span className='absolute -top-1 -right-1 text-white text-[10px] font-bold w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center shadow-md' style={{ backgroundColor: '#DC013C' }}>
+              {itemQuantity}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Product Info */}
-      <div className="p-2 flex flex-col flex-grow">
-        <h3 className="text-xs sm:text-sm font-medium text-gray-800 line-clamp-2 mb-1">
+      <div className="p-2.5 sm:p-3 flex flex-col flex-grow">
+        <h3 className="text-xs sm:text-sm font-semibold text-slate-900 line-clamp-2 mb-1.5 leading-tight">
           {productName}
         </h3>
-        {/* Only show rating and review count, no date or initials */}
-        <div className="flex items-center mb-0">
+
+        <div className="mt-auto">
+          <div className="flex items-center gap-1 mb-1">
+            {priceNum > 0 && (
+              <p className="text-base sm:text-lg font-extrabold text-slate-900 leading-none">
+                ₹{priceNum.toFixed(0)}
+              </p>
+            )}
+            {mrpNum > 0 && mrpNum > priceNum && (
+              <p className="text-[10px] sm:text-xs text-slate-400 line-through leading-none mt-0.5">
+                ₹{mrpNum.toFixed(0)}
+              </p>
+            )}
+            {discount > 0 && (
+              <span className="ml-1 rounded bg-emerald-50 text-emerald-700 text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 leading-none">
+                {discount}% OFF
+              </span>
+            )}
+          </div>
+
           <div className="flex items-center min-w-0">
             {[...Array(5)].map((_, i) => (
               <FaStar
                 key={i}
-                size={10}
+                size={9}
                 className={i < ratingValue ? 'text-yellow-400' : 'text-gray-300'}
               />
             ))}
-            <span className="text-gray-500 text-[8px] sm:text-xs ml-1 truncate">
+            <span className="text-gray-500 text-[9px] sm:text-xs ml-1 truncate">
               {reviewCount > 0 ? `(${reviewCount})` : 'No reviews yet'}
             </span>
           </div>
-        </div>
-
-        <div className="mt-auto flex items-center justify-between">
-          <div className="flex flex-col gap-0.5">
-            {priceNum > 0 && (
-              <p className="text-sm sm:text-base font-bold text-black">
-                ₹{priceNum.toFixed(2)}
-              </p>
-            )}
-            {mrpNum > 0 && mrpNum > priceNum && (
-              <div className="flex items-center gap-1.5">
-                <p className="text-xs sm:text-sm text-gray-400 line-through">
-                  ₹{mrpNum.toFixed(2)}
-                </p>
-                {discount > 0 && (
-                  <span className="text-[10px] sm:text-xs font-semibold text-green-600">
-                    {discount}% off
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-          
-          <button 
-            onClick={handleAddToCart}
-            disabled={isOutOfStock}
-            className='w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 relative'
-            style={{ backgroundColor: isOutOfStock ? '#9CA3AF' : (itemQuantity > 0 ? '#262626' : '#DC013C') }}
-            onMouseEnter={(e) => {
-              if (isOutOfStock) return
-              e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#1a1a1a' : '#b8012f'
-            }}
-            onMouseLeave={(e) => {
-              if (isOutOfStock) return
-              e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#262626' : '#DC013C'
-            }}
-          >
-            <ShoppingCartIcon className='text-white' size={16} />
-            {itemQuantity > 0 && (
-              <span className='absolute -top-1 -right-1 text-white text-[10px] font-bold w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center shadow-md' style={{ backgroundColor: '#DC013C' }}>
-                {itemQuantity}
-              </span>
-            )}
-          </button>
         </div>
       </div>
     </Link>
