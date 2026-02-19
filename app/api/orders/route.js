@@ -153,6 +153,17 @@ export async function POST(request) {
             }
         }
 
+        const hasPersonalizedOfferItem = Array.isArray(items)
+            ? items.some((item) => typeof item?.offerToken === 'string' && item.offerToken.trim().length > 0)
+            : false;
+
+        if (hasPersonalizedOfferItem && String(paymentMethod || '').toUpperCase() === 'COD') {
+            return NextResponse.json(
+                { error: 'Cash on Delivery is not available for personalized offer products. Please use online payment.' },
+                { status: 400 }
+            );
+        }
+
         // Coupon logic
         let coupon = null;
         if (couponCode) {

@@ -640,7 +640,13 @@ export default function CheckoutPage() {
   const isWalletOnly = totalAfterWallet === 0 && safeRedeemCoins > 0;
   const needsPaymentSelection = totalAfterWallet > 0;
   const maxCODAmount = shippingSetting?.maxCODAmount || 0;
-  const isCODDisabledForOrder = shippingSetting?.enableCOD === false || (maxCODAmount > 0 && totalAfterWallet > maxCODAmount);
+  const hasPersonalizedOfferItem = Object.values(cartItems || {}).some(
+    (entry) => typeof entry === 'object' && !!entry?.offerToken
+  );
+  const isCODDisabledForOrder =
+    hasPersonalizedOfferItem ||
+    shippingSetting?.enableCOD === false ||
+    (maxCODAmount > 0 && totalAfterWallet > maxCODAmount);
   const isPaymentMissing = needsPaymentSelection && !form.payment;
   const isInvalidPaymentSelection = form.payment === 'cod' && isCODDisabledForOrder;
   const isPlaceOrderDisabled = placingOrder || isPaymentMissing || isInvalidPaymentSelection;
@@ -662,6 +668,12 @@ export default function CheckoutPage() {
       setForm((f) => ({ ...f, payment: '' }));
     }
   }, [isWalletOnly, form.payment]);
+
+  useEffect(() => {
+    if (hasPersonalizedOfferItem && form.payment === 'cod') {
+      setForm((f) => ({ ...f, payment: 'card' }));
+    }
+  }, [hasPersonalizedOfferItem, form.payment]);
 
   useEffect(() => {
     if (appliedCoupon && (isWalletOnly || form.payment !== 'card')) {
@@ -1022,6 +1034,12 @@ export default function CheckoutPage() {
 
       // Validate COD limit
       if (form.payment === 'cod') {
+        if (hasPersonalizedOfferItem) {
+          setFormError('COD is not available for personalized offer products. Please use online payment.');
+          setPlacingOrder(false);
+          return;
+        }
+
         const maxCODAmount = shippingSetting?.maxCODAmount || 0;
         const remainingAmount = totalAfterWallet;
         
@@ -1049,7 +1067,13 @@ export default function CheckoutPage() {
         const value = cartItems?.[item._id];
         const qty = typeof value === 'number' ? value : value?.quantity || item.quantity || 0;
         const variantOptions = typeof value === 'object' ? value?.variantOptions : undefined;
-        return { id: item._id, quantity: qty, ...(variantOptions ? { variantOptions } : {}) };
+        const offerToken = typeof value === 'object' ? value?.offerToken : undefined;
+        return {
+          id: item._id,
+          quantity: qty,
+          ...(variantOptions ? { variantOptions } : {}),
+          ...(offerToken ? { offerToken } : {})
+        };
       }).filter(i => i.quantity > 0);
       
       const finalPaymentMethod = isWalletOnly
@@ -2025,7 +2049,7 @@ export default function CheckoutPage() {
                 </label>
 
                 {/* Cash on Delivery Option */}
-                {(() => {
+                {!hasPersonalizedOfferItem && (() => {
                   const maxCODAmount = shippingSetting?.maxCODAmount || 0;
                   const remainingAmount = total - walletDiscount;
                   const isCODDisabled = isWalletOnly || shippingSetting?.enableCOD === false || 
@@ -2067,8 +2091,14 @@ export default function CheckoutPage() {
                   );
                 })()}
               </div>
+
+              {hasPersonalizedOfferItem && (
+                <div className="mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  COD is not available for personalized offer products. Please use online payment.
+                </div>
+              )}
               
-              {!user && (
+              {!user && !hasPersonalizedOfferItem && (
                 <div className="mt-4 text-sm text-gray-600 bg-green-50 border border-green-200 rounded-lg p-3">
                   <span className="font-semibold text-green-900">✓ Guest Checkout Available:</span> You can place COD orders without creating an account. Your order will be processed instantly!
                 </div>
