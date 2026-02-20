@@ -238,18 +238,49 @@ const Navbar = () => {
 
   // Fetch categories from API
   useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
     const fetchCategories = async () => {
       try {
-        const res = await fetch('/api/categories');
-        const data = await res.json();
-        if (data.categories) {
-          setCategories(data.categories);
+        const endpoints = ['/api/categories', '/api/store/categories'];
+
+        for (const endpoint of endpoints) {
+          try {
+            const res = await fetch(endpoint, {
+              method: 'GET',
+              cache: 'no-store',
+              signal: controller.signal,
+            });
+
+            if (!res.ok) {
+              continue;
+            }
+
+            const data = await res.json();
+            if (active && Array.isArray(data?.categories)) {
+              setCategories(data.categories);
+              return;
+            }
+          } catch (innerError) {
+            if (innerError?.name === 'AbortError') return;
+          }
         }
+
+        if (active) setCategories([]);
       } catch (error) {
-        console.error('Error fetching categories:', error);
+        if (error?.name !== 'AbortError') {
+          console.warn('Categories could not be loaded right now.');
+        }
       }
     };
+
     fetchCategories();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, []);
 
   // Product names for animated placeholder

@@ -78,7 +78,7 @@ export default function ProductForm({ product = null, onClose, onSubmitSuccess }
         const [variants, setVariants] = useState([]);
         const [images, setImages] = useState({ "1": null, "2": null, "3": null, "4": null, "5": null, "6": null, "7": null, "8": null });
         const [productInfo, setProductInfo] = useState({
-            name: '', slug: '', brand: '', shortDescription: '', description: '', mrp: '', price: '', category: '', sku: '', stockQuantity: 0, colors: [], sizes: [], fastDelivery: false, allowReturn: true, allowReplacement: true, reviews: [], badges: [], imageAspectRatio: '1:1', tags: []
+            name: '', slug: '', brand: '', shortDescription: '', description: '', mrp: '', price: '', category: '', sku: '', stockQuantity: 0, colors: [], sizes: [], fastDelivery: false, allowReturn: true, allowReplacement: true, reviews: [], badges: [], imageAspectRatio: '1:1', tags: [], deliveredBy: '', soldBy: '', paymentInfo: ''
         });
         const [tagInput, setTagInput] = useState('');
         const [loading, setLoading] = useState(false);
@@ -234,7 +234,10 @@ export default function ProductForm({ product = null, onClose, onSubmitSuccess }
                 allowReplacement: product.allowReplacement !== undefined ? product.allowReplacement : true,
                 reviews: product.reviews || [],
                 badges: product.attributes?.badges || [],
-                imageAspectRatio: product.imageAspectRatio || '1:1'
+                imageAspectRatio: product.imageAspectRatio || '1:1',
+                deliveredBy: product.attributes?.deliveredBy || '',
+                soldBy: product.attributes?.soldBy || '',
+                paymentInfo: product.attributes?.paymentInfo || ''
             })
             // Set selected categories from product data - debug and handle all cases
             console.log('Product data for categories:', { 
@@ -415,6 +418,9 @@ export default function ProductForm({ product = null, onClose, onSubmitSuccess }
                 brand: productInfo.brand,
                 shortDescription: productInfo.shortDescription,
                 badges: productInfo.badges || [],
+                deliveredBy: productInfo.deliveredBy,
+                soldBy: productInfo.soldBy,
+                paymentInfo: productInfo.paymentInfo,
                 ...(bulkEnabled ? { variantType: 'bulk_bundles' } : {})
             }
             formData.append('attributes', JSON.stringify(attributes))
@@ -646,6 +652,39 @@ export default function ProductForm({ product = null, onClose, onSubmitSuccess }
                 <div>
                     <label className="block text-sm font-medium mb-1">Short Description</label>
                     <input name="shortDescription" value={productInfo.shortDescription || ''} onChange={onChangeHandler} className="w-full border rounded px-3 py-2" placeholder="One-liner overview" />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Delivered by (optional)</label>
+                        <input
+                            name="deliveredBy"
+                            value={productInfo.deliveredBy || ''}
+                            onChange={onChangeHandler}
+                            className="w-full border rounded px-3 py-2"
+                            placeholder="e.g. Quickfynd"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Sold by (optional)</label>
+                        <input
+                            name="soldBy"
+                            value={productInfo.soldBy || ''}
+                            onChange={onChangeHandler}
+                            className="w-full border rounded px-3 py-2"
+                            placeholder="e.g. Store name"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Payment text (optional)</label>
+                        <input
+                            name="paymentInfo"
+                            value={productInfo.paymentInfo || ''}
+                            onChange={onChangeHandler}
+                            className="w-full border rounded px-3 py-2"
+                            placeholder="e.g. Secure transaction"
+                        />
+                    </div>
                 </div>
 
                 {/* Tags */}
