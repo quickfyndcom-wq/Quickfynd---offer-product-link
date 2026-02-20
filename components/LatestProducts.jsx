@@ -167,12 +167,6 @@ const ProductCard = ({ product }) => {
     >
       {/* Image Container */}
       <div className="relative w-full h-36 sm:h-64 overflow-hidden bg-gray-50 aspect-square sm:aspect-auto">
-        <div className="absolute inset-x-0 top-0 z-10 p-2 sm:p-3 pointer-events-none">
-          <div className="inline-flex items-center rounded-full bg-black/70 text-white text-[10px] sm:text-xs font-semibold px-2 py-1 backdrop-blur-sm">
-            Trending Pick
-          </div>
-        </div>
-
         {hasFastDelivery && (
           <span className="absolute top-2 right-2 z-20 pointer-events-none inline-flex items-center gap-1 text-white text-[10px] sm:text-[8px] lg:text-[12px] font-bold px-2 py-1 sm:px-1.5 sm:py-0.5 lg:px-2.5 lg:py-1.5 rounded-full shadow-md" style={{ backgroundColor: '#006644' }}>
             Fast Delivery
@@ -207,28 +201,6 @@ const ProductCard = ({ product }) => {
         )}
 
         <div className="absolute inset-x-0 bottom-0 z-10 h-16 sm:h-20 bg-gradient-to-t from-black/45 via-black/15 to-transparent pointer-events-none" />
-
-        <button 
-          onClick={handleAddToCart}
-          disabled={isOutOfStock}
-          className='absolute bottom-2 right-2 z-20 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shadow-lg transition-all duration-300'
-          style={{ backgroundColor: isOutOfStock ? '#9CA3AF' : (itemQuantity > 0 ? '#262626' : '#DC013C') }}
-          onMouseEnter={(e) => {
-            if (isOutOfStock) return
-            e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#1a1a1a' : '#b8012f'
-          }}
-          onMouseLeave={(e) => {
-            if (isOutOfStock) return
-            e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#262626' : '#DC013C'
-          }}
-        >
-          <ShoppingCartIcon className='text-white' size={16} />
-          {itemQuantity > 0 && (
-            <span className='absolute -top-1 -right-1 text-white text-[10px] font-bold w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center shadow-md' style={{ backgroundColor: '#DC013C' }}>
-              {itemQuantity}
-            </span>
-          )}
-        </button>
       </div>
 
       {/* Product Info */}
@@ -238,22 +210,46 @@ const ProductCard = ({ product }) => {
         </h3>
 
         <div className="mt-auto">
-          <div className="flex items-center gap-1 mb-1">
-            {priceNum > 0 && (
-              <p className="text-base sm:text-lg font-extrabold text-slate-900 leading-none">
-                ₹{priceNum.toFixed(0)}
-              </p>
-            )}
-            {mrpNum > 0 && mrpNum > priceNum && (
-              <p className="text-[10px] sm:text-xs text-slate-400 line-through leading-none mt-0.5">
-                ₹{mrpNum.toFixed(0)}
-              </p>
-            )}
-            {discount > 0 && (
-              <span className="ml-1 rounded bg-emerald-50 text-emerald-700 text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 leading-none">
-                {discount}% OFF
-              </span>
-            )}
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <div className="flex items-center gap-1 flex-wrap">
+              {priceNum > 0 && (
+                <p className="text-base sm:text-lg font-extrabold text-slate-900 leading-none">
+                  ₹{priceNum.toFixed(0)}
+                </p>
+              )}
+              {mrpNum > 0 && mrpNum > priceNum && (
+                <p className="text-[10px] sm:text-xs text-slate-400 line-through leading-none mt-0.5">
+                  ₹{mrpNum.toFixed(0)}
+                </p>
+              )}
+              {discount > 0 && (
+                <span className="ml-1 rounded bg-emerald-50 text-emerald-700 text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 leading-none">
+                  {discount}% OFF
+                </span>
+              )}
+            </div>
+
+            <button
+              onClick={handleAddToCart}
+              disabled={isOutOfStock}
+              className='relative z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shadow-md transition-all duration-300 flex-shrink-0'
+              style={{ backgroundColor: isOutOfStock ? '#9CA3AF' : (itemQuantity > 0 ? '#262626' : '#DC013C') }}
+              onMouseEnter={(e) => {
+                if (isOutOfStock) return
+                e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#1a1a1a' : '#b8012f'
+              }}
+              onMouseLeave={(e) => {
+                if (isOutOfStock) return
+                e.currentTarget.style.backgroundColor = itemQuantity > 0 ? '#262626' : '#DC013C'
+              }}
+            >
+              <ShoppingCartIcon className='text-white' size={15} />
+              {itemQuantity > 0 && (
+                <span className='absolute -top-1 -right-1 text-white text-[10px] font-bold w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center shadow-md' style={{ backgroundColor: '#DC013C' }}>
+                  {itemQuantity}
+                </span>
+              )}
+            </button>
           </div>
 
           <div className="flex items-center min-w-0">
