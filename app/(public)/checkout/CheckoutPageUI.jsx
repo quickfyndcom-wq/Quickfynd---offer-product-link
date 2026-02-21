@@ -10,6 +10,7 @@ import { clearCart, addToCart, removeFromCart, deleteItemFromCart } from "@/lib/
 import { fetchProducts } from "@/lib/features/product/productSlice";
 import { fetchShippingSettings, calculateShipping } from "@/lib/shipping";
 import FbqInitiateCheckout from "@/components/FbqInitiateCheckout";
+import { trackMetaEvent } from "@/lib/metaPixelClient";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import dynamic from "next/dynamic";
@@ -682,6 +683,33 @@ export default function CheckoutPage() {
       setCouponError('Coupons are available only for card payments.');
     }
   }, [appliedCoupon, isWalletOnly, form.payment]);
+
+  // Meta Pixel: AddPaymentInfo when payment method is selected on checkout
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!form.payment || isWalletOnly) return;
+    if (cartArray.length === 0) return;
+
+    const contentIds = cartArray
+      .map((item) => String(item?._id || item?._cartKey || ''))
+      .filter(Boolean);
+
+    if (contentIds.length === 0) return;
+
+    const eventKey = `meta_add_payment_info_${form.payment}_${contentIds.join(',')}_${Number(totalAfterWallet || 0)}`;
+    if (sessionStorage.getItem(eventKey)) return;
+
+    trackMetaEvent('AddPaymentInfo', {
+      value: Number(totalAfterWallet || 0),
+      currency: 'INR',
+      content_type: 'product',
+      content_ids: contentIds,
+      num_items: cartArray.reduce((sum, item) => sum + Number(item?.quantity || 0), 0),
+      payment_method: String(form.payment).toUpperCase(),
+    });
+
+    sessionStorage.setItem(eventKey, '1');
+  }, [form.payment, isWalletOnly, cartArray, totalAfterWallet]);
 
   // Load shipping settings - refetch on page load and when products change
   useEffect(() => {
@@ -1416,7 +1444,12 @@ export default function CheckoutPage() {
 
   return (
     <>
-      <FbqInitiateCheckout />
+      <FbqInitiateCheckout
+        value={totalAfterWallet}
+        currency="INR"
+        contentIds={cartArray.map((item) => String(item?._id || item?._cartKey || '')).filter(Boolean)}
+        numItems={cartArray.reduce((sum, item) => sum + Number(item?.quantity || 0), 0)}
+      />
       <div className="py-10 bg-white md:pb-0 pb-32 min-h-[35dvh]">
       <div className="max-w-[1250px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Left column: address, form, payment */}

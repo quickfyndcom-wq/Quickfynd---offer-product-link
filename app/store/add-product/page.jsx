@@ -110,6 +110,22 @@ export default function ProductForm({ product = null, onClose, onSubmitSuccess }
 
     const { user, loading: authLoading, getToken } = useAuth();
 
+    const normalizeErrorMessage = (value, fallback = 'Request failed') => {
+        if (!value) return fallback;
+        if (typeof value === 'string') return value;
+        if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+        if (typeof value === 'object') {
+            const msg = value.error || value.message || value.detail || value.code;
+            if (typeof msg === 'string') return msg;
+            try {
+                return JSON.stringify(value);
+            } catch {
+                return fallback;
+            }
+        }
+        return fallback;
+    };
+
     // Fetch categories from database
     useEffect(() => {
         const fetchCategories = async () => {
@@ -517,7 +533,7 @@ export default function ProductForm({ product = null, onClose, onSubmitSuccess }
             }
             router.push('/store/manage-product')
         } catch (error) {
-            toast.error(error?.response?.data?.error || error.message)
+            toast.error(normalizeErrorMessage(error?.response?.data?.error || error?.response?.data || error?.message))
         } finally {
             setLoading(false)
         }

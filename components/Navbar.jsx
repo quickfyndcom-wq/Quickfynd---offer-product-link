@@ -28,6 +28,22 @@ const Navbar = () => {
   const [showImageSearchResults, setShowImageSearchResults] = useState(false);
   const imagePasteCooldownRef = useRef(0);
 
+  const normalizeErrorMessage = (value, fallback = 'Something went wrong') => {
+    if (!value) return fallback;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (typeof value === 'object') {
+      const msg = value.error || value.message || value.detail || value.code;
+      if (typeof msg === 'string') return msg;
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return fallback;
+      }
+    }
+    return fallback;
+  };
+
   // Helper function for image search
   const handleImageSearch = async (file) => {
     if (imageSearchLoading) return;
@@ -39,10 +55,25 @@ const Navbar = () => {
         method: 'POST',
         body: formData
       });
-      const data = await res.json();
+      let data = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = {};
+      }
+
+      if (!res.ok) {
+        if (res.status === 413) {
+          toast.error('Image is too large. Please upload a smaller image.');
+        } else {
+          toast.error(normalizeErrorMessage(data?.error || data?.message || `Request failed (${res.status})`, 'Image search failed'));
+        }
+        setImageSearchLoading(false);
+        return;
+      }
       
       if (data.error) {
-        toast.error(data.error || 'Image search failed');
+        toast.error(normalizeErrorMessage(data.error, 'Image search failed'));
         setImageSearchLoading(false);
         return;
       }

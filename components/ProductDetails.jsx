@@ -11,6 +11,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { addToCart, uploadCart } from "@/lib/features/cart/cartSlice";
 import MobileProductActions from "./MobileProductActions";
 import { useAuth } from '@/lib/useAuth';
+import { trackMetaEvent } from "@/lib/metaPixelClient";
 
 const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = null }) => {
   // Assume product loading state from redux if available
@@ -57,6 +58,24 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
   const reviewCount = reviewsToUse.length > 0
     ? reviewsToUse.length
     : (typeof product.ratingCount === 'number' ? product.ratingCount : 0);
+
+  useEffect(() => {
+    if (!product?._id) return;
+    if (typeof window === 'undefined') return;
+
+    const eventKey = `meta_viewcontent_sent_${String(product._id)}`;
+    if (sessionStorage.getItem(eventKey)) return;
+
+    trackMetaEvent('ViewContent', {
+      content_type: 'product',
+      content_ids: [String(product._id)],
+      content_name: product.name || product.title || 'Product',
+      value: Number(product.price || 0),
+      currency: 'INR',
+    });
+
+    sessionStorage.setItem(eventKey, '1');
+  }, [product?._id, product?.name, product?.title, product?.price]);
 
   useEffect(() => {
     const fetchReviews = async () => {

@@ -20,6 +20,22 @@ function SearchResultsInner() {
   const [similarLoading, setSimilarLoading] = useState(false);
   const [recommendedProducts, setRecommendedProducts] = useState([]);
 
+  const normalizeErrorMessage = (value, fallback = 'Failed to fetch results') => {
+    if (!value) return fallback;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (typeof value === 'object') {
+      const msg = value.error || value.message || value.detail || value.code;
+      if (typeof msg === 'string') return msg;
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return fallback;
+      }
+    }
+    return fallback;
+  };
+
   // Initialize from search params
   useEffect(() => {
     const kw = searchParams.get('keyword') || '';
@@ -67,7 +83,7 @@ function SearchResultsInner() {
         const data = await response.json();
         
         if (data.error) {
-          setError(data.error);
+          setError(normalizeErrorMessage(data.error));
           setProducts([]);
         } else {
           setProducts(data.products || []);
@@ -77,7 +93,7 @@ function SearchResultsInner() {
         }
       } catch (err) {
         console.error(err);
-        setError(err.message || 'Failed to fetch results');
+        setError(normalizeErrorMessage(err?.message || err));
         setProducts([]);
       } finally {
         setLoading(false);

@@ -11,6 +11,7 @@ import { deleteItemFromCart, fetchCart, uploadCart } from "@/lib/features/cart/c
 import { PackageIcon, Trash2Icon } from "lucide-react";
 import Image from "next/image";
 import { useAuth } from "@/lib/useAuth";
+import { trackMetaEvent } from "@/lib/metaPixelClient";
 
 export const dynamic = "force-dynamic";
 
@@ -253,6 +254,29 @@ export default function Cart() {
     const inStockCartArray = cartArray.filter((item) => getMaxQty(item) !== 0);
     const outOfStockCartArray = cartArray.filter((item) => getMaxQty(item) === 0);
     const checkoutDisabled = inStockCartArray.length === 0;
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (!inStockCartArray.length) return;
+
+        const contentIds = inStockCartArray
+            .map((item) => String(item?._id || item?._cartKey || ''))
+            .filter(Boolean);
+
+        const cartSignature = `${contentIds.join(',')}_${Number(totalPrice || 0)}`;
+        const eventKey = `meta_viewcart_sent_${cartSignature}`;
+        if (sessionStorage.getItem(eventKey)) return;
+
+        trackMetaEvent('ViewCart', {
+            content_type: 'product',
+            content_ids: contentIds,
+            value: Number(totalPrice || 0),
+            currency: 'INR',
+            num_items: inStockCartArray.reduce((sum, item) => sum + Number(item?.quantity || 0), 0),
+        });
+
+        sessionStorage.setItem(eventKey, '1');
+    }, [inStockCartArray, totalPrice]);
 
     return (
         <div className="min-h-[40dvh]">
