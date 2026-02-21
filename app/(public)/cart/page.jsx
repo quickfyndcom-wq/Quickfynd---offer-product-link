@@ -199,10 +199,6 @@ export default function Cart() {
         };
     }, [user, dispatch]);
 
-    if (!productsLoaded) {
-        return <div className="text-center py-16 text-gray-400">Loading cart…</div>;
-    }
-
     const handleDeleteItemFromCart = async (cartKey) => {
         const key = String(cartKey || '');
         if (!key) return;
@@ -281,7 +277,9 @@ export default function Cart() {
     return (
         <div className="min-h-[40dvh]">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                {cartArray.length > 0 ? (
+                {!productsLoaded ? (
+                    <div className="text-center py-16 text-gray-400">Loading cart…</div>
+                ) : cartArray.length > 0 ? (
                     <>
                         <div className="mb-6">
                             <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Cart ({cartArray.length})</h1>
