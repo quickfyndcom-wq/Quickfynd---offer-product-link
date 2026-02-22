@@ -206,6 +206,30 @@ export default function StoreOrders() {
         return statusOption?.color || 'bg-gray-100 text-gray-700';
     };
 
+    // Unified payment-status resolver for dashboard
+    const isOrderPaid = (order) => {
+        const paymentMethod = String(order?.paymentMethod || '').trim().toLowerCase();
+        const orderStatus = String(order?.status || '').trim().toUpperCase();
+        const paymentStatus = String(order?.paymentStatus || '').trim().toLowerCase();
+
+        // COD is paid only when delivered/collected
+        if (paymentMethod === 'cod') {
+            if (orderStatus === 'DELIVERED') return true;
+            if (order?.delhivery?.payment?.is_cod_recovered) return true;
+            return !!order?.isPaid;
+        }
+
+        // Non-COD (card/online/prepaid) should appear paid unless explicitly failed/unpaid
+        if (paymentMethod) {
+            const explicitUnpaidStatuses = new Set(['failed', 'payment_failed', 'refunded', 'unpaid', 'pending']);
+            if (explicitUnpaidStatuses.has(paymentStatus)) return false;
+            if (orderStatus === 'PAYMENT_FAILED') return false;
+            return true;
+        }
+
+        return !!order?.isPaid;
+    };
+
     // Calculate order statistics
     const getOrderStats = () => {
         const stats = {
@@ -219,11 +243,7 @@ export default function StoreOrders() {
             RETURNED: orders.filter(o => o.status === 'RETURNED').length,
             RETURN_REQUESTED: orders.filter(o => o.returns && o.returns.some(r => r.status === 'REQUESTED')).length,
             PENDING_PAYMENT: orders.filter(o => {
-                // Auto-mark COD orders as PAID if delivered
-                const paymentMethod = (o.paymentMethod || '').toLowerCase();
-                const status = (o.status || '').toUpperCase();
-                const isPaid = paymentMethod === 'cod' && status === 'DELIVERED' ? true : o.isPaid;
-                return !isPaid;
+                return !isOrderPaid(o);
             }).length,
             PENDING_SHIPMENT: orders.filter(o => !o.trackingId && ['ORDER_PLACED', 'PROCESSING'].includes(o.status)).length,
         };
@@ -251,11 +271,7 @@ export default function StoreOrders() {
         const dateFiltered = orders.filter(isOrderInRange);
         if (filterStatus === 'ALL') return dateFiltered;
         if (filterStatus === 'PENDING_PAYMENT') return dateFiltered.filter(o => {
-            // Auto-mark COD orders as PAID if delivered
-            const paymentMethod = (o.paymentMethod || '').toLowerCase();
-            const status = (o.status || '').toUpperCase();
-            const isPaid = paymentMethod === 'cod' && status === 'DELIVERED' ? true : o.isPaid;
-            return !isPaid;
+            return !isOrderPaid(o);
         });
         if (filterStatus === 'PENDING_SHIPMENT') return dateFiltered.filter(o => !o.trackingId && ['ORDER_PLACED', 'PROCESSING'].includes(o.status));
         if (filterStatus === 'RETURN_REQUESTED') return dateFiltered.filter(o => o.returns && o.returns.some(r => r.status === 'REQUESTED'));
@@ -489,34 +505,23 @@ export default function StoreOrders() {
 
     // Helper function to compute correct payment status
     const getPaymentStatus = (order) => {
-        // Auto-mark COD orders as PAID if delivered
         const paymentMethod = (order.paymentMethod || '').toLowerCase();
         const status = (order.status || '').toUpperCase();
+        const resolvedPaid = isOrderPaid(order);
         
         console.log('[PAYMENT STATUS DEBUG]', {
             orderId: order._id,
             paymentMethod: order.paymentMethod,
             status: order.status,
             isPaid: order.isPaid,
+            paymentStatus: order.paymentStatus,
             normalizedPaymentMethod: paymentMethod,
             normalizedStatus: status,
-            isCOD: paymentMethod === 'cod',
-            isDelivered: status === 'DELIVERED',
-            shouldMarkPaid: paymentMethod === 'cod' && status === 'DELIVERED',
-            delhiveryPaymentCollected: order.delhivery?.payment?.is_cod_recovered
+            resolvedPaid,
+            delhiveryPaymentCollected: order.delhivery?.payment?.is_cod_recovered,
         });
-        
-        // Check if COD + DELIVERED
-        if (paymentMethod === 'cod' && status === 'DELIVERED') {
-            return true;
-        }
-        
-        // Check if Delhivery reported payment collected
-        if (order.delhivery?.payment?.is_cod_recovered) {
-            return true;
-        }
-        
-        return order.isPaid || false;
+
+        return resolvedPaid;
     };
 
     const fetchOrders = async () => {

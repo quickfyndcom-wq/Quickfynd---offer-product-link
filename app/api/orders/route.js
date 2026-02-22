@@ -17,7 +17,10 @@ import { fetchNormalizedDelhiveryTracking } from '@/lib/delhivery';
 
 const PaymentMethod = {
     COD: 'COD',
-    STRIPE: 'STRIPE'
+    STRIPE: 'STRIPE',
+    CARD: 'CARD',
+    RAZORPAY: 'RAZORPAY',
+    WALLET: 'WALLET'
 };
 
 
@@ -800,11 +803,30 @@ export async function GET(request) {
         const limit = parseInt(searchParams.get('limit') || '20', 10);
         const offset = parseInt(searchParams.get('offset') || '0', 10);
         
+        const paidOnlineMethods = [
+            PaymentMethod.STRIPE,
+            PaymentMethod.CARD,
+            PaymentMethod.RAZORPAY,
+            PaymentMethod.WALLET,
+            'PREPAID',
+            'ONLINE',
+            'UPI',
+            'NETBANKING',
+            'CARD',
+            'card',
+            'razorpay',
+            'wallet',
+            'prepaid',
+            'online',
+            'upi',
+            'netbanking',
+        ];
+
         const orders = await Order.find({
             userId,
             $or: [
-                { paymentMethod: PaymentMethod.COD },
-                { paymentMethod: PaymentMethod.STRIPE, isPaid: true }
+                { paymentMethod: { $in: ['COD', 'cod'] } },
+                { paymentMethod: { $in: paidOnlineMethods }, isPaid: true }
             ]
         })
         .populate({
