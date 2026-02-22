@@ -49,20 +49,23 @@ export default function DashboardOrdersPage() {
 
   // Helper function to compute correct payment status
   const getPaymentStatus = (order) => {
-    // Auto-mark COD orders as PAID if delivered
-    const paymentMethod = (order.paymentMethod || '').toLowerCase();
-    const status = (order.status || '').toUpperCase();
-    
-    if (paymentMethod === 'cod' && status === 'DELIVERED') {
-      return true;
+    const paymentMethod = String(order?.paymentMethod || '').toLowerCase();
+    const status = String(order?.status || '').toUpperCase();
+    const paymentStatus = String(order?.paymentStatus || '').toLowerCase();
+
+    if (paymentMethod === 'cod') {
+      if (status === 'DELIVERED') return true;
+      if (order?.delhivery?.payment?.is_cod_recovered) return true;
+      return !!order?.isPaid;
     }
-    
-    // Check if Delhivery reported payment collected
-    if (order.delhivery?.payment?.is_cod_recovered && paymentMethod === 'cod') {
-      return true;
-    }
-    
-    return order.isPaid || false;
+
+    if (status === 'PAYMENT_FAILED') return false;
+    if (['failed', 'payment_failed', 'refunded', 'unpaid'].includes(paymentStatus)) return false;
+
+    // Razorpay/card/online orders should be considered paid unless explicitly failed
+    if (paymentMethod) return true;
+
+    return !!order?.isPaid;
   }
 
   const canCancelOrder = (order) => {
@@ -250,16 +253,15 @@ export default function DashboardOrdersPage() {
             }
           }
           
-          // Auto-mark COD orders as PAID if they're DELIVERED
-          const paymentMethod = (updatedOrder.paymentMethod || '').toLowerCase();
-          const status = (updatedOrder.status || '').toUpperCase();
-          
-          if (paymentMethod === 'cod' && status === 'DELIVERED') {
-            updatedOrder.isPaid = true;
-          }
-          
-          // Also check if Delhivery reported payment collected
-          if (updatedOrder.delhivery?.payment?.is_cod_recovered && paymentMethod === 'cod') {
+          const paymentMethod = String(updatedOrder?.paymentMethod || '').toLowerCase();
+          const status = String(updatedOrder?.status || '').toUpperCase();
+          const paymentStatus = String(updatedOrder?.paymentStatus || '').toLowerCase();
+
+          if (paymentMethod === 'cod') {
+            if (status === 'DELIVERED' || updatedOrder?.delhivery?.payment?.is_cod_recovered) {
+              updatedOrder.isPaid = true;
+            }
+          } else if (!['failed', 'payment_failed', 'refunded', 'unpaid'].includes(paymentStatus) && status !== 'PAYMENT_FAILED') {
             updatedOrder.isPaid = true;
           }
           
@@ -299,16 +301,15 @@ export default function DashboardOrdersPage() {
                   status: response.data.order.status || order.status,
                   trackingUrl: response.data.order.trackingUrl || order.trackingUrl
                 };
-                // Auto-mark COD orders as PAID if they're DELIVERED
-                const paymentMethod = (updatedOrder.paymentMethod || '').toLowerCase();
-                const status = (updatedOrder.status || '').toUpperCase();
-                
-                if (paymentMethod === 'cod' && status === 'DELIVERED') {
-                  updatedOrder.isPaid = true;
-                }
-                
-                // Also check if Delhivery reported payment collected
-                if (updatedOrder.delhivery?.payment?.is_cod_recovered && paymentMethod === 'cod') {
+                const paymentMethod = String(updatedOrder?.paymentMethod || '').toLowerCase();
+                const status = String(updatedOrder?.status || '').toUpperCase();
+                const paymentStatus = String(updatedOrder?.paymentStatus || '').toLowerCase();
+
+                if (paymentMethod === 'cod') {
+                  if (status === 'DELIVERED' || updatedOrder?.delhivery?.payment?.is_cod_recovered) {
+                    updatedOrder.isPaid = true;
+                  }
+                } else if (!['failed', 'payment_failed', 'refunded', 'unpaid'].includes(paymentStatus) && status !== 'PAYMENT_FAILED') {
                   updatedOrder.isPaid = true;
                 }
                 return updatedOrder;

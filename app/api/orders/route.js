@@ -38,7 +38,20 @@ export async function POST(request) {
         console.log('ORDER API: Incoming request', { method: request.method, headers: headersObj, body });
 
         // Extract fields
-        const { addressId, addressData, items, couponCode, paymentMethod, isGuest, guestInfo, coinsToRedeem } = body;
+        const {
+            addressId,
+            addressData,
+            items,
+            couponCode,
+            paymentMethod,
+            isGuest,
+            guestInfo,
+            coinsToRedeem,
+            paymentStatus,
+            razorpayPaymentId,
+            razorpayOrderId,
+            razorpaySignature
+        } = body;
         let userId = null;
         let isPlusMember = false;
 
@@ -383,6 +396,7 @@ export async function POST(request) {
                 total: parseFloat(total.toFixed(2)),
                 shippingFee: shippingFee,
                 paymentMethod,
+                paymentStatus: paymentStatus || 'PENDING',
                 isCouponUsed: !!coupon,
                 coupon: coupon || {},
                 coinsRedeemed,
@@ -393,6 +407,21 @@ export async function POST(request) {
                     price: item.price
                 }))
             };
+
+            const normalizedPaymentMethod = String(paymentMethod || '').toUpperCase();
+            const paidOnlineMethods = new Set(['CARD', 'RAZORPAY', 'UPI', 'NETBANKING', 'ONLINE', 'PREPAID', 'WALLET']);
+
+            if (normalizedPaymentMethod === 'COD') {
+                orderData.isPaid = false;
+                orderData.paymentStatus = paymentStatus || 'PENDING';
+            } else if (paidOnlineMethods.has(normalizedPaymentMethod)) {
+                orderData.isPaid = true;
+                orderData.paymentStatus = paymentStatus || 'PAID';
+            }
+
+            if (razorpayPaymentId) orderData.razorpayPaymentId = razorpayPaymentId;
+            if (razorpayOrderId) orderData.razorpayOrderId = razorpayOrderId;
+            if (razorpaySignature) orderData.razorpaySignature = razorpaySignature;
 
             if (isGuest) {
                 // Robust upsert for guest user
@@ -822,13 +851,7 @@ export async function GET(request) {
             'netbanking',
         ];
 
-        const orders = await Order.find({
-            userId,
-            $or: [
-                { paymentMethod: { $in: ['COD', 'cod'] } },
-                { paymentMethod: { $in: paidOnlineMethods }, isPaid: true }
-            ]
-        })
+        const orders = await Order.find({ userId })
         .populate({
             path: 'orderItems.productId',
             model: 'Product'
@@ -845,6 +868,22 @@ export async function GET(request) {
                 const hex = order._id.toString().slice(-6);
                 order.shortOrderNumber = parseInt(hex, 16);
             }
+
+            const paymentMethod = String(order?.paymentMethod || '').toUpperCase();
+            const status = String(order?.status || '').toUpperCase();
+            const paymentStatus = String(order?.paymentStatus || '').toUpperCase();
+
+            if (paymentMethod === 'COD') {
+                if (status === 'DELIVERED' || order?.delhivery?.payment?.is_cod_recovered) {
+                    order.isPaid = true;
+                }
+            } else if (paymentMethod) {
+                const failedStatuses = new Set(['FAILED', 'PAYMENT_FAILED', 'REFUNDED', 'UNPAID']);
+                if (!failedStatuses.has(paymentStatus) && status !== 'PAYMENT_FAILED') {
+                    order.isPaid = true;
+                }
+            }
+
             return order;
         });
 

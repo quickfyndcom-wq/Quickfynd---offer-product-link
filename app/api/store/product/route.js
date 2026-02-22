@@ -1,11 +1,13 @@
 
-"use server";
 import imagekit from "@/configs/imageKit";
 import connectDB from '@/lib/mongodb';
 import Product from '@/models/Product';
 import authSeller from "@/middlewares/authSeller";
 import { NextResponse } from "next/server";
 import { getAuth } from '@/lib/firebase-admin';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 // Helper: Upload images to ImageKit
 const uploadImages = async (images) => {
@@ -265,7 +267,16 @@ export async function GET(request) {
 
         // ADMIN/GLOBAL: Return all products, no auth required
         const products = await Product.find({}).sort({ createdAt: -1 }).lean();
-        return NextResponse.json({ products });
+        return NextResponse.json(
+            { products },
+            {
+                headers: {
+                    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                    Pragma: 'no-cache',
+                    Expires: '0',
+                },
+            }
+        );
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: error.code || error.message }, { status: 400 });
