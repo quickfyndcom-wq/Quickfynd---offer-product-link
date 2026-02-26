@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { auth } from "@/lib/firebase";
 
 export default function MetaPixel() {
   const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID;
@@ -29,7 +30,30 @@ export default function MetaPixel() {
     })(window, document, "script", "https://connect.facebook.net/en_US/fbevents.js");
 
     if (!window.__metaPixelInitialized) {
-      window.fbq && window.fbq("init", pixelId);
+      let advancedMatching = {};
+      try {
+        const email = String(auth?.currentUser?.email || "").trim().toLowerCase();
+        const phone = String(auth?.currentUser?.phoneNumber || "").replace(/\D/g, "");
+
+        if (email) {
+          advancedMatching = { ...advancedMatching, em: email };
+        }
+
+        if (phone) {
+          advancedMatching = { ...advancedMatching, ph: phone };
+        }
+
+        let externalId = window.localStorage.getItem("meta_external_id") || "";
+        if (!externalId) {
+          externalId = `${window.location.hostname}_${Date.now()}`;
+          window.localStorage.setItem("meta_external_id", externalId);
+        }
+        if (externalId) {
+          advancedMatching = { ...advancedMatching, external_id: externalId };
+        }
+      } catch {}
+
+      window.fbq && window.fbq("init", pixelId, advancedMatching);
       window.__metaPixelInitialized = true;
     }
   }, [pixelId]);
