@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuth } from '@/lib/firebase-admin'
 import authSeller from '@/middlewares/authSeller'
-import razorpay from '@/lib/razorpay'
+import { getRazorpayClient } from '@/lib/razorpay'
 
 const withTimeout = async (promise, timeoutMs, label) => {
     let timeoutId
@@ -83,6 +83,7 @@ export async function GET(request) {
         let balanceFetch = null
         let settlementsFetch = null
         let note = ''
+        const razorpay = getRazorpayClient()
 
         if (typeof razorpay.balance?.fetch === 'function') {
             try {

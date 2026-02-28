@@ -71,6 +71,13 @@ export async function GET(request) {
     const razorpayStatus = await getCompleteRazorpayStatus(order.razorpayPaymentId);
 
     if (!razorpayStatus.payment.success) {
+      if (razorpayStatus.payment.errorCode === 'RAZORPAY_NOT_CONFIGURED') {
+        return NextResponse.json({
+          error: 'Razorpay is not configured for this environment',
+          code: 'RAZORPAY_NOT_CONFIGURED'
+        }, { status: 503 });
+      }
+
       return NextResponse.json({
         error: 'Failed to fetch Razorpay payment status',
         details: razorpayStatus.payment.error
