@@ -73,7 +73,9 @@ export default function RootLayout({ children }) {
         </Script> */}
       </head>
       <body className={`${outfit.className} antialiased`} suppressHydrationWarning>
-        <MetaPixel />
+        <React.Suspense fallback={null}>
+          <MetaPixel />
+        </React.Suspense>
         {/* Google Tag Manager (noscript required for browsers with JS disabled) */}
         <noscript>
           <iframe
