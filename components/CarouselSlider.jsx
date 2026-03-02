@@ -487,44 +487,69 @@ export default function CarouselSlider() {
           flexShrink: 0,
           position: 'relative',
         }}>
-          <div
-            style={{
-              width: '100%',
-              height: 'auto',
-              maxHeight: 420,
-              background: '#f9f9f9',
-              borderRadius: 14,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 0,
-              boxShadow: '0 4px 16px rgba(40,116,240,0.2)',
-              overflow: 'hidden',
-              position: 'sticky',
-              top: 20,
-            }}
-          >
-            {/* Banner Image Only */}
-            <Image 
-              src={Banner}
-              alt="Promo Banner" 
-              width={240}
-              height={380}
-              priority
-              style={{ 
-                width: '100%', 
-                height: '100%', 
-                objectFit: 'cover',
-                borderRadius: 16,
-                display: 'block',
-              }} 
+          {loading ? (
+            <div
+              style={{
+                width: '100%',
+                height: 380,
+                borderRadius: 14,
+                background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                position: 'sticky',
+                top: 20,
+              }}
             />
-          </div>
+          ) : (
+            <div
+              style={{
+                width: '100%',
+                height: 'auto',
+                maxHeight: 420,
+                background: '#f9f9f9',
+                borderRadius: 14,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                boxShadow: '0 4px 16px rgba(40,116,240,0.2)',
+                overflow: 'hidden',
+                position: 'sticky',
+                top: 20,
+              }}
+            >
+              {/* Banner Image Only */}
+              <Image 
+                src={Banner}
+                alt="Promo Banner" 
+                width={240}
+                height={380}
+                priority
+                style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  objectFit: 'cover',
+                  borderRadius: 16,
+                  display: 'block',
+                }} 
+              />
+            </div>
+          )}
         </div>
       </div>
 
       <style jsx global>{`
+        @keyframes shimmer {
+          0% {
+            background-position: -200% 0;
+          }
+          100% {
+            background-position: 200% 0;
+          }
+        }
+
         .carousel-scroll {
           scrollbar-width: none;
           -ms-overflow-style: none;

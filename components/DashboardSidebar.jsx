@@ -1,10 +1,13 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 export default function DashboardSidebar() {
   const pathname = usePathname()
+  const mobileSliderRef = useRef(null)
+  const [currentHash, setCurrentHash] = useState('')
 
   const menuItems = [
     { label: 'Profile', href: '/dashboard/profile' },
@@ -12,44 +15,86 @@ export default function DashboardSidebar() {
     { label: 'Wishlist', href: '/dashboard/wishlist' },
     { label: 'Browse History', href: '/browse-history' },
     { label: 'Support Tickets', href: '/dashboard/tickets' },
-    { label: 'Addresses', href: '/dashboard/profile#addresses' },
     { label: 'Account Settings', href: '/settings' },
     { label: 'Help & Support', href: '/help' },
   ]
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const updateHash = () => {
+      setCurrentHash(window.location.hash || '')
+    }
+
+    updateHash()
+    window.addEventListener('hashchange', updateHash)
+
+    return () => {
+      window.removeEventListener('hashchange', updateHash)
+    }
+  }, [])
+
   const isActive = (href) => {
     if (href.includes('#')) {
-      return pathname === href.split('#')[0]
+      const [basePath, hashPart] = href.split('#')
+      return pathname === basePath && currentHash === `#${hashPart}`
     }
-    return pathname === href
+
+    if (pathname !== href) return false
+
+    const hasHashSpecificMenuForCurrentRoute = !!currentHash && menuItems.some(
+      (item) => item.href === `${href}${currentHash}`
+    )
+
+    return !hasHashSpecificMenuForCurrentRoute
+  }
+
+  const handleSliderArrowClick = () => {
+    if (!mobileSliderRef.current) return
+    mobileSliderRef.current.scrollBy({ left: 180, behavior: 'smooth' })
   }
 
   return (
     <>
-      {/* Mobile sidebar toggle */}
-      <div className="md:hidden -mt-2 mb-6">
-        <div className="flex items-center justify-between">
+      {/* Mobile navigation slider */}
+      <div className="md:hidden -mt-2 mb-4">
+        <div className="mb-2 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-800">Dashboard</h2>
-          <details className="relative">
-            <summary className="list-none cursor-pointer px-3 py-2 rounded-lg border border-slate-200 text-slate-700">
-              Menu
-            </summary>
-            <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-md p-2 z-10">
-              {menuItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`block px-3 py-2 rounded-lg hover:bg-gray-100 font-medium ${
-                    isActive(item.href)
-                      ? 'bg-gray-100 text-gray-900'
-                      : 'text-gray-700'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          </details>
+          <button
+            type="button"
+            onClick={handleSliderArrowClick}
+            className="w-7 h-7 rounded-full border border-slate-200 text-slate-500 flex items-center justify-center bg-white"
+            aria-label="Scroll dashboard menu"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </button>
+        </div>
+
+        <div ref={mobileSliderRef} className="overflow-x-auto snap-x snap-mandatory pb-1 -mx-1 px-1">
+          <div className="flex gap-2 min-w-max">
+            {menuItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`snap-start min-w-[140px] px-3 py-3 rounded-xl border text-sm font-medium transition flex items-center justify-between gap-2 ${
+                  isActive(item.href)
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span>{item.label}</span>
+                {isActive(item.href) && (
+                  <span className="w-5 h-5 rounded-full bg-white/20 border border-white/40 flex items-center justify-center">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
 

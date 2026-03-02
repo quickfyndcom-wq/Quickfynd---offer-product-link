@@ -199,6 +199,9 @@ const Navbar = () => {
 
   const openSignOutConfirm = (context = 'desktop') => {
     setSignOutContext(context);
+    if (context === 'mobile') {
+      setMobileMenuOpen(false);
+    }
     setSignOutConfirmOpen(true);
   };
 
@@ -1511,7 +1514,7 @@ const Navbar = () => {
 
 
           {signOutConfirmOpen && (
-            <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
+            <div className="fixed inset-0 z-[10050] flex items-center justify-center px-4">
               <div
                 className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
                 onClick={() => setSignOutConfirmOpen(false)}

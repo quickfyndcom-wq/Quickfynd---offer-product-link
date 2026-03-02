@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import axios from "axios";
-import Dummy from '../assets/ads.png';
+import Dummy from '../assets/sp.webp';
 
 export default function TopDeals() {
   const [products, setProducts] = useState([]);
@@ -123,13 +123,36 @@ let result = allProducts;
 
         {/* RIGHT FIXED BANNER - HIDDEN ON MOBILE */}
         <div className="w-full sm:w-[250px] md:w-[300px] hidden lg:block">
-          <Image
-            src={Dummy}
-            alt="Offer Banner"
-            className="w-full rounded-lg shadow"
-          />
+          {loading ? (
+            <div
+              className="w-full rounded-lg"
+              style={{
+                height: 420,
+                background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+              }}
+            />
+          ) : (
+            <Image
+              src={Dummy}
+              alt="Offer Banner"
+              className="w-full rounded-lg shadow"
+            />
+          )}
         </div>
       </div>
+
+      <style jsx global>{`
+        @keyframes shimmer {
+          0% {
+            background-position: -200% 0;
+          }
+          100% {
+            background-position: 200% 0;
+          }
+        }
+      `}</style>
     </div>
   );
 }

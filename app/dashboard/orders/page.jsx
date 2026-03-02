@@ -35,6 +35,8 @@ export default function DashboardOrdersPage() {
   const [cancelNote, setCancelNote] = useState('')
   const [creatingTicketForOrderId, setCreatingTicketForOrderId] = useState(null)
   const [activeReviewKey, setActiveReviewKey] = useState(null)
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false)
+  const [payingCodOrderId, setPayingCodOrderId] = useState(null)
 
   const orderStatuses = [
     { value: 'ALL', label: 'All Orders', icon: '📦' },
@@ -180,6 +182,112 @@ export default function DashboardOrdersPage() {
     }
   }
 
+  const handleConvertCodToCard = async (order, e = null) => {
+    e?.stopPropagation?.()
+
+    const orderId = order?._id || order?.id
+    const totalAmount = Number(order?.total || 0)
+
+    if (!orderId || totalAmount <= 0) {
+      toast.error('Invalid order amount for payment')
+      return
+    }
+
+    if (!razorpayLoaded || !window.Razorpay) {
+      toast.error('Payment gateway is loading. Please try again in a moment.')
+      return
+    }
+
+    try {
+      setPayingCodOrderId(orderId)
+      const token = await auth.currentUser.getIdToken(true)
+
+      const orderResponse = await axios.post('/api/razorpay/order', {
+        amount: totalAmount,
+        currency: 'INR',
+        receipt: `cod_convert_${orderId}`
+      })
+
+      if (!orderResponse?.data?.success || !orderResponse?.data?.orderId) {
+        toast.error(orderResponse?.data?.error || 'Failed to create payment order')
+        setPayingCodOrderId(null)
+        return
+      }
+
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        order_id: orderResponse.data.orderId,
+        amount: orderResponse.data.amount,
+        currency: orderResponse.data.currency || 'INR',
+        name: 'QuickFynd',
+        description: `Pay for Order #${order.shortOrderNumber || String(orderId).slice(-6).toUpperCase()}`,
+        image: '/logo.png',
+        prefill: {
+          name: user?.displayName || '',
+          email: user?.email || '',
+          contact: order?.shippingAddress?.phone || ''
+        },
+        theme: { color: '#2563eb' },
+        handler: async function (response) {
+          try {
+            const verifyResponse = await axios.post('/api/razorpay/verify', {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              paymentPayload: {
+                existingOrderId: orderId,
+                convertCodToOnline: true,
+                token
+              }
+            })
+
+            if (!verifyResponse?.data?.success) {
+              throw new Error(verifyResponse?.data?.message || 'Payment verification failed')
+            }
+
+            setOrders((prevOrders) =>
+              prevOrders.map((existingOrder) => {
+                const existingOrderId = existingOrder?._id || existingOrder?.id
+                if (existingOrderId !== orderId) return existingOrder
+                return {
+                  ...existingOrder,
+                  isPaid: true,
+                  paymentStatus: 'paid',
+                  paymentMethod: 'CARD',
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpayOrderId: response.razorpay_order_id
+                }
+              })
+            )
+
+            toast.success('Payment successful. Your COD order is now prepaid.')
+          } catch (error) {
+            toast.error(error?.response?.data?.message || error?.message || 'Payment verification failed')
+          } finally {
+            setPayingCodOrderId(null)
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            setPayingCodOrderId(null)
+          }
+        }
+      }
+
+      const rzp = new window.Razorpay(options)
+      rzp.on('payment.failed', () => {
+        toast.error('Payment failed. Please try again.')
+        setPayingCodOrderId(null)
+      })
+
+      setPayingCodOrderId(null)
+      rzp.open()
+    } catch (error) {
+      toast.error(error?.response?.data?.error || error?.message || 'Unable to start payment')
+      setPayingCodOrderId(null)
+    }
+  }
+
   const filteredOrders = selectedStatus === 'ALL' ? orders : orders.filter(order => order.status === selectedStatus)
 
   const checkScrollPosition = () => {
@@ -218,6 +326,30 @@ export default function DashboardOrdersPage() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUser(u ?? null))
     return () => unsub()
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    if (window.Razorpay) {
+      setRazorpayLoaded(true)
+      return
+    }
+
+    const existingScript = document.querySelector('script[data-razorpay-checkout="true"]')
+    if (existingScript) {
+      const onLoad = () => setRazorpayLoaded(true)
+      existingScript.addEventListener('load', onLoad)
+      return () => existingScript.removeEventListener('load', onLoad)
+    }
+
+    const script = document.createElement('script')
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.async = true
+    script.setAttribute('data-razorpay-checkout', 'true')
+    script.onload = () => setRazorpayLoaded(true)
+    script.onerror = () => setRazorpayLoaded(false)
+    document.body.appendChild(script)
   }, [])
 
   useEffect(() => {
@@ -405,14 +537,33 @@ export default function DashboardOrdersPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-10 grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div className="max-w-7xl mx-auto px-4 py-4 md:py-10 grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6">
         <DashboardSidebar />
 
         <main className="md:col-span-3">
-          <h1 className="text-2xl font-semibold text-slate-800 mb-6">My Orders</h1>
+          <h1 className="text-3xl md:text-2xl font-semibold text-slate-800 mb-2 md:mb-6">My Orders</h1>
+          <p className="md:hidden text-sm text-slate-500 mb-4">Track status, payment and delivery details</p>
           
           {/* Status Filter Tabs */}
           <div className="mb-6 relative">
+            <div className="md:hidden rounded-xl border border-slate-200 bg-white p-3 mb-3">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Filter orders</label>
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {orderStatuses.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}{status.value !== 'ALL' ? ` (${orders.filter(o => o.status === status.value).length})` : ''}
+                  </option>
+                ))}
+              </select>
+              <div className="mt-2 text-xs text-slate-500">
+                Showing <span className="font-semibold text-slate-700">{filteredOrders.length}</span> order(s)
+              </div>
+            </div>
+
             <style>{`
               .tabs-wrapper {
                 display: block !important;
@@ -499,7 +650,7 @@ export default function DashboardOrdersPage() {
               </button>
             )}
 
-            <div className="tabs-wrapper">
+            <div className="tabs-wrapper hidden md:block">
               <div className="tabs-inner">
                 {orderStatuses.map((status) => (
                   <button
@@ -548,21 +699,112 @@ export default function DashboardOrdersPage() {
               </button>
             </div>
           ) : (
-            <div className="max-h-[70vh] overflow-y-auto pr-1 space-y-4">
+            <div className="max-h-none md:max-h-[70vh] overflow-visible md:overflow-y-auto pr-0 md:pr-1 space-y-3 md:space-y-4">
               {filteredOrders.map((order) => {
                 const orderId = order._id || order.id
                 const isExpanded = expandedOrder === orderId
                 const orderItems = order.orderItems || []
                 const totalItems = orderItems.reduce((sum, item) => sum + (item.quantity || 0), 0)
+                const orderDate = new Date(order.createdAt).toLocaleDateString()
+                const statusTone =
+                  order.status === 'DELIVERED' ? 'bg-green-100 text-green-700' :
+                  order.status === 'OUT_FOR_DELIVERY' ? 'bg-teal-100 text-teal-700' :
+                  order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-700' :
+                  order.status === 'WAREHOUSE_RECEIVED' ? 'bg-indigo-100 text-indigo-700' :
+                  order.status === 'PICKED_UP' ? 'bg-purple-100 text-purple-700' :
+                  order.status === 'PICKUP_REQUESTED' ? 'bg-yellow-100 text-yellow-700' :
+                  order.status === 'WAITING_FOR_PICKUP' ? 'bg-yellow-50 text-yellow-700' :
+                  order.status === 'CONFIRMED' ? 'bg-orange-100 text-orange-700' :
+                  order.status === 'PROCESSING' ? 'bg-yellow-100 text-yellow-700' :
+                  order.status === 'RETURN_REQUESTED' ? 'bg-pink-100 text-pink-700' :
+                  order.status === 'RETURNED' ? 'bg-pink-200 text-pink-800' :
+                  order.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
+                  'bg-slate-100 text-slate-700'
                 
                 return (
                   <div 
                     key={orderId} 
-                    className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => setExpandedOrder(isExpanded ? null : orderId)}
+                    className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow"
                   >
+                    {/* Mobile Header */}
+                    <div className="md:hidden px-4 py-4 border-b border-slate-200 bg-gradient-to-b from-white to-slate-50/70">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] text-slate-500">Order #</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="font-semibold text-slate-800">{order.shortOrderNumber || orderId.substring(0, 8).toUpperCase()}</p>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                navigator.clipboard.writeText(orderId)
+                                toast.success('Order ID copied!')
+                              }}
+                              className="p-1 hover:bg-slate-100 rounded transition"
+                              title="Copy full order ID"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        <span className={`inline-block px-2.5 py-1 text-[11px] font-semibold rounded-full ${statusTone}`}>
+                          {order.status || 'ORDER_PLACED'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                        <div>
+                          <p className="text-[11px] text-slate-500">Date</p>
+                          <p className="font-medium text-slate-800">{orderDate}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-slate-500">Total</p>
+                          <p className="font-semibold text-slate-800">₹{(order.total || 0).toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-slate-500">Items</p>
+                          <p className="font-medium text-slate-800">{totalItems}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-slate-500">Payment</p>
+                          <span className={`inline-block px-2 py-0.5 text-[11px] font-medium rounded ${getPaymentStatus(order) ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {getPaymentStatus(order) ? 'Paid' : 'Pending'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 mt-3">
+                        {order.trackingUrl && (
+                          <a
+                            href={order.trackingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="px-3 py-2.5 text-center text-xs bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition"
+                          >
+                            Track Order
+                          </a>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (isExpanded) {
+                              setExpandedOrder(null)
+                            } else {
+                              setExpandedOrder(orderId)
+                            }
+                          }}
+                          className={`px-3 py-2.5 text-xs rounded-lg transition ${order.trackingUrl ? 'text-blue-700 bg-blue-50 hover:bg-blue-100' : 'col-span-2 text-blue-700 bg-blue-50 hover:bg-blue-100'}`}
+                        >
+                          {isExpanded ? 'Hide Details' : 'View Details'}
+                        </button>
+                      </div>
+                    </div>
+
                     {/* Order Header */}
-                    <div className="px-6 py-4 border-b border-slate-200">
+                    <div className="hidden md:block px-6 py-4 border-b border-slate-200">
                       <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
                         <div className="flex flex-wrap items-center gap-4">
                           <div>
@@ -587,7 +829,7 @@ export default function DashboardOrdersPage() {
                           </div>
                           <div>
                             <p className="text-xs text-slate-500">Date</p>
-                            <p className="text-sm text-slate-700">{new Date(order.createdAt).toLocaleDateString()}</p>
+                            <p className="text-sm text-slate-700">{orderDate}</p>
                           </div>
                           <div>
                             <p className="text-xs text-slate-500">Items</p>
@@ -599,23 +841,7 @@ export default function DashboardOrdersPage() {
                           </div>
                           <div>
                             <p className="text-xs text-slate-500">Status</p>
-                            <span
-                              className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${
-                                order.status === 'DELIVERED' ? 'bg-green-100 text-green-700' :
-                                order.status === 'OUT_FOR_DELIVERY' ? 'bg-teal-100 text-teal-700' :
-                                order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-700' :
-                                order.status === 'WAREHOUSE_RECEIVED' ? 'bg-indigo-100 text-indigo-700' :
-                                order.status === 'PICKED_UP' ? 'bg-purple-100 text-purple-700' :
-                                order.status === 'PICKUP_REQUESTED' ? 'bg-yellow-100 text-yellow-700' :
-                                order.status === 'WAITING_FOR_PICKUP' ? 'bg-yellow-50 text-yellow-700' :
-                                order.status === 'CONFIRMED' ? 'bg-orange-100 text-orange-700' :
-                                order.status === 'PROCESSING' ? 'bg-yellow-100 text-yellow-700' :
-                                order.status === 'RETURN_REQUESTED' ? 'bg-pink-100 text-pink-700' :
-                                order.status === 'RETURNED' ? 'bg-pink-200 text-pink-800' :
-                                order.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
-                                'bg-slate-100 text-slate-700'
-                              }`}
-                            >
+                            <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${statusTone}`}>
                               {order.status || 'ORDER_PLACED'}
                             </span>
                           </div>
@@ -643,7 +869,11 @@ export default function DashboardOrdersPage() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              setExpandedOrder(isExpanded ? null : orderId)
+                              if (isExpanded) {
+                                setExpandedOrder(null)
+                              } else {
+                                setExpandedOrder(orderId)
+                              }
                             }}
                             className="px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition"
                           >
@@ -876,6 +1106,20 @@ export default function DashboardOrdersPage() {
                                     )}
                                   </div>
                                 )}
+
+                                {(order.paymentMethod === 'cod' || order.paymentMethod === 'COD') && !getPaymentStatus(order) && !['CANCELLED', 'RETURNED'].includes(String(order.status || '').toUpperCase()) && (
+                                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                    <p className="text-xs text-blue-700 font-semibold mb-1">Pay Online Instead of COD</p>
+                                    <p className="text-xs text-blue-600 mb-3">Complete payment now using card/UPI/netbanking.</p>
+                                    <button
+                                      onClick={(e) => handleConvertCodToCard(order, e)}
+                                      disabled={payingCodOrderId === orderId}
+                                      className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition ${payingCodOrderId === orderId ? 'bg-blue-200 text-blue-600 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                                    >
+                                      {payingCodOrderId === orderId ? 'Opening payment...' : `Pay ₹${(order.total || 0).toFixed(2)} Now`}
+                                    </button>
+                                  </div>
+                                )}
                                 
                                 {/* Delhivery Payment Collection Status */}
                                 {order.delhivery?.payment?.is_cod_recovered && (
@@ -1001,49 +1245,49 @@ export default function DashboardOrdersPage() {
 
                         {/* Live Delivery Tracking */}
                         {(order.trackingId || order.trackingUrl || order.courier || order.delhivery) && (
-                          <div className="bg-gradient-to-br from-slate-50 to-blue-50 border-2 border-blue-200 rounded-xl p-6 space-y-5">
+                          <div className="bg-gradient-to-br from-slate-50 to-blue-50 border border-blue-200 md:border-2 rounded-xl p-3 md:p-6 space-y-3 md:space-y-5">
                             {/* Header */}
-<div className="flex items-center gap-3 pb-4 border-b-2 border-blue-200">
-                                <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<div className="flex items-center gap-2 md:gap-3 pb-2.5 md:pb-4 border-b border-blue-200 md:border-b-2">
+                                <div className="w-9 h-9 md:w-10 md:h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                                  <svg className="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                   </svg>
                                 </div>
-                                <h3 className="text-xl font-bold text-slate-800">Live Delivery Tracking</h3>
+                                <h3 className="text-base md:text-xl font-bold text-slate-800">Live Delivery Tracking</h3>
                             </div>
 
                             {/* Current Location - Prominent Green Box */}
                             {order.delhivery?.current_status_location && (
-                              <div className="bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl p-5 shadow-lg">
-                                <div className="flex items-start gap-3">
-                                  <svg className="w-6 h-6 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
+                              <div className="bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl p-3.5 md:p-5 shadow-lg">
+                                <div className="flex items-start gap-2.5 md:gap-3">
+                                  <svg className="w-5 h-5 md:w-6 md:h-6 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                                   </svg>
                                   <div className="flex-1">
-                                    <p className="text-sm font-semibold opacity-90 mb-1">📍 Current Location</p>
-                                    <p className="text-lg font-bold">{order.delhivery.current_status_location}</p>
+                                    <p className="text-xs md:text-sm font-semibold opacity-90 mb-1">📍 Current Location</p>
+                                    <p className="text-sm md:text-lg font-bold break-words leading-snug">{order.delhivery.current_status_location}</p>
                                   </div>
                                 </div>
                               </div>
                             )}
 
                             {/* Status Section */}
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3.5 md:p-4">
                               <p className="text-xs font-semibold text-slate-500 mb-2">Status</p>
-                              <p className="text-2xl font-bold text-blue-600">
-                                {order.delhivery?.current_status || order.status || 'Processing'}
+                              <p className="text-lg md:text-2xl font-bold text-blue-600 break-words leading-snug">
+                                {String(order.delhivery?.current_status || order.status || 'Processing').replace(/_/g, ' ')}
                               </p>
                               {order.delhivery?.current_status && order.delhivery.current_status_remarks && (
-                                <p className="text-sm text-slate-600 mt-2 italic">{order.delhivery.current_status_remarks}</p>
+                                <p className="text-xs md:text-sm text-slate-600 mt-2 italic">{order.delhivery.current_status_remarks}</p>
                               )}
                             </div>
 
                             {/* Expected Delivery Section */}
                             {order.delhivery?.expected_delivery_date && (
-                              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3.5 md:p-4">
                                 <p className="text-xs font-semibold text-slate-500 mb-2">Expected Delivery</p>
-                                <p className="text-xl font-bold text-purple-600">
+                                <p className="text-base md:text-xl font-bold text-purple-600 leading-snug">
                                   {new Date(order.delhivery.expected_delivery_date).toLocaleString('en-IN', {
                                     day: '2-digit',
                                     month: '2-digit',
@@ -1056,8 +1300,8 @@ export default function DashboardOrdersPage() {
                             )}
 
                             {/* Tracking Details */}
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                              <div className="space-y-3 text-sm">
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3.5 md:p-4">
+                              <div className="space-y-2.5 text-sm">
                                 {order.courier && (
                                   <div className="flex items-center justify-between">
                                     <span className="text-slate-600 font-medium">Courier</span>
@@ -1065,22 +1309,22 @@ export default function DashboardOrdersPage() {
                                   </div>
                                 )}
                                 {order.trackingId && (
-                                  <div className="flex items-center justify-between">
+                                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3">
                                     <span className="text-slate-600 font-medium">Tracking ID</span>
-                                    <span className="font-mono font-semibold text-slate-800 bg-slate-100 px-3 py-1 rounded">{order.trackingId}</span>
+                                    <span className="font-mono text-xs sm:text-sm font-semibold text-slate-800 bg-slate-100 px-2.5 py-1 rounded break-all">{order.trackingId}</span>
                                   </div>
                                 )}
                               </div>
                               
                               {order.trackingUrl && (
-                                <div className="mt-4 pt-4 border-t border-slate-200">
+                                <div className="mt-3 pt-3 border-t border-slate-200">
                                   <a 
                                     href={order.trackingUrl} 
                                     target="_blank" 
                                     rel="noopener noreferrer"
                                     className="w-full inline-block text-center px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition"
                                   >
-                                    ⚡ Track Your Order
+                                    Track Your Order
                                   </a>
                                 </div>
                               )}
@@ -1088,14 +1332,40 @@ export default function DashboardOrdersPage() {
 
                             {/* Tracking History Timeline */}
                             {order.delhivery?.events && order.delhivery.events.length > 0 && (
-                              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-                                <div className="flex items-center gap-2 mb-4">
+                              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3.5 md:p-5">
+                                <div className="flex items-center gap-2 mb-3 md:mb-4">
                                   <svg className="w-5 h-5 text-orange-600" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
                                   </svg>
                                   <p className="text-sm font-bold text-slate-800">Tracking History</p>
                                 </div>
-                                <div className="relative">
+
+                                <div className="md:hidden space-y-2.5">
+                                  {order.delhivery.events.map((event, idx) => (
+                                    <div key={`mobile-${idx}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                      <p className="font-semibold text-sm text-slate-800">📍 {String(event.status || 'Update').replace(/_/g, ' ')}</p>
+                                      <span className="block text-[11px] text-slate-500 mt-0.5">
+                                          {new Date(event.time).toLocaleString('en-IN', {
+                                            day: '2-digit',
+                                            month: '2-digit',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                          })}
+                                      </span>
+                                      {event.location && (
+                                        <p className="text-sm text-slate-600 mt-1.5">
+                                          <span className="font-medium">Location:</span> {event.location}
+                                        </p>
+                                      )}
+                                      {event.remarks && (
+                                        <p className="text-xs text-slate-500 mt-1.5 italic">💬 {event.remarks}</p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <div className="hidden md:block relative">
                                   <div className="absolute left-2 top-2 bottom-2 w-0.5 bg-gradient-to-b from-blue-400 to-slate-200"></div>
                                   <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
                                     {order.delhivery.events.map((event, idx) => (

@@ -40,7 +40,7 @@ export async function POST(request) {
 
     // Verify signature
     if (generated_signature === razorpay_signature) {
-      // If paying for an existing COD order (upsell), update that order instead of creating a new one
+      // If paying for an existing COD order, update that order instead of creating a new one
       if (paymentPayload && paymentPayload.existingOrderId) {
         try {
           const existingOrder = await Order.findById(paymentPayload.existingOrderId);
@@ -48,20 +48,29 @@ export async function POST(request) {
             return NextResponse.json({ success: false, message: 'Existing order not found' }, { status: 404 });
           }
 
-          // Apply 5% prepaid discount and mark as paid
-          const discountedTotal = Number((existingOrder.total * 0.95).toFixed(2));
-          existingOrder.total = discountedTotal;
+          const shouldApplyPrepaidDiscount = paymentPayload.applyPrepaidDiscount === true;
+
+          if (shouldApplyPrepaidDiscount) {
+            const discountedTotal = Number((existingOrder.total * 0.95).toFixed(2));
+            existingOrder.total = discountedTotal;
+            existingOrder.isCouponUsed = true;
+            existingOrder.coupon = { code: 'PREPAID5', discountType: 'percentage', discount: 5 };
+          }
+
           existingOrder.isPaid = true;
           existingOrder.paymentMethod = 'CARD';
           existingOrder.paymentStatus = 'paid';
-          existingOrder.isCouponUsed = true;
-          existingOrder.coupon = { code: 'PREPAID5', discountType: 'percentage', discount: 5 };
+          existingOrder.razorpayPaymentId = razorpay_payment_id;
+          existingOrder.razorpayOrderId = razorpay_order_id;
+          existingOrder.razorpaySignature = razorpay_signature;
           await existingOrder.save();
 
           return NextResponse.json({ 
             success: true,
             orderId: existingOrder._id.toString(),
-            message: 'Existing order updated to prepaid with discount' 
+            message: shouldApplyPrepaidDiscount
+              ? 'Existing order updated to prepaid with discount'
+              : 'Existing COD order paid successfully' 
           });
         } catch (e) {
           return NextResponse.json({ success: false, message: e.message || 'Failed to update existing order' }, { status: 500 });

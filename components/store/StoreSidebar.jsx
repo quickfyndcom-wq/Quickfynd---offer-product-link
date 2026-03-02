@@ -15,7 +15,7 @@ const StoreSidebar = ({storeInfo}) => {
         { name: 'Featured Sections', href: '/store/category-slider', icon: Sparkles },
         { name: 'Navbar Menu', href: '/store/navbar-menu', icon: LayoutListIcon },
         { name: 'Home Categories', href: '/store/storefront/home-menu-categories', icon: FolderIcon },
-        { name: 'Carousel Slider', href: '/store/storefront/carousel-slider', icon: Sparkles },
+        { name: 'Hero Slider', href: '/store/storefront/hero-slider', icon: Sparkles },
         { name: 'Deals of the Day', href: '/store/storefront/deals', icon: StarIcon },
         { name: 'Promotional Offers', href: '/store/personalized-offers', icon: Gift },
         { name: 'Media', href: '/store/media', icon: ImageIcon },
@@ -55,7 +55,7 @@ const StoreSidebar = ({storeInfo}) => {
                 '/store/category-slider',
                 '/store/navbar-menu',
                 '/store/storefront/home-menu-categories',
-                '/store/storefront/carousel-slider',
+                '/store/storefront/hero-slider',
                 '/store/storefront/deals',
                 '/store/media',
             ]

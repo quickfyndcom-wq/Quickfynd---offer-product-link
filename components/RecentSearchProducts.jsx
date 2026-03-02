@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useAuth } from '@/lib/useAuth';
 import axios from 'axios';
@@ -14,6 +14,37 @@ export default function RecentSearchProducts() {
   const [recentProducts, setRecentProducts] = useState([]);
   const [isNewCustomer, setIsNewCustomer] = useState(true);
   const [loading, setLoading] = useState(true);
+  const sliderRef = useRef(null);
+  const isDraggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startScrollLeftRef = useRef(0);
+
+  const handleMouseDown = event => {
+    if (!sliderRef.current) return;
+    isDraggingRef.current = true;
+    startXRef.current = event.pageX - sliderRef.current.offsetLeft;
+    startScrollLeftRef.current = sliderRef.current.scrollLeft;
+  };
+
+  const handleMouseLeave = () => {
+    isDraggingRef.current = false;
+  };
+
+  const handleMouseUp = () => {
+    isDraggingRef.current = false;
+  };
+
+  const handleMouseMove = event => {
+    if (!isDraggingRef.current || !sliderRef.current) return;
+    event.preventDefault();
+    const x = event.pageX - sliderRef.current.offsetLeft;
+    const walk = (x - startXRef.current) * 0.9;
+    sliderRef.current.scrollLeft = startScrollLeftRef.current - walk;
+  };
+
+  const handleDragStart = event => {
+    event.preventDefault();
+  };
 
   useEffect(() => {
     const fetchRecentlyViewed = async () => {
@@ -155,10 +186,20 @@ export default function RecentSearchProducts() {
           </Link>
         </div>
 
-        {/* Product Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 px-4">
+        {/* Product Row */}
+        <div
+          ref={sliderRef}
+          className="flex flex-nowrap gap-4 overflow-x-auto scrollbar-hide scroll-smooth px-4 pb-2 cursor-grab active:cursor-grabbing select-none"
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseLeave}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+          onDragStart={handleDragStart}
+        >
           {recentProducts.map(product => (
-            <ProductCard key={product._id || product.id} product={product} />
+            <div key={product._id || product.id} className="w-[220px] sm:w-[230px] flex-shrink-0">
+              <ProductCard product={product} />
+            </div>
           ))}
         </div>
       </div>

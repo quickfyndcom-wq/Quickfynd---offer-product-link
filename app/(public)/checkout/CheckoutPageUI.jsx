@@ -1309,7 +1309,7 @@ export default function CheckoutPage() {
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_signature: response.razorpay_signature,
-                paymentPayload: { existingOrderId: upsellOrderId }
+                paymentPayload: { existingOrderId: upsellOrderId, applyPrepaidDiscount: true }
               })
             });
             const verifyData = await verifyRes.json();

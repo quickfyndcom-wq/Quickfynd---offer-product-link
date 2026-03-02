@@ -3,25 +3,17 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import BannerC from '@/assets/heroslider1/slider01.png';
-import WideBanner1 from '@/assets/heroslider1/main3.webp';
-import WideBanner2 from '@/assets/heroslider1/main1.webp';
-import Banner3 from '@/assets/heroslider1/banner05.avif';
 
 const HEIGHT = 320;
 const SLIDE_INTERVAL = 5000;
 const SKELETON_TIMEOUT = 1000; // Reduced timeout for faster initial display 
 
-const slides = [
-  { image: BannerC, link: '/offers', bg: '#442163' },
-  { image: WideBanner1, link: '/offers', bg: '#0071A4' },
-  // { image: Banner3, link: '/offers', bg: '#8a1114' },
-  { image: WideBanner2, link: '/offers', bg: '#00D5C3' },
-];
+const defaultSlides = [];
 
 export default function HeroBannerSlider() {
+  const [slides, setSlides] = useState(defaultSlides);
   const [index, setIndex] = useState(0);
-  const [loaded, setLoaded] = useState(() => [false, false, false, false]);
+  const [loaded, setLoaded] = useState(() => Array(defaultSlides.length).fill(false));
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const router = useRouter();
   const intervalRef = useRef(null);
@@ -42,6 +34,46 @@ export default function HeroBannerSlider() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const loadHeroSlides = async () => {
+      try {
+        const response = await fetch('/api/store/hero-slider', { cache: 'no-store' });
+        const data = await response.json();
+
+        if (!isMounted) return;
+
+        const apiSlides = Array.isArray(data?.slides)
+          ? data.slides
+              .filter((slide) => slide?.image)
+              .map((slide) => ({
+                image: slide.image,
+                link: slide.link || '/offers',
+                bg: slide.bg || '#7A0A11',
+              }))
+          : [];
+
+        if (data?.enabled && apiSlides.length > 0) {
+          setSlides(apiSlides);
+          setLoaded(Array(apiSlides.length).fill(false));
+          setIndex(0);
+        }
+      } catch (error) {
+        console.error('Failed to load dynamic hero slider settings:', error);
+      }
+    };
+
+    loadHeroSlides();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (slides.length === 0) return;
+
+    if (intervalRef.current) clearInterval(intervalRef.current);
 
     intervalRef.current = setInterval(() => {
       setIndex((i) => (i + 1) % slides.length);
@@ -55,73 +87,79 @@ export default function HeroBannerSlider() {
       if (intervalRef.current) clearInterval(intervalRef.current);
       clearTimeout(skeletonTimer);
     };
-  }, []);
+  }, [slides.length]);
 
   useEffect(() => {
-    if (loaded[0]) {
+    if (loaded[0] || slides.length === 0) {
       setIsInitialLoad(false);
     }
-  }, [loaded]);
+  }, [loaded, slides.length]);
 
-  if (isInitialLoad && !loaded[0]) {
-    return (
-      <>
-        <div className="hero-banner-skeleton">
-          <div className="hero-banner-skeleton__inner"></div>
-        </div>
-        <style jsx>{`
+  const renderSkeleton = () => (
+    <>
+      <div className="hero-banner-skeleton">
+        <div className="hero-banner-skeleton__inner"></div>
+      </div>
+      <style jsx>{`
+        .hero-banner-skeleton {
+          width: 100%;
+          height: ${HEIGHT}px;
+          background-color: #f3f4f6;
+          position: relative;
+          overflow: hidden;
+          contain: layout style paint;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .hero-banner-skeleton__inner {
+          width: 100%;
+          max-width: 1250px;
+          height: 100%;
+          background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        
+        @media (max-width: 640px) {
           .hero-banner-skeleton {
-            width: 100%;
-            height: ${HEIGHT}px;
-            background-color: #f3f4f6;
-            position: relative;
-            overflow: hidden;
-            contain: layout style paint;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            height: auto;
+            aspect-ratio: 1250 / 320;
+            min-height: 100px;
           }
           
           .hero-banner-skeleton__inner {
             width: 100%;
-            max-width: 1250px;
+            max-width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s ease-in-out infinite;
+            position: absolute;
+            top: 0;
+            left: 0;
           }
-          
-          @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-          }
-          
-          @media (max-width: 640px) {
-            .hero-banner-skeleton {
-              height: auto;
-              aspect-ratio: 1250 / 320;
-              min-height: 100px;
-            }
-            
-            .hero-banner-skeleton__inner {
-              width: 100%;
-              max-width: 100%;
-              height: 100%;
-              position: absolute;
-              top: 0;
-              left: 0;
-            }
-          }
-        `}</style>
-      </>
-    );
+        }
+      `}</style>
+    </>
+  );
+
+  if (isInitialLoad && !loaded[0]) {
+    return renderSkeleton();
+  }
+
+  if (!isInitialLoad && slides.length === 0) {
+    return renderSkeleton();
   }
 
   return (
     <div
       className="hero-banner"
       style={{
-        background: slides[index].bg,
+        background: slides[index]?.bg || '#7A0A11',
         contain: 'layout style paint',
       }}
     >
@@ -157,8 +195,8 @@ export default function HeroBannerSlider() {
                 alt={`Banner ${i + 1}`}
                 width={1250}
                 height={HEIGHT}
-                priority={true}
-                loading="eager"
+                priority={i === 0}
+                loading={i === 0 ? 'eager' : 'lazy'}
                 quality={75}
                 placeholder="empty"
                 style={{

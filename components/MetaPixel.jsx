@@ -1,13 +1,43 @@
 "use client";
 import { useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { auth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function MetaPixel() {
   const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID;
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   if (!pixelId) return null;
+
+  const getAdvancedMatching = (user) => {
+    let advancedMatching = {};
+
+    try {
+      const email = String(user?.email || "").trim().toLowerCase();
+      const phone = String(user?.phoneNumber || "").replace(/\D/g, "");
+
+      if (email) {
+        advancedMatching = { ...advancedMatching, em: email };
+      }
+
+      if (phone) {
+        advancedMatching = { ...advancedMatching, ph: phone };
+      }
+
+      let externalId = window.localStorage.getItem("meta_external_id") || "";
+      if (!externalId) {
+        externalId = `${window.location.hostname}_${Date.now()}`;
+        window.localStorage.setItem("meta_external_id", externalId);
+      }
+      if (externalId) {
+        advancedMatching = { ...advancedMatching, external_id: externalId };
+      }
+    } catch {}
+
+    return advancedMatching;
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -30,43 +60,41 @@ export default function MetaPixel() {
     })(window, document, "script", "https://connect.facebook.net/en_US/fbevents.js");
 
     if (!window.__metaPixelInitialized) {
-      let advancedMatching = {};
-      try {
-        const email = String(auth?.currentUser?.email || "").trim().toLowerCase();
-        const phone = String(auth?.currentUser?.phoneNumber || "").replace(/\D/g, "");
-
-        if (email) {
-          advancedMatching = { ...advancedMatching, em: email };
-        }
-
-        if (phone) {
-          advancedMatching = { ...advancedMatching, ph: phone };
-        }
-
-        let externalId = window.localStorage.getItem("meta_external_id") || "";
-        if (!externalId) {
-          externalId = `${window.location.hostname}_${Date.now()}`;
-          window.localStorage.setItem("meta_external_id", externalId);
-        }
-        if (externalId) {
-          advancedMatching = { ...advancedMatching, external_id: externalId };
-        }
-      } catch {}
-
+      const advancedMatching = getAdvancedMatching(auth?.currentUser);
       window.fbq && window.fbq("init", pixelId, advancedMatching);
       window.__metaPixelInitialized = true;
     }
   }, [pixelId]);
 
   useEffect(() => {
+    if (typeof window === "undefined" || !pixelId) return;
+
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!window.fbq) return;
+
+      const advancedMatching = getAdvancedMatching(user);
+      if (!advancedMatching?.em && !advancedMatching?.ph) return;
+
+      const currentKey = `${advancedMatching.em || ""}|${advancedMatching.ph || ""}`;
+      if (window.__metaAdvancedMatchingKey === currentKey) return;
+
+      window.fbq("init", pixelId, advancedMatching);
+      window.__metaAdvancedMatchingKey = currentKey;
+    });
+
+    return () => unsub();
+  }, [pixelId]);
+
+  useEffect(() => {
     if (typeof window === "undefined" || !window.fbq) return;
 
-    const routeKey = `${pathname || ""}?${window.location.search || ""}`;
+    const query = searchParams?.toString() || "";
+    const routeKey = query ? `${pathname || ""}?${query}` : `${pathname || ""}`;
     if (window.__lastMetaPageView === routeKey) return;
 
     window.fbq("track", "PageView");
     window.__lastMetaPageView = routeKey;
-  }, [pathname]);
+  }, [pathname, searchParams]);
 
     return (
       <>

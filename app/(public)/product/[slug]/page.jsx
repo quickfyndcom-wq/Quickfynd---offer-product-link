@@ -70,9 +70,96 @@ export default function ProductBySlug() {
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
     const [relatedProducts, setRelatedProducts] = useState([]);
+    const [loadingRelated, setLoadingRelated] = useState(false);
     const [reviews, setReviews] = useState([]);
     const [loadingReviews, setLoadingReviews] = useState(false);
     const products = useSelector(state => state.product.list);
+
+    const getCategoryCandidates = (baseProduct) => {
+        const values = [];
+
+        const addValue = (value) => {
+            if (!value) return;
+            if (typeof value === 'string') {
+                values.push(value.trim());
+                return;
+            }
+            if (typeof value === 'object') {
+                if (value.slug) values.push(String(value.slug).trim());
+                if (value.name) values.push(String(value.name).trim());
+            }
+        };
+
+        addValue(baseProduct?.category);
+        if (Array.isArray(baseProduct?.categories)) {
+            baseProduct.categories.forEach(addValue);
+        }
+
+        return [...new Set(values.filter(Boolean))];
+    };
+
+    const pickRelatedProducts = (list, baseProduct, limit = 5) => {
+        if (!Array.isArray(list) || !baseProduct) return [];
+
+        const baseSlug = baseProduct.slug;
+        const baseId = String(baseProduct._id || baseProduct.id || '');
+        const baseCategories = new Set(getCategoryCandidates(baseProduct).map((v) => v.toLowerCase()));
+
+        const scored = list
+            .filter((item) => {
+                const itemSlug = item?.slug;
+                const itemId = String(item?._id || item?.id || '');
+                const inStock = item?.inStock !== false;
+                return inStock && itemSlug !== baseSlug && itemId !== baseId;
+            })
+            .map((item) => {
+                const itemCategories = new Set(getCategoryCandidates(item).map((v) => v.toLowerCase()));
+                const hasCategoryMatch = [...itemCategories].some((cat) => baseCategories.has(cat));
+                return { item, score: hasCategoryMatch ? 1 : 0 };
+            })
+            .sort((a, b) => b.score - a.score)
+            .map((entry) => entry.item);
+
+        return scored.slice(0, limit);
+    };
+
+    const fetchRelatedProducts = async (baseProduct) => {
+        if (!baseProduct) {
+            setRelatedProducts([]);
+            return;
+        }
+
+        setLoadingRelated(true);
+        try {
+            let related = [];
+
+            if (products.length > 0) {
+                related = pickRelatedProducts(products, baseProduct, 5);
+            }
+
+            if (related.length === 0) {
+                const categoryCandidates = getCategoryCandidates(baseProduct);
+                for (const category of categoryCandidates) {
+                    const { data } = await axios.get(`/api/products?category=${encodeURIComponent(category)}&limit=20`);
+                    const apiProducts = data?.products || [];
+                    related = pickRelatedProducts(apiProducts, baseProduct, 5);
+                    if (related.length > 0) break;
+                }
+            }
+
+            if (related.length === 0) {
+                const { data } = await axios.get('/api/products?limit=20');
+                related = pickRelatedProducts(data?.products || [], baseProduct, 5);
+            }
+
+            setRelatedProducts(related);
+        } catch (error) {
+            console.error('Error fetching related products:', error);
+            setRelatedProducts([]);
+        } finally {
+            setLoadingRelated(false);
+        }
+    };
 
     const fetchProduct = async () => {
         setLoading(true);
@@ -88,16 +175,7 @@ export default function ProductBySlug() {
             }
             
             setProduct(found);
-            
-            // Get related products from Redux if available
-            if (found && products.length > 0) {
-                const related = products
-                    .filter(p => p.slug !== slug && p.category === found.category && p.inStock)
-                    .slice(0, 5);
-                setRelatedProducts(related);
-            } else {
-                setRelatedProducts([]);
-            }
+            await fetchRelatedProducts(found);
         } catch (error) {
             console.error('Error fetching product:', error);
             setProduct(null);
@@ -133,6 +211,14 @@ export default function ProductBySlug() {
             fetchReviews(productId);
         }
     }, [product?._id, product?.id]);
+
+    useEffect(() => {
+        if (!product || products.length === 0) return;
+        const related = pickRelatedProducts(products, product, 5);
+        if (related.length > 0) {
+            setRelatedProducts(related);
+        }
+    }, [products, product?._id, product?.slug]);
 
     // Track browse history for signed-in users and localStorage for guests
     useEffect(() => {
@@ -188,12 +274,14 @@ export default function ProductBySlug() {
                         <ProductDetails product={product} reviews={reviews} loadingReviews={loadingReviews} />
                         <ProductDescription product={product} reviews={reviews || []} loadingReviews={loadingReviews} onReviewAdded={() => fetchReviews(product._id || product.id)} />
                         {/* Related Products */}
-                        {relatedProducts.length > 0 && (
+                        {loadingRelated ? (
+                            <RelatedProductsSkeleton />
+                        ) : relatedProducts.length > 0 && (
                             <div className="px-4 mt-12 mb-16">
-                                <h2 className="text-2xl font-semibold text-slate-800 mb-6">Related Products</h2>
+                                <h2 className="text-2xl font-semibold text-slate-800 mb-6">Recommended Products</h2>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-5 gap-6">
                                     {relatedProducts.map((prod) => (
-                                        <ProductCard key={prod.id} product={prod} />
+                                        <ProductCard key={prod._id || prod.id || prod.slug} product={prod} />
                                     ))}
                                 </div>
                             </div>
