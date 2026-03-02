@@ -8,6 +8,7 @@ import { useDispatch } from "react-redux"
 import { fetchProducts as fetchProductsAction } from "@/lib/features/product/productSlice"
 import { toast } from "react-hot-toast"
 import Image from "next/image"
+import Link from "next/link"
 import Loading from "@/components/Loading"
 
 import axios from "axios"
@@ -166,7 +167,15 @@ export default function StoreManageProducts() {
 
     return (
         <>
-            <h1 className="text-2xl text-slate-500 mb-5">Manage <span className="text-slate-800 font-medium">Products</span></h1>
+            <div className="flex items-center justify-between gap-3 mb-5 max-w-5xl">
+                <h1 className="text-2xl text-slate-500">Manage <span className="text-slate-800 font-medium">Products</span></h1>
+                <Link
+                    href="/store/add-product"
+                    className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition"
+                >
+                    + Add Product
+                </Link>
+            </div>
             
             {/* Search Bar and Category Filter */}
             <div className="mb-6 max-w-5xl flex gap-4 flex-wrap">
@@ -242,6 +251,17 @@ export default function StoreManageProducts() {
                 )}
             </div>
 
+            {filteredProducts.length === 0 ? (
+                <div className="w-full max-w-5xl ring ring-slate-200 rounded p-8 text-center bg-white">
+                    <p className="text-slate-600 mb-4">No products found. Add your first product to get started.</p>
+                    <Link
+                        href="/store/add-product"
+                        className="inline-block px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition"
+                    >
+                        + Add Product
+                    </Link>
+                </div>
+            ) : (
             <table className="w-full max-w-5xl text-left  ring ring-slate-200  rounded overflow-hidden text-sm">
                 <thead className="bg-slate-50 text-gray-700 uppercase tracking-wider">
                     <tr>
@@ -341,6 +361,7 @@ export default function StoreManageProducts() {
                     ))}
                 </tbody>
             </table>
+            )}
 
             {showEditModal && (
                 <ProductForm 
