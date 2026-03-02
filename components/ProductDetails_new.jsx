@@ -212,6 +212,7 @@ const ProductDetails = ({ product }) => {
                       alt={`${product.name} ${index + 1}`}
                       width={80}
                       height={80}
+                      unoptimized
                       className="object-contain w-full h-full p-2"
                     />
                   </button>
@@ -259,6 +260,7 @@ const ProductDetails = ({ product }) => {
                     src={mainImage}
                     alt={product.name}
                     fill
+                    unoptimized
                     className="object-contain p-8"
                     priority
                   />
@@ -283,6 +285,7 @@ const ProductDetails = ({ product }) => {
                     alt={`${product.name} ${index + 1}`}
                     width={80}
                     height={80}
+                    unoptimized
                     className="object-contain w-full h-full p-2"
                   />
                 </button>

@@ -95,6 +95,7 @@ export default function CategorySliderDisplay({ slider }) {
                     src={product.image}
                     alt={product.name}
                     fill
+                    unoptimized
                     className="qf-card__img"
                     sizes="(max-width: 768px) 160px, 192px"
                   />

@@ -85,6 +85,7 @@ const ProductCard = ({ product }) => {
           src={primaryImage}
           alt={productName}
           fill
+          unoptimized
           style={{ objectFit: 'cover' }}
           className={`w-full h-full object-cover ${hasSecondary ? 'transition-opacity duration-500' : ''} ${
             hasSecondary && hovered ? 'opacity-0' : 'opacity-100'
@@ -99,6 +100,7 @@ const ProductCard = ({ product }) => {
             src={secondaryImage}
             alt={productName}
             fill
+            unoptimized
             style={{ objectFit: 'cover' }}
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
               hovered ? 'opacity-100' : 'opacity-0'

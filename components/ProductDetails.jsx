@@ -687,6 +687,7 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
                       alt={`${product.name} ${index + 1}`}
                       width={56}
                       height={56}
+                      unoptimized
                       className="object-cover w-full h-full"
                       onError={(e) => { e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png'; }}
                     />
@@ -730,6 +731,7 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
                       src={mainImage || 'https://ik.imagekit.io/jrstupuke/placeholder.png'}
                       alt={product.name}
                       fill
+                      unoptimized
                       sizes="100vw"
                       className="object-cover"
                       priority
@@ -775,6 +777,7 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
                   src={mainImage || 'https://ik.imagekit.io/jrstupuke/placeholder.png'}
                   alt={product.name}
                   fill
+                  unoptimized
                   className="object-cover"
                   priority
                   onError={(e) => { e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png'; }}
@@ -799,6 +802,7 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
                     alt={`${product.name} ${index + 1}`}
                     width={56}
                     height={56}
+                    unoptimized
                     className="object-cover w-full h-full"
                     onError={(e) => { e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png'; }}
                   />
@@ -1475,6 +1479,7 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
                         src={product.images?.[0] || 'https://ik.imagekit.io/jrstupuke/placeholder.png'}
                         alt={product.name}
                         fill
+                        unoptimized
                         className="object-cover"
                       />
                     </div>
@@ -1500,6 +1505,7 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
                           src={fbtProduct.images?.[0] || 'https://ik.imagekit.io/jrstupuke/placeholder.png'}
                           alt={fbtProduct.name}
                           fill
+                          unoptimized
                           className="object-cover"
                         />
                       </div>

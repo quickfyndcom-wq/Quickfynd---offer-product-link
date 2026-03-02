@@ -149,6 +149,7 @@ const ProductCard = ({ product }) => {
                         src={imageSrc}
                         alt={displayName}
                         fill
+                        unoptimized
                         className="object-cover transition-transform duration-300 group-hover:scale-105"
                         onError={(e) => {
                             if (e.currentTarget.src !== 'https://ik.imagekit.io/jrstupuke/placeholder.png') {

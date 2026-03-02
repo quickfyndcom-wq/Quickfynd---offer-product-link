@@ -5,7 +5,7 @@ import { MapPin, Mail, Phone } from "lucide-react"
 const StoreInfo = ({store}) => {
     return (
         <div className="flex-1 space-y-2 text-sm">
-            <Image width={100} height={100} src={store.logo} alt={store.name} className="max-w-20 max-h-20 object-contain shadow rounded-full max-sm:mx-auto" />
+            <Image width={100} height={100} src={store.logo} alt={store.name} unoptimized className="max-w-20 max-h-20 object-contain shadow rounded-full max-sm:mx-auto" />
             <div className="flex flex-col sm:flex-row gap-3 items-center">
                 <h3 className="text-xl font-semibold text-slate-800"> {store.name} </h3>
                 <span className="text-sm">@{store.username}</span>
@@ -35,6 +35,7 @@ const StoreInfo = ({store}) => {
                                         height={36}
                                         src={store.user.image}
                                         alt={store.user.name}
+                                        unoptimized
                                         className="w-9 h-9 rounded-full"
                                     />
                                 ) : (

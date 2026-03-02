@@ -195,6 +195,7 @@ export default function HeroBannerSlider() {
                 alt={`Banner ${i + 1}`}
                 width={1250}
                 height={HEIGHT}
+                unoptimized
                 priority={i === 0}
                 loading={i === 0 ? 'eager' : 'lazy'}
                 quality={75}

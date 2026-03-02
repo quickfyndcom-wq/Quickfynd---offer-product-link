@@ -272,6 +272,7 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
                         src={product.image || product.images?.[0]}
                         alt={product.name}
                         fill
+                        unoptimized
                         draggable="false"
                         className="object-cover group-hover:scale-110 transition-transform duration-500 pointer-events-none select-none"
                         sizes="(max-width: 640px) 224px, 256px"

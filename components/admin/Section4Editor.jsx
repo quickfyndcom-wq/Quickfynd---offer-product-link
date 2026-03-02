@@ -242,6 +242,7 @@ export default function Section4Editor({ section, onSave, onClose }) {
                             src={product.image}
                             alt={product.name}
                             fill
+                            unoptimized
                             className="object-cover rounded"
                           />
                         )}
@@ -334,6 +335,7 @@ export default function Section4Editor({ section, onSave, onClose }) {
                                 src={product.images[0]}
                                 alt={product.name}
                                 fill
+                                unoptimized
                                 className="object-cover rounded"
                               />
                             )}

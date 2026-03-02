@@ -140,6 +140,7 @@ const OrderItem = ({ order: initialOrder }) => {
                                                         alt={product.name}
                                                         width={64}
                                                         height={64}
+                                                        unoptimized
                                                         className="w-full h-full object-cover"
                                                     />
                                                 ) : (
@@ -182,6 +183,7 @@ const OrderItem = ({ order: initialOrder }) => {
                                                         alt={product.name}
                                                         width={96}
                                                         height={96}
+                                                        unoptimized
                                                         className="w-full h-full object-cover"
                                                     />
                                                 ) : (

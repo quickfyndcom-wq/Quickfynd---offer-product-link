@@ -17,6 +17,7 @@ export default function AdminGridSection({ title, products = [] }) {
                 alt={product.name}
                 width={120}
                 height={120}
+                unoptimized
                 className="object-contain rounded"
                 priority={idx < 3}
               />

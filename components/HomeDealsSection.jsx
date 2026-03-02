@@ -51,6 +51,7 @@ const HomeDealsSection = ({ sections }) => {
                       alt={item.name}
                       width={300}
                       height={300}
+                      unoptimized
                       className="rounded-xl w-full h-32 object-contain"
                     />
                     <p className="text-sm font-medium mt-1 text-gray-700">{item.name && item.name.length > 25 ? item.name.slice(0, 25) + '…' : item.name}</p>

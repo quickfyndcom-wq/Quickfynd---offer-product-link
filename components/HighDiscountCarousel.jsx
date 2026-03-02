@@ -296,6 +296,7 @@ export default function HighDiscountCarousel() {
                         src={getImageSrc(product)}
                         alt={product.name || "Product"}
                         fill
+                        unoptimized
                         className="object-cover"
                       />
                       <div className="absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: BRAND_COLORS.red, color: BRAND_COLORS.white }}>

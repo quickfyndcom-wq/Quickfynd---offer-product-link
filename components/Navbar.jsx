@@ -692,6 +692,7 @@ const Navbar = () => {
                             src={product.image || product.images?.[0]}
                             alt={product.name || 'Product'}
                             fill
+                            unoptimized
                             sizes="32px"
                             className="object-cover"
                           />
@@ -973,6 +974,7 @@ const Navbar = () => {
                               src={product.image}
                               alt={product.name}
                               fill
+                              unoptimized
                               className="object-cover group-hover:scale-110 transition"
                             />
                           ) : (
@@ -1007,7 +1009,7 @@ const Navbar = () => {
                 onMouseLeave={() => setUserDropdownOpen(false)}
               >
                 {firebaseUser.photoURL ? (
-                  <Image src={firebaseUser.photoURL} alt="User" width={32} height={32} className="rounded-full object-cover border-2 border-white/20" />
+                  <Image src={firebaseUser.photoURL} alt="User" width={32} height={32} unoptimized className="rounded-full object-cover border-2 border-white/20" />
                 ) : (
                   <span className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-600 text-white font-bold text-lg border-2 border-white/20">
                     {firebaseUser.displayName?.[0]?.toUpperCase() || firebaseUser.email?.[0]?.toUpperCase() || 'U'}
@@ -1193,7 +1195,7 @@ const Navbar = () => {
                   className="p-2 hover:bg-gray-100 rounded-full transition"
                 >
                   {firebaseUser.photoURL ? (
-                    <Image src={firebaseUser.photoURL} alt="User" width={28} height={28} className="rounded-full object-cover" />
+                    <Image src={firebaseUser.photoURL} alt="User" width={28} height={28} unoptimized className="rounded-full object-cover" />
                   ) : (
                     <span className="w-7 h-7 flex items-center justify-center rounded-full bg-blue-600 text-white font-bold text-base">
                       {firebaseUser.displayName?.[0]?.toUpperCase() || firebaseUser.email?.[0]?.toUpperCase() || 'U'}
@@ -1264,6 +1266,7 @@ const Navbar = () => {
                           src={product.image || product.images?.[0]}
                           alt={product.name || 'Product'}
                           fill
+                          unoptimized
                           sizes="32px"
                           className="object-cover"
                         />
@@ -1317,7 +1320,7 @@ const Navbar = () => {
               ) : (
                 <div className="w-full px-4 py-3 bg-blue-50 text-blue-700 text-sm font-semibold rounded-full mb-4 flex items-center gap-2">
                   {firebaseUser.photoURL ? (
-                    <Image src={firebaseUser.photoURL} alt="User" width={28} height={28} className="rounded-full object-cover" />
+                    <Image src={firebaseUser.photoURL} alt="User" width={28} height={28} unoptimized className="rounded-full object-cover" />
                   ) : (
                     <span className="w-7 h-7 flex items-center justify-center rounded-full bg-blue-600 text-white font-bold text-base">
                       {firebaseUser.displayName?.[0]?.toUpperCase() || firebaseUser.email?.[0]?.toUpperCase() || 'U'}
