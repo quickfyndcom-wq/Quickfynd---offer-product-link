@@ -20,6 +20,12 @@ function SearchResultsInner() {
   const [similarLoading, setSimilarLoading] = useState(false);
   const [recommendedProducts, setRecommendedProducts] = useState([]);
 
+  const getImageSrc = (image) => {
+    if (typeof image === 'string' && image.trim()) return image;
+    if (image && typeof image === 'object') return image.url || image.src || null;
+    return null;
+  };
+
   const normalizeErrorMessage = (value, fallback = 'Failed to fetch results') => {
     if (!value) return fallback;
     if (typeof value === 'string') return value;
@@ -195,11 +201,12 @@ function SearchResultsInner() {
                   className="group bg-white rounded-lg shadow-sm hover:shadow-lg transition overflow-hidden"
                 >
                   <div className="relative h-48 bg-gray-100 overflow-hidden">
-                    {product.image ? (
+                    {getImageSrc(product.image || product.images?.[0]) ? (
                       <Image
-                        src={product.image}
+                        src={getImageSrc(product.image || product.images?.[0])}
                         alt={product.name}
                         fill
+                        unoptimized
                         className="object-cover group-hover:scale-110 transition duration-300"
                       />
                     ) : (
@@ -253,11 +260,12 @@ function SearchResultsInner() {
                 >
                   {/* Product Image */}
                   <div className="relative h-48 bg-gray-100 overflow-hidden">
-                    {product.image ? (
+                    {getImageSrc(product.image || product.images?.[0]) ? (
                       <Image
-                        src={product.image}
+                        src={getImageSrc(product.image || product.images?.[0])}
                         alt={product.name}
                         fill
+                        unoptimized
                         className="object-cover group-hover:scale-110 transition duration-300"
                       />
                     ) : (
@@ -317,11 +325,12 @@ function SearchResultsInner() {
                       className="group bg-white rounded-lg shadow-sm hover:shadow-lg transition overflow-hidden"
                     >
                       <div className="relative h-48 bg-gray-100 overflow-hidden">
-                        {product.image ? (
+                        {getImageSrc(product.image || product.images?.[0]) ? (
                           <Image
-                            src={product.image}
+                            src={getImageSrc(product.image || product.images?.[0])}
                             alt={product.name}
                             fill
+                            unoptimized
                             className="object-cover group-hover:scale-110 transition duration-300"
                           />
                         ) : (

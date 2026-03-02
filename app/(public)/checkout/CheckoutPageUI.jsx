@@ -37,6 +37,12 @@ export default function CheckoutPage() {
   
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
+  const getImageSrc = (image) => {
+    if (typeof image === 'string' && image.trim()) return image;
+    if (image && typeof image === 'object') return image.url || image.src || '/placeholder.png';
+    return '/placeholder.png';
+  };
+
   const [form, setForm] = useState({
     addressId: "",
     payment: "cod",
@@ -1461,7 +1467,16 @@ export default function CheckoutPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {cartArray.map((item) => (
                   <div key={item._cartKey || item._id} className="flex items-center bg-gray-50 border border-gray-200 rounded-lg p-3 gap-3">
-                    <img src={item.image || item.images?.[0] || '/placeholder.png'} alt={item.name} className="w-14 h-14 object-cover rounded-md border" />
+                    <img
+                      src={getImageSrc(item.image || item.images?.[0])}
+                      alt={item.name}
+                      className="w-14 h-14 object-cover rounded-md border"
+                      onError={(e) => {
+                        if (e.currentTarget.src !== '/placeholder.png') {
+                          e.currentTarget.src = '/placeholder.png';
+                        }
+                      }}
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-gray-900 truncate">{item.name}</div>
                       <div className="text-xs text-gray-500 truncate">{item.brand || ''}</div>

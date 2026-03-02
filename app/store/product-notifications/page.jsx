@@ -9,6 +9,13 @@ import { BellIcon, MailIcon, CheckCircleIcon, AlertCircleIcon } from 'lucide-rea
 export default function ProductNotificationsPage() {
   const { getToken } = useAuth()
   const [activeTab, setActiveTab] = useState('settings') // settings, send, templates, or history
+  const [sortBy, setSortBy] = useState('newest')
+
+  const getImageSrc = (image) => {
+    if (typeof image === 'string' && image.trim()) return image
+    if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+    return 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+  }
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
 
@@ -320,7 +327,16 @@ export default function ProductNotificationsPage() {
                   return (
                     <div className='flex gap-4'>
                       {product?.images?.[0] && (
-                        <img src={product.images[0]} alt={product.name} className='w-20 h-20 object-cover rounded' />
+                          <img
+                            src={getImageSrc(product.images[0])}
+                            alt={product.name}
+                            className='w-20 h-20 object-cover rounded'
+                            onError={(e) => {
+                              if (e.currentTarget.src !== 'https://ik.imagekit.io/jrstupuke/placeholder.png') {
+                                e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+                              }
+                            }}
+                          />
                       )}
                       <div className='flex-1'>
                         <h3 className='font-semibold text-slate-800'>{product?.name}</h3>

@@ -32,6 +32,12 @@ export default function ProductPricing() {
     const [editingProduct, setEditingProduct] = useState(null);
     const [costPrice, setCostPrice] = useState('');
     const [saving, setSaving] = useState(false);
+
+    const getImageSrc = (image) => {
+        if (typeof image === 'string' && image.trim()) return image;
+        if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+        return 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+    };
     
     useEffect(() => {
         if (!authLoading && !user) {
@@ -198,9 +204,10 @@ export default function ProductPricing() {
                                                         {product.images && product.images[0] && (
                                                             <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-slate-100">
                                                                 <Image 
-                                                                    src={product.images[0]} 
+                                                                    src={getImageSrc(product.images[0])} 
                                                                     alt={product.name}
                                                                     fill
+                                                                    unoptimized
                                                                     className="object-cover"
                                                                 />
                                                             </div>

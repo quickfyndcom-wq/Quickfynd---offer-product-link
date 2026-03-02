@@ -13,6 +13,12 @@ const HomeDealsSection = ({ sections }) => {
   const [bannerImages, setBannerImages] = useState([Banner1]);
   const [bannerMeta, setBannerMeta] = useState({ title: 'Shop your fashion needs', subtitle: 'With latest & trendy choices', ctaText: 'Shop Now', ctaLink: '/shop' });
 
+  const getImageSrc = (image) => {
+    if (typeof image === 'string' && image.trim()) return image;
+    if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+    return 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+  };
+
   useEffect(() => {
     // If you want to support dynamic banners, you can pass them as a prop or fetch here
     // For now, fallback to static
@@ -47,7 +53,7 @@ const HomeDealsSection = ({ sections }) => {
                     className="bg-gray-50 p-2 rounded-xl hover:shadow transition-all flex flex-col items-center text-center"
                   >
                     <Image
-                      src={item.images && item.images[0] ? item.images[0] : ''}
+                      src={getImageSrc(item.images && item.images[0] ? item.images[0] : item.image)}
                       alt={item.name}
                       width={300}
                       height={300}

@@ -33,6 +33,12 @@ export default function Cart() {
     const shippingFee = 0;
     const [deletingKeys, setDeletingKeys] = useState({});
 
+    const getImageSrc = (image) => {
+        if (typeof image === 'string' && image.trim()) return image;
+        if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+        return 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+    };
+
 
     // Ensure products list is loaded for cart display
     useEffect(() => {
@@ -295,10 +301,11 @@ export default function Cart() {
                                         <div className="flex gap-4">
                                             <div className="w-24 h-24 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
                                                 <Image
-                                                    src={item.images[0]}
+                                                    src={getImageSrc(item.images?.[0] || item.image)}
                                                     alt={item.name}
                                                     width={96}
                                                     height={96}
+                                                    unoptimized
                                                     className="w-full h-full object-contain p-2"
                                                 />
                                             </div>
@@ -356,10 +363,11 @@ export default function Cart() {
                                                 <div className="flex gap-4">
                                                     <div className="w-24 h-24 flex-shrink-0 bg-white rounded-lg overflow-hidden">
                                                         <Image
-                                                            src={item.images[0]}
+                                                            src={getImageSrc(item.images?.[0] || item.image)}
                                                             alt={item.name}
                                                             width={96}
                                                             height={96}
+                                                            unoptimized
                                                             className="w-full h-full object-contain p-2"
                                                         />
                                                     </div>

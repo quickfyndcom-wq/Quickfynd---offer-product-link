@@ -17,6 +17,12 @@ export default function DealsOfTheDay() {
     const [searchQuery, setSearchQuery] = useState('')
     const [showSettingsBtn] = useState(true)
 
+    const getImageSrc = (image) => {
+        if (typeof image === 'string' && image.trim()) return image
+        if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+        return 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+    }
+
     // Form state
     const [formData, setFormData] = useState({
         title: '',
@@ -302,9 +308,10 @@ export default function DealsOfTheDay() {
                                                     <div className="aspect-square relative mb-2 rounded overflow-hidden bg-white">
                                                         {product.images?.[0] ? (
                                                             <Image
-                                                                src={product.images[0]}
+                                                                src={getImageSrc(product.images[0])}
                                                                 alt={product.name}
                                                                 fill
+                                                                unoptimized
                                                                 className="object-cover"
                                                             />
                                                         ) : (
@@ -426,9 +433,10 @@ export default function DealsOfTheDay() {
                                                 <div className="aspect-square relative mb-2 rounded overflow-hidden bg-white">
                                                     {product.images?.[0] ? (
                                                         <Image
-                                                            src={product.images[0]}
+                                                            src={getImageSrc(product.images[0])}
                                                             alt={product.name}
                                                             fill
+                                                            unoptimized
                                                             className="object-cover"
                                                         />
                                                     ) : (

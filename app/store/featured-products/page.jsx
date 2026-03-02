@@ -14,6 +14,11 @@ export default function FeaturedProducts() {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
+        const getImageSrc = (image) => {
+            if (typeof image === 'string' && image.trim()) return image
+            if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+            return 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+        }
     const [sortBy, setSortBy] = useState('name')
 
     // Fetch all products
@@ -178,7 +183,7 @@ export default function FeaturedProducts() {
                 ) : (
                     filteredProducts.map(product => {
                         const isSelected = selectedProducts.includes(product._id)
-                        const primaryImage = product.images?.[0] || 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+                        const primaryImage = getImageSrc(product.images?.[0] || product.image)
 
                         return (
                             <div
@@ -210,6 +215,7 @@ export default function FeaturedProducts() {
                                                 alt={product.name}
                                                 width={200}
                                                 height={200}
+                                                unoptimized
                                                 className="w-full h-full object-cover"
                                                 onError={(e) => { e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png' }}
                                             />

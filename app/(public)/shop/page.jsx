@@ -33,6 +33,12 @@ function ShopContent() {
     const [fastSellingIndex, setFastSellingIndex] = useState(0);
     const { user, getToken } = useAuth();
 
+    const getImageSrc = (image) => {
+        if (typeof image === 'string' && image.trim()) return image;
+        if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+        return 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+    };
+
     useEffect(() => {
         setMounted(true);
     }, []);
@@ -539,9 +545,14 @@ function ShopContent() {
                                         <div className="relative h-64 bg-slate-100 overflow-hidden">
                                             {fastSellingProducts[fastSellingIndex]?.images?.[0] ? (
                                                 <img
-                                                    src={fastSellingProducts[fastSellingIndex].images[0]}
+                                                    src={getImageSrc(fastSellingProducts[fastSellingIndex].images[0])}
                                                     alt={fastSellingProducts[fastSellingIndex].name || 'Product'}
                                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                    onError={(e) => {
+                                                        if (e.currentTarget.src !== 'https://ik.imagekit.io/jrstupuke/placeholder.png') {
+                                                            e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+                                                        }
+                                                    }}
                                                 />
                                             ) : null}
                                             <div className="absolute inset-x-0 bottom-0 p-2.5 bg-gradient-to-t from-black/70 to-transparent">

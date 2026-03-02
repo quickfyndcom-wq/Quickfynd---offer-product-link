@@ -21,6 +21,12 @@ export default function DashboardWishlistPage() {
     const [selectedItems, setSelectedItems] = useState([]);
     const [addingToCart, setAddingToCart] = useState(false);
 
+    const getImageSrc = (image) => {
+        if (typeof image === 'string' && image.trim()) return image;
+        if (image && typeof image === 'object') return image.url || image.src || '/placeholder.png';
+        return '/placeholder.png';
+    };
+
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, (u) => setUser(u ?? null));
         return () => unsub();
@@ -192,9 +198,10 @@ export default function DashboardWishlistPage() {
                                             />
                                             <div className="relative w-24 h-24 flex-shrink-0">
                                                 <Image
-                                                    src={item.product?.images?.[0] || '/placeholder.png'}
+                                                    src={getImageSrc(item.product?.images?.[0] || item.product?.image)}
                                                     alt={item.product?.name}
                                                     fill
+                                                    unoptimized
                                                     className="object-cover rounded-lg"
                                                 />
                                             </div>

@@ -61,6 +61,11 @@ const updateTrackingDetails = async (orderId, trackingId, trackingUrl, courier, 
 
 export default function StoreOrders() {
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '₹';
+    const getImageSrc = (image) => {
+        if (typeof image === 'string' && image.trim()) return image
+        if (image && typeof image === 'object') return image.url || image.src || '/placeholder.png'
+        return '/placeholder.png'
+    }
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedOrder, setSelectedOrder] = useState(null);
@@ -1675,9 +1680,14 @@ export default function StoreOrders() {
                                     {selectedOrder.orderItems.map((item, i) => (
                                         <div key={i} className="flex items-center gap-4 border border-slate-200 rounded-xl p-3 bg-white hover:shadow-md transition-shadow">
                                             <img
-                                                src={item.productId?.images?.[0] || item.product?.images?.[0] || '/placeholder.png'}
+                                                src={getImageSrc(item.productId?.images?.[0] || item.product?.images?.[0] || item.productId?.image || item.product?.image)}
                                                 alt={item.productId?.name || item.product?.name || 'Product'}
                                                 className="w-20 h-20 object-cover rounded-lg border border-slate-100"
+                                                onError={(e) => {
+                                                    if (e.currentTarget.src !== '/placeholder.png') {
+                                                        e.currentTarget.src = '/placeholder.png'
+                                                    }
+                                                }}
                                             />
                                             <div className="flex-1">
                                                 <p className="font-medium text-slate-900">{item.productId?.name || item.product?.name || 'Unknown Product'}</p>

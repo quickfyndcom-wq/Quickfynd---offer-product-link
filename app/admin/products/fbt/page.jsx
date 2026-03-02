@@ -22,6 +22,12 @@ export default function FBTManagement() {
   const [fbtBundleDiscount, setFbtBundleDiscount] = useState('');
   const [searchFbt, setSearchFbt] = useState('');
 
+  const getImageSrc = (image) => {
+    if (typeof image === 'string' && image.trim()) return image;
+    if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+    return 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+  };
+
   const { isSignedIn, isAdmin } = useAuth();
   const router = useRouter();
 
@@ -171,9 +177,10 @@ export default function FBTManagement() {
                   >
                     <div className="w-12 h-12 relative flex-shrink-0">
                       <Image
-                        src={product.images?.[0] || 'https://ik.imagekit.io/jrstupuke/placeholder.png'}
+                        src={getImageSrc(product.images?.[0] || product.image)}
                         alt={product.name}
                         fill
+                        unoptimized
                         className="object-cover rounded"
                       />
                     </div>
@@ -194,9 +201,10 @@ export default function FBTManagement() {
                 <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-200">
                   <div className="w-20 h-20 relative flex-shrink-0">
                     <Image
-                      src={selectedProduct.images?.[0] || 'https://ik.imagekit.io/jrstupuke/placeholder.png'}
+                      src={getImageSrc(selectedProduct.images?.[0] || selectedProduct.image)}
                       alt={selectedProduct.name}
                       fill
+                      unoptimized
                       className="object-cover rounded"
                     />
                   </div>
@@ -245,9 +253,10 @@ export default function FBTManagement() {
                             >
                               <div className="w-10 h-10 relative flex-shrink-0">
                                 <Image
-                                  src={product.images?.[0] || 'https://ik.imagekit.io/jrstupuke/placeholder.png'}
+                                  src={getImageSrc(product.images?.[0] || product.image)}
                                   alt={product.name}
                                   fill
+                                  unoptimized
                                   className="object-cover rounded"
                                 />
                               </div>
@@ -269,9 +278,10 @@ export default function FBTManagement() {
                           >
                             <div className="w-12 h-12 relative flex-shrink-0">
                               <Image
-                                src={product.images?.[0] || 'https://ik.imagekit.io/jrstupuke/placeholder.png'}
+                                src={getImageSrc(product.images?.[0] || product.image)}
                                 alt={product.name}
                                 fill
+                                unoptimized
                                 className="object-cover rounded"
                               />
                             </div>

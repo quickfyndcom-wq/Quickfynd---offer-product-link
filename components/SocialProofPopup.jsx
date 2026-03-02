@@ -9,6 +9,12 @@ const SocialProofPopup = () => {
   const [products, setProducts] = useState([])
   const [mounted, setMounted] = useState(false)
 
+  const getImageSrc = (image) => {
+    if (typeof image === 'string' && image.trim()) return image
+    if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+    return 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+  }
+
   // Ensure component is mounted (client-side only)
   useEffect(() => {
     setMounted(true)
@@ -135,9 +141,14 @@ const SocialProofPopup = () => {
             <div className="relative w-16 h-16 flex-shrink-0 bg-slate-100 rounded-lg overflow-hidden">
               {currentProduct.images?.[0] ? (
                 <img
-                  src={currentProduct.images[0]}
+                  src={getImageSrc(currentProduct.images[0])}
                   alt={currentProduct.name}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    if (e.currentTarget.src !== 'https://ik.imagekit.io/jrstupuke/placeholder.png') {
+                      e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+                    }
+                  }}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">

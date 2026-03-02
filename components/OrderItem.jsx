@@ -17,6 +17,12 @@ const OrderItem = ({ order: initialOrder }) => {
     const [order, setOrder] = useState(initialOrder);
     const [refreshing, setRefreshing] = useState(false);
 
+    const getImageSrc = (image) => {
+        if (typeof image === 'string' && image.trim()) return image;
+        if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+        return 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+    };
+
     const { ratings } = useSelector(state => state.rating);
     
     // Helper function to compute correct payment status
@@ -136,7 +142,7 @@ const OrderItem = ({ order: initialOrder }) => {
                                             <div className="w-16 h-16 bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
                                                 {product.images?.[0] ? (
                                                     <Image
-                                                        src={product.images[0]}
+                                                        src={getImageSrc(product.images[0])}
                                                         alt={product.name}
                                                         width={64}
                                                         height={64}
@@ -179,7 +185,7 @@ const OrderItem = ({ order: initialOrder }) => {
                                             <div className="w-24 h-24 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200">
                                                 {product.images?.[0] ? (
                                                     <Image
-                                                        src={product.images[0]}
+                                                        src={getImageSrc(product.images[0])}
                                                         alt={product.name}
                                                         width={96}
                                                         height={96}

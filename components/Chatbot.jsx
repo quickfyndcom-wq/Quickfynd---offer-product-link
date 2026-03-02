@@ -24,6 +24,12 @@ const Chatbot = () => {
     const inputRef = useRef(null);
     const languageSelectorRef = useRef(null);
 
+    const getImageSrc = (image) => {
+        if (typeof image === 'string' && image.trim()) return image;
+        if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+        return 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+    };
+
     const greetings = {
         english: "hey! 👋 I can help you with products, orders, shipping, returns, payments, coupons, and all our policies. what do you need?",
         hindi: "नमस्ते! 👋 मैं आपको उत्पादों, ऑर्डर, शिपिंग, रिटर्न, पेमेंट, कूपन और सभी पॉलिसी के बारे में बता सकता हूं। क्या चाहिए?",
@@ -343,9 +349,14 @@ const Chatbot = () => {
                                                                 <div className="flex gap-2">
                                                                     {product.images && product.images[0] && (
                                                                         <img
-                                                                            src={product.images[0]}
+                                                                            src={getImageSrc(product.images[0])}
                                                                             alt={product.name}
                                                                             className="w-12 h-12 object-cover rounded"
+                                                                            onError={(e) => {
+                                                                                if (e.currentTarget.src !== 'https://ik.imagekit.io/jrstupuke/placeholder.png') {
+                                                                                    e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+                                                                                }
+                                                                            }}
                                                                         />
                                                                     )}
                                                                     <div className="flex-1 min-w-0">

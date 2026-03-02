@@ -17,6 +17,12 @@ export default function EditHomeSection(){
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(null)
 
+  const getImageSrc = (image) => {
+    if (typeof image === 'string' && image.trim()) return image
+    if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+    return 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+  }
+
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -161,7 +167,16 @@ export default function EditHomeSection(){
             <div className='grid grid-cols-2 md:grid-cols-4 gap-3 border rounded-lg p-3 max-h-96 overflow-auto'>
               {products.map(p=> (
                 <button type='button' key={p.id} onClick={()=>pick(p.id)} className={`text-left border-2 rounded-lg p-3 ${form.productIds.includes(p.id)?'border-blue-600 bg-blue-50':'border-gray-200'}`}>
-                  <img src={p.images[0]} alt={p.name} className='w-full aspect-square object-contain mb-2'/>
+                  <img
+                    src={getImageSrc(p.images?.[0] || p.image)}
+                    alt={p.name}
+                    className='w-full aspect-square object-contain mb-2'
+                    onError={(e) => {
+                      if (e.currentTarget.src !== 'https://ik.imagekit.io/jrstupuke/placeholder.png') {
+                        e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+                      }
+                    }}
+                  />
                   <div className='text-xs font-medium'>{p.name}</div>
                   <div className='text-xs text-gray-600'>₹ {p.price}</div>
                 </button>

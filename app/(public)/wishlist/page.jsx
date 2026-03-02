@@ -53,6 +53,12 @@ function WishlistAuthed() {
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const getImageSrc = (image) => {
+    if (typeof image === 'string' && image.trim()) return image;
+    if (image && typeof image === 'object') return image.url || image.src || PLACEHOLDER_IMAGE;
+    return PLACEHOLDER_IMAGE;
+  };
+
   /* ----------------------------------------------------
      Load wishlist
   ---------------------------------------------------- */
@@ -275,7 +281,7 @@ function WishlistAuthed() {
                   if (!product) return null;
 
                   const img =
-                    product.images?.[0] || PLACEHOLDER_IMAGE;
+                    getImageSrc(product.images?.[0] || product.image);
                   const isSelected = selected.includes(product._pid);
                   const discount = product.mrp ? Math.round(((product.mrp - product.price) / product.mrp) * 100) : 0;
 
@@ -317,6 +323,7 @@ function WishlistAuthed() {
                           alt={product.name}
                           width={300}
                           height={300}
+                          unoptimized
                           className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-300"
                         />
                       </div>

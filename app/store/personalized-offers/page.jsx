@@ -29,6 +29,12 @@ export default function PersonalizedOffersAdmin() {
     notes: ''
   });
 
+  const getImageSrc = (image) => {
+    if (typeof image === 'string' && image.trim()) return image
+    if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+    return 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+  }
+
   // Load data when user is authenticated
   useEffect(() => {
     if (user) {
@@ -498,9 +504,14 @@ export default function PersonalizedOffersAdmin() {
                   <div className="flex items-center gap-3 mb-2">
                     {offer.product?.images?.[0] && (
                       <img
-                        src={offer.product.images[0]}
+                        src={getImageSrc(offer.product.images[0])}
                         alt={offer.product.name}
                         className="w-16 h-16 object-cover rounded"
+                        onError={(e) => {
+                          if (e.currentTarget.src !== 'https://ik.imagekit.io/jrstupuke/placeholder.png') {
+                            e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+                          }
+                        }}
                       />
                     )}
                     <div>

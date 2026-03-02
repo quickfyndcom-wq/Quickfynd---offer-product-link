@@ -15,6 +15,12 @@ import { StarIcon, Search, Filter } from "lucide-react"
 export default function StoreReviews() {
     const { getToken, user } = useAuth()
 
+    const getImageSrc = (image) => {
+        if (typeof image === 'string' && image.trim()) return image
+        if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+        return 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+    }
+
     const [loading, setLoading] = useState(true)
     const [products, setProducts] = useState([])
     const [filteredProducts, setFilteredProducts] = useState([])
@@ -216,10 +222,11 @@ export default function StoreReviews() {
                                     {/* Product Image */}
                                     {product.images && product.images[0] && (
                                         <Image
-                                            src={product.images[0]}
+                                            src={getImageSrc(product.images[0])}
                                             alt={product.name}
                                             width={80}
                                             height={80}
+                                            unoptimized
                                             className="rounded-lg object-cover border"
                                         />
                                     )}
@@ -282,6 +289,7 @@ export default function StoreReviews() {
                                                 alt={rev.user.name ? rev.user.name : 'Customer avatar'}
                                                 width={40}
                                                 height={40}
+                                                unoptimized
                                                 className="rounded-full"
                                             />
                                         )}
@@ -308,10 +316,11 @@ export default function StoreReviews() {
                                                     {rev.images.map((img, idx) => (
                                                         <Image
                                                             key={idx}
-                                                            src={img}
+                                                            src={getImageSrc(img)}
                                                             alt="Review image"
                                                             width={80}
                                                             height={80}
+                                                            unoptimized
                                                             className="rounded object-cover"
                                                         />
                                                     ))}
@@ -363,10 +372,11 @@ export default function StoreReviews() {
                         <div className="flex items-start gap-4 mb-6 pb-4 border-b">
                             {selectedProduct?.images?.[0] && (
                                 <Image
-                                    src={selectedProduct.images[0]}
+                                    src={getImageSrc(selectedProduct.images[0])}
                                     alt={selectedProduct.name}
                                     width={80}
                                     height={80}
+                                    unoptimized
                                     className="rounded-lg object-cover border"
                                 />
                             )}

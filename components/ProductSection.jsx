@@ -15,6 +15,11 @@ export default function ProductSection({ title, products, viewAllLink }) {
                 <h2 className="text-xl font-bold text-gray-900">{title}</h2>
                 {viewAllLink && (
                     <button
+                    const getImageSrc = (image) => {
+                        if (typeof image === 'string' && image.trim()) return image;
+                        if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+                        return 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+                    };
                         onClick={() => router.push(viewAllLink)}
                         className="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium flex items-center gap-1"
                     >
@@ -36,7 +41,7 @@ export default function ProductSection({ title, products, viewAllLink }) {
                         {/* Product Image */}
                         <div className="relative aspect-square bg-white rounded-lg overflow-hidden mb-2 border border-gray-100">
                             <Image
-                                src={product.images[0]}
+                                src={getImageSrc(product.images?.[0] || product.image)}
                                 alt={product.name}
                                 fill
                                 unoptimized
@@ -45,10 +50,11 @@ export default function ProductSection({ title, products, viewAllLink }) {
                         </div>
                         {/* Product Info */}
                         <div className="space-y-1">
-                            <h3 className="text-sm font-medium text-gray-900 line-clamp-2 group-hover:text-orange-600 transition">
-                                {product.name}
+                                            <Image
+                                                src={getImageSrc(product.images?.[0] || product.image)}
                             </h3>
                                                         {/* Show price row only if at least one price is > 0 */}
+                                                unoptimized
                                                         {(Number(product.price) > 0 || Number(product.mrp) > 0) && (
                                                             <div className="flex items-center gap-2">
                                                                 {/* Show sale price if > 0 */}

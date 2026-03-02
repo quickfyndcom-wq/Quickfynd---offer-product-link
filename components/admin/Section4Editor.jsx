@@ -20,6 +20,12 @@ export default function Section4Editor({ section, onSave, onClose }) {
   const [showProductPicker, setShowProductPicker] = useState(false)
   const [loading, setLoading] = useState(false)
 
+  const getImageSrc = (image) => {
+    if (typeof image === 'string' && image.trim()) return image
+    if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+    return 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+  }
+
   useEffect(() => {
     fetchCategories()
     fetchProducts()
@@ -239,7 +245,7 @@ export default function Section4Editor({ section, onSave, onClose }) {
                       <div className="relative w-20 h-20 bg-gray-100 rounded flex-shrink-0">
                         {product.image && (
                           <Image
-                            src={product.image}
+                            src={getImageSrc(product.image)}
                             alt={product.name}
                             fill
                             unoptimized
@@ -332,7 +338,7 @@ export default function Section4Editor({ section, onSave, onClose }) {
                           <div className="relative aspect-square bg-gray-100 rounded mb-2">
                             {product.images?.[0] && (
                               <Image
-                                src={product.images[0]}
+                                src={getImageSrc(product.images[0])}
                                 alt={product.name}
                                 fill
                                 unoptimized

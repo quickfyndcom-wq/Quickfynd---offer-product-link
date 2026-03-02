@@ -30,6 +30,12 @@ export default function StoreManageProducts() {
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedCategory, setSelectedCategory] = useState('') // Category filter
 
+    const getImageSrc = (image) => {
+        if (typeof image === 'string' && image.trim()) return image
+        if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+        return 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+    }
+
     const fetchStoreProducts = async () => {
         try {
              const token = await getToken()
@@ -256,7 +262,7 @@ export default function StoreManageProducts() {
                         <tr key={product._id} className="border-t border-gray-200 hover:bg-gray-50">
                             <td className="px-4 py-3">
                                 <div className="flex gap-2 items-center">
-                                    <Image width={40} height={40} className='p-1 shadow rounded cursor-pointer' src={product.images[0]} alt="" />
+                                    <Image width={40} height={40} unoptimized className='p-1 shadow rounded cursor-pointer' src={getImageSrc(product.images?.[0] || product.image)} alt="" />
                                     {product.name}
                                 </div>
                             </td>

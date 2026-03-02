@@ -13,6 +13,12 @@ function TrackOrderPageInner() {
   const [notFound, setNotFound] = useState(false)
   const [forceDelhivery, setForceDelhivery] = useState(false)
 
+  const getImageSrc = (image) => {
+    if (typeof image === 'string' && image.trim()) return image
+    if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+    return 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+  }
+
   useEffect(() => {
     const orderId = searchParams.get("orderId");
     if (orderId) {
@@ -332,7 +338,16 @@ function TrackOrderPageInner() {
                       <div key={idx} className="flex items-start gap-4 pb-4 border-b border-slate-100 last:border-0">
                         <div className="w-20 h-20 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0">
                           {product.images?.[0] ? (
-                            <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
+                            <img
+                              src={getImageSrc(product.images[0])}
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                if (e.currentTarget.src !== 'https://ik.imagekit.io/jrstupuke/placeholder.png') {
+                                  e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+                                }
+                              }}
+                            />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">No image</div>
                           )}

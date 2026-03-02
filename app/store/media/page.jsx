@@ -22,6 +22,12 @@ export default function StoreMediaPage() {
   const [filterCategory, setFilterCategory] = useState('')
   const [categories, setCategories] = useState([])
 
+  const getImageSrc = (image) => {
+    if (typeof image === 'string' && image.trim()) return image
+    if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+    return 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+  }
+
   // Fetch products
   const fetchProducts = async () => {
     try {
@@ -162,9 +168,10 @@ export default function StoreMediaPage() {
               <div className="relative w-full h-48 bg-slate-100 overflow-hidden">
                 {product.images && product.images.length > 0 ? (
                   <Image
-                    src={product.images[0]}
+                    src={getImageSrc(product.images[0])}
                     alt={product.name}
                     fill
+                    unoptimized
                     className="object-cover group-hover:scale-110 transition-transform duration-300"
                   />
                 ) : (

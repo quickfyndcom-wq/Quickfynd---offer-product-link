@@ -17,6 +17,12 @@ export default function HomePreferences() {
     const [searchQuery, setSearchQuery] = useState('')
     const [sortBy, setSortBy] = useState('name')
 
+    const getImageSrc = (image) => {
+        if (typeof image === 'string' && image.trim()) return image
+        if (image && typeof image === 'object') return image.url || image.src || 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+        return 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+    }
+
     // Design settings state
     const [designSettings, setDesignSettings] = useState({
         categorySliders: { enabled: true, title: "Featured Collections", description: "Browse our curated collections" },
@@ -261,7 +267,7 @@ export default function HomePreferences() {
                         ) : (
                             filteredProducts.map(product => {
                                 const isSelected = selectedProducts.includes(product._id)
-                                const primaryImage = product.images?.[0] || 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+                                const primaryImage = getImageSrc(product.images?.[0] || product.image)
 
                                 return (
                                     <div
@@ -293,6 +299,7 @@ export default function HomePreferences() {
                                                         alt={product.name}
                                                         width={200}
                                                         height={200}
+                                                        unoptimized
                                                         className="w-full h-full object-cover"
                                                         onError={(e) => { e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png' }}
                                                     />

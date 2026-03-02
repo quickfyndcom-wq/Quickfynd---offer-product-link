@@ -12,7 +12,13 @@ export default function ProductImageViewer({ product, onClose }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [isDownloading, setIsDownloading] = useState(false)
 
-  const images = product.images || []
+  const getImageSrc = (image) => {
+    if (typeof image === 'string' && image.trim()) return image
+    if (image && typeof image === 'object') return image.url || image.src || null
+    return null
+  }
+
+  const images = (product.images || []).map(getImageSrc).filter(Boolean)
 
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))
@@ -174,6 +180,7 @@ export default function ProductImageViewer({ product, onClose }) {
                     src={images[currentImageIndex]}
                     alt={`${product.name} - Image ${currentImageIndex + 1}`}
                     fill
+                    unoptimized
                     className="object-contain"
                   />
                 </div>
@@ -245,6 +252,7 @@ export default function ProductImageViewer({ product, onClose }) {
                           src={image}
                           alt={`Thumbnail ${index + 1}`}
                           fill
+                          unoptimized
                           className="object-cover"
                         />
                         <div className="absolute inset-0 hover:bg-black hover:bg-opacity-10 transition-colors" />
