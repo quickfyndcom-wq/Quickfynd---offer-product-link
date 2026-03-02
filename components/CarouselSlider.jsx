@@ -273,7 +273,12 @@ export default function CarouselSlider() {
               ))
             ) : products.length > 0 ? (
               products.map((product) => {
-                const imageSrc = product.images?.[0]?.url || product.images?.[0] || "/placeholder.png";
+                const rawImage = product.images?.[0];
+                const imageSrc =
+                  (typeof rawImage === 'string' && rawImage) ||
+                  (rawImage && typeof rawImage === 'object' && (rawImage.url || rawImage.src)) ||
+                  product.image ||
+                  'https://ik.imagekit.io/jrstupuke/placeholder.png';
                 return (
                   <Link
                     key={product.slug || product.id || product.name}
@@ -348,6 +353,7 @@ export default function CarouselSlider() {
                         alt={product.name}
                         width={180}
                         height={180}
+                        unoptimized
                         style={{ 
                           objectFit: 'contain', 
                           maxHeight: '100%', 
@@ -355,6 +361,11 @@ export default function CarouselSlider() {
                           pointerEvents: 'none', 
                           userSelect: 'none',
                           padding: '8px',
+                        }}
+                        onError={(e) => {
+                          if (e.currentTarget.src !== 'https://ik.imagekit.io/jrstupuke/placeholder.png') {
+                            e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+                          }
                         }}
                         draggable={false}
                       />
