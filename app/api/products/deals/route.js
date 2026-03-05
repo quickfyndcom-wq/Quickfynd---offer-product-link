@@ -5,6 +5,15 @@ import Category from "@/models/Category";
 import { NextResponse } from "next/server";
 import { getCachedData, setCachedData, generateCacheKey } from "@/lib/cache";
 
+const resolveImageUrl = (image) => {
+    if (typeof image === 'string' && image.trim()) return image;
+    if (image && typeof image === 'object') {
+        const resolved = image.url || image.src;
+        if (typeof resolved === 'string' && resolved.trim()) return resolved;
+    }
+    return 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+};
+
 export async function GET(request) {
     try {
         await dbConnect();
@@ -147,9 +156,14 @@ export async function GET(request) {
 
                 // Calculate savings
                 const savings = product.mrp - product.price;
+                const normalizedImages = Array.isArray(product.images)
+                    ? product.images.map(resolveImageUrl).filter(Boolean)
+                    : [];
 
                 return {
                     ...product,
+                    images: normalizedImages,
+                    image: normalizedImages[0] || resolveImageUrl(null),
                     discount,
                     savings,
                     label,
@@ -160,9 +174,14 @@ export async function GET(request) {
             } catch (err) {
                 console.error('Error enriching deal product:', err);
                 const discount = product.discount || 0;
+                const normalizedImages = Array.isArray(product.images)
+                    ? product.images.map(resolveImageUrl).filter(Boolean)
+                    : [];
                 
                 return {
                     ...product,
+                    images: normalizedImages,
+                    image: normalizedImages[0] || resolveImageUrl(null),
                     discount,
                     savings: product.mrp - product.price,
                     label: `${discount}% OFF`,

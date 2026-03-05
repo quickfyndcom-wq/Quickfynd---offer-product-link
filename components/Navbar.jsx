@@ -1268,16 +1268,14 @@ const Navbar = () => {
                     onClick={() => setSearchFocused(false)}
                   >
                     <div className="relative h-8 w-8 overflow-hidden rounded-md bg-gray-100">
-                      {product.image || product.images?.[0] ? (
-                        <Image
-                          src={product.image || product.images?.[0]}
-                          alt={product.name || 'Product'}
-                          fill
-                          unoptimized
-                          sizes="32px"
-                          className="object-cover"
-                        />
-                      ) : null}
+                      <Image
+                        src={getProductImageSrc(product)}
+                        alt={product.name || 'Product'}
+                        fill
+                        unoptimized
+                        sizes="32px"
+                        className="object-cover"
+                      />
                     </div>
                     <div className="min-w-0">
                       <span className="font-medium block truncate">{product.name}</span>

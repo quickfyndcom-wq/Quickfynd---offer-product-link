@@ -6,6 +6,15 @@ import authSeller from "@/middlewares/authSeller";
 import { getAuth } from "@/lib/firebase-admin";
 import crypto from "crypto";
 
+const resolveImageUrl = (image) => {
+  if (typeof image === 'string' && image.trim()) return image;
+  if (image && typeof image === 'object') {
+    const resolved = image.url || image.src;
+    if (typeof resolved === 'string' && resolved.trim()) return resolved;
+  }
+  return 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+};
+
 // Generate unique offer token
 function generateOfferToken() {
   return crypto.randomBytes(16).toString('hex');
@@ -59,7 +68,12 @@ export async function GET(req) {
         
         return {
           ...offer,
-          product: product || null,
+          product: product
+            ? {
+                ...product,
+                image: resolveImageUrl(product.images?.[0])
+              }
+            : null,
           isExpired: new Date() > new Date(offer.expiresAt),
           isValid: offer.isActive && !offer.isUsed && new Date() < new Date(offer.expiresAt)
         };
@@ -182,7 +196,7 @@ export async function POST(req) {
           slug: product.slug,
           price: product.price,
           mrp: product.mrp,
-          image: product.images?.[0]
+          image: resolveImageUrl(product.images?.[0])
         },
         discountedPrice,
         offerUrl

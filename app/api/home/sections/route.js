@@ -3,6 +3,15 @@ import HomeSection from "@/models/HomeSection";
 import Product from "@/models/Product";
 import { NextResponse } from "next/server";
 
+const resolveImageUrl = (image) => {
+  if (typeof image === 'string' && image.trim()) return image;
+  if (image && typeof image === 'object') {
+    const resolved = image.url || image.src;
+    if (typeof resolved === 'string' && resolved.trim()) return resolved;
+  }
+  return 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+};
+
 // GET /api/home/sections
 // Returns active homepage selections with product details and optional slides
 export async function GET() {
@@ -30,7 +39,7 @@ export async function GET() {
             .map((p) => ({
               ...p,
               id: p._id.toString(),
-              image: p.images?.[0] || null,
+              image: resolveImageUrl(p.images?.[0]),
               offLabel:
                 p.mrp && p.mrp > p.price
                   ? `Min. ${Math.max(0, Math.round(((p.mrp - p.price) / p.mrp) * 100))}% Off`

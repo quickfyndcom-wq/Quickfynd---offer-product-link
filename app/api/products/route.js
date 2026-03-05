@@ -5,6 +5,15 @@ import Category from "@/models/Category";
 import { NextResponse } from "next/server";
 import { getCachedData, setCachedData, generateCacheKey } from "@/lib/cache";
 
+const resolveImageUrl = (image) => {
+    if (typeof image === 'string' && image.trim()) return image;
+    if (image && typeof image === 'object') {
+        const resolved = image.url || image.src;
+        if (typeof resolved === 'string' && resolved.trim()) return resolved;
+    }
+    return 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+};
+
 export async function POST(request) {
     try {
         await dbConnect();
@@ -138,16 +147,24 @@ export async function GET(request){
         }
 
         // Normalize category/categories and calculate discount
-        products = products.map(p => ({
-            ...p,
-            category: p.category?.name || p.category || null,
-            categories: Array.isArray(p.categories) 
-                ? p.categories.map(cat => cat?.name || cat)
-                : [],
-            discount: (p.mrp && p.price && p.mrp > p.price) 
-                ? Math.round(((p.mrp - p.price) / p.mrp) * 100)
-                : null
-        }));
+        products = products.map(p => {
+            const normalizedImages = Array.isArray(p.images)
+                ? p.images.map(resolveImageUrl).filter(Boolean)
+                : [];
+
+            return {
+                ...p,
+                images: normalizedImages,
+                image: normalizedImages[0] || resolveImageUrl(null),
+                category: p.category?.name || p.category || null,
+                categories: Array.isArray(p.categories)
+                    ? p.categories.map(cat => cat?.name || cat)
+                    : [],
+                discount: (p.mrp && p.price && p.mrp > p.price)
+                    ? Math.round(((p.mrp - p.price) / p.mrp) * 100)
+                    : null
+            };
+        });
 
         // FIX N+1: Batch fetch all ratings in ONE query
         const ratingsMap = {};

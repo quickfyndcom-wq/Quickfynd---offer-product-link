@@ -64,6 +64,14 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
     if (!regular || !current || regular <= current) return null
     return Math.round(((regular - current) / regular) * 100)
   }
+  const getImageSrc = (image) => {
+    if (typeof image === 'string' && image.trim()) return image
+    if (image && typeof image === 'object') {
+      const resolved = image.url || image.src
+      if (typeof resolved === 'string' && resolved.trim()) return resolved
+    }
+    return 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+  }
   const isFastDelivery = (product) => Boolean(product.fastDelivery || product.isFastDelivery || product.deliveryFast || product.express)
   const isOutOfStockProduct = (product) => {
     if (!product) return true
@@ -266,10 +274,10 @@ const HorizontalSlider = ({ section, router, allProducts }) => {
               >
                 {/* Product Image */}
                 <div className="relative w-full h-56 sm:h-64 bg-gray-50 overflow-hidden">
-                  {product.image || product.images?.[0] ? (
+                  {getImageSrc(product.image || product.images?.[0]) ? (
                     <>
                       <Image
-                        src={product.image || product.images?.[0]}
+                        src={getImageSrc(product.image || product.images?.[0])}
                         alt={product.name}
                         fill
                         unoptimized

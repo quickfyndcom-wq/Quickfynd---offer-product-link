@@ -4,6 +4,15 @@ import Product from "@/models/Product";
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 
+const resolveImageUrl = (image) => {
+  if (typeof image === 'string' && image.trim()) return image;
+  if (image && typeof image === 'object') {
+    const resolved = image.url || image.src;
+    if (typeof resolved === 'string' && resolved.trim()) return resolved;
+  }
+  return 'https://ik.imagekit.io/jrstupuke/placeholder.png';
+};
+
 // GET: Aggregate approved ratings and return top-rated products in one call
 export async function GET(request) {
   try {
@@ -91,7 +100,18 @@ export async function GET(request) {
       },
     ];
 
-    const products = await Rating.aggregate(pipeline).exec();
+    const rawProducts = await Rating.aggregate(pipeline).exec();
+    const products = rawProducts.map((product) => {
+      const normalizedImages = Array.isArray(product.images)
+        ? product.images.map(resolveImageUrl).filter(Boolean)
+        : [];
+
+      return {
+        ...product,
+        images: normalizedImages,
+        image: normalizedImages[0] || resolveImageUrl(null),
+      };
+    });
 
     return NextResponse.json(
       { products },

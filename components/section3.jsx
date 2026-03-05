@@ -9,6 +9,15 @@ export default function TopDeals() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const getImageSrc = (image) => {
+    if (typeof image === "string" && image.trim()) return image;
+    if (image && typeof image === "object") {
+      const resolved = image.url || image.src;
+      if (typeof resolved === "string" && resolved.trim()) return resolved;
+    }
+    return "https://ik.imagekit.io/jrstupuke/placeholder.png";
+  };
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -89,10 +98,7 @@ let result = allProducts;
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 md:gap-6">
               {products?.slice(0, 10).map((item, i) => {
-                const img =
-                  item.images?.[0] && item.images[0] !== ""
-                    ? item.images[0]
-                    : "https://ik.imagekit.io/jrstupuke/placeholder.png";
+                const img = getImageSrc(item.images?.[0] || item.image);
 
                 return (
                   <a
