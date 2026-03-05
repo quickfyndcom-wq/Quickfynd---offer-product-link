@@ -1,6 +1,7 @@
 import dbConnect from "@/lib/mongodb";
 import Product from "@/models/Product";
 import authSeller from "@/middlewares/authSeller";
+import { NextResponse } from "next/server";
 
 export async function POST(request) {
   try {
@@ -18,41 +19,46 @@ export async function POST(request) {
         const decodedToken = await getAuth().verifyIdToken(idToken);
         userId = decodedToken.uid;
       } catch (e) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
     }
-    if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const storeId = await authSeller(userId);
-    if (!storeId) return Response.json({ error: "Not authorized as seller" }, { status: 401 });
+    if (!storeId) return NextResponse.json({ error: "Not authorized as seller" }, { status: 401 });
 
     const { productId } = await request.json();
     if (!productId) {
-      return Response.json({ error: "Product ID is required" }, { status: 400 });
+      return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
     }
 
     await dbConnect();
 
-    const product = await Product.findById(productId).lean();
+    const product = await Product.findById(productId)
+      .select('_id storeId fastDelivery')
+      .lean();
+
     if (!product) {
-      return Response.json({ error: "Product not found" }, { status: 404 });
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
     // Verify the product belongs to the seller's store
-    if (product.storeId !== storeId) {
-      return Response.json({ error: "Unauthorized to modify this product" }, { status: 403 });
+    if (String(product.storeId) !== String(storeId)) {
+      return NextResponse.json({ error: "Unauthorized to modify this product" }, { status: 403 });
     }
 
-    // Toggle fast delivery
-    product.fastDelivery = !product.fastDelivery;
-    await product.save();
+    const nextFastDelivery = !Boolean(product.fastDelivery);
 
-    return Response.json({ 
-      message: product.fastDelivery ? "Fast delivery enabled" : "Fast delivery disabled",
-      fastDelivery: product.fastDelivery 
+    await Product.findByIdAndUpdate(productId, {
+      fastDelivery: nextFastDelivery,
+    });
+
+    return NextResponse.json({ 
+      message: nextFastDelivery ? "Fast delivery enabled" : "Fast delivery disabled",
+      fastDelivery: nextFastDelivery 
     });
   } catch (error) {
     console.error("Error toggling fast delivery:", error);
-    return Response.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
