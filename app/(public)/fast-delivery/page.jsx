@@ -19,7 +19,7 @@ export default function FastDeliveryPage() {
   const fetchFastDeliveryProducts = async () => {
     try {
       setLoading(true);
-      const { data } = await axios.get('/api/products?fastDelivery=true');
+      const { data } = await axios.get('/api/products?fastDelivery=true&limit=300');
       setProducts(data.products || []);
     } catch (error) {
       console.error('Error fetching fast delivery products:', error);

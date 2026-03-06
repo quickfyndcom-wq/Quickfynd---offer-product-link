@@ -9,6 +9,26 @@ const SLIDE_INTERVAL = 5000;
 
 const defaultSlides = [];
 
+const getFullQualityHeroImage = (rawUrl) => {
+  const url = String(rawUrl || '').trim();
+  if (!url) return url;
+
+  if (!url.includes('ik.imagekit.io')) return url;
+
+  let cleaned = url;
+
+  if (cleaned.includes('/tr:')) {
+    cleaned = cleaned.replace(/\/tr:[^/]+\//, '/');
+  }
+
+  if (cleaned.includes('?tr=')) {
+    cleaned = cleaned.replace(/\?tr=[^&]*/i, '').replace(/^([^?]+)&/, '$1?');
+    if (cleaned.endsWith('?')) cleaned = cleaned.slice(0, -1);
+  }
+
+  return cleaned;
+};
+
 export default function HeroBannerSlider() {
   const [slides, setSlides] = useState(defaultSlides);
   const [index, setIndex] = useState(0);
@@ -45,7 +65,7 @@ export default function HeroBannerSlider() {
           ? data.slides
               .filter((slide) => slide?.image)
               .map((slide) => ({
-                image: slide.image,
+                image: getFullQualityHeroImage(slide.image),
                 link: slide.link || '/offers',
                 bg: slide.bg || '#7A0A11',
               }))
@@ -174,7 +194,6 @@ export default function HeroBannerSlider() {
                 unoptimized
                 priority={i === 0}
                 loading={i === 0 ? 'eager' : 'lazy'}
-                quality={75}
                 placeholder="empty"
                 style={{
                   width: '100%',

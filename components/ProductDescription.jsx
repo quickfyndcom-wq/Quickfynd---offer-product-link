@@ -376,12 +376,14 @@ const ProductDescription = ({ product, reviews = [], loadingReviews = false, onR
                         >
                             ×
                         </button>
-                        <Image
-                            src={lightboxImage}
+                        <img
+                            src={resolveImageUrl(lightboxImage)}
                             alt="Review image full size"
-                            width={800}
-                            height={800}
                             className="rounded-lg max-h-[85vh] w-auto object-contain"
+                            onClick={(e) => e.stopPropagation()}
+                            onError={(e) => {
+                                e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png'
+                            }}
                         />
                     </div>
                 </div>

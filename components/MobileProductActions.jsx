@@ -18,15 +18,32 @@ export default function MobileProductActions({
         <button
           onClick={onOrderNow}
           disabled={isOutOfStock || isOrdering}
-          className={`flex-1 flex items-center justify-center gap-2 h-12 rounded-lg font-bold text-white transition-all shadow-md ${
+          className={`flex-1 flex items-center justify-center gap-2 h-12 rounded-xl font-semibold text-white transition-all shadow-md border ${
             (isOutOfStock || isOrdering)
-              ? 'bg-gray-400 cursor-not-allowed opacity-70' 
-              : 'bg-red-500 active:bg-red-600'
+              ? 'bg-gray-400 border-gray-400 cursor-not-allowed opacity-70' 
+              : 'bg-gradient-to-r from-rose-500 to-red-500 border-red-500 active:from-rose-600 active:to-red-600'
           }`}
         >
-          <span className="text-base">{isOutOfStock ? 'Out of Stock' : isOrdering ? 'Processing...' : 'Order Now'}</span>
-          {!isOutOfStock && !isOrdering && <Plus size={20} strokeWidth={3} />}
-          {isOrdering && <span className="w-4 h-4 border-2 border-white/70 border-t-white rounded-full animate-spin" />}
+          {isOutOfStock ? (
+            <span className="text-base tracking-wide">Out of Stock</span>
+          ) : isOrdering ? (
+            <span className="relative w-full h-full flex items-center justify-center py-0.5">
+              <span className="relative flex items-center gap-2 text-white">
+                <ShoppingCart size={18} strokeWidth={2.5} className="animate-pulse" />
+                <span className="text-sm font-semibold tracking-wide">Placing</span>
+                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
+                </span>
+              </span>
+            </span>
+          ) : (
+            <>
+              <span className="text-base tracking-wide">Order Now</span>
+              <Plus size={20} strokeWidth={3} />
+            </>
+          )}
         </button>
 
         {/* Add to Cart Button - Hidden when out of stock */}

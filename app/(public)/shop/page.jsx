@@ -2,24 +2,21 @@
 import { Suspense, useMemo, useState, useCallback, useEffect, useRef } from "react";
 import ProductCard from "@/components/ProductCard"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useDispatch, useSelector } from "react-redux"
-import { fetchProducts } from "@/lib/features/product/productSlice"
 import { useAuth } from '@/lib/useAuth'
 import axios from 'axios'
 import { SlidersHorizontal, X } from 'lucide-react'
 
 function ShopContent() {
-    const dispatch = useDispatch();
     const searchParams = useSearchParams();
     const search = searchParams.get('search');
     const categoryParam = searchParams.get('category');
     const router = useRouter();
-    const products = useSelector(state => state.product.list);
-    const loading = useSelector(state => state.product.loading);
     const [mounted, setMounted] = useState(false);
     const fetchedRef = useRef({ category: null, general: false });
     const [categoryProducts, setCategoryProducts] = useState([]);
+    const [allProducts, setAllProducts] = useState([]);
     const [categoryLoading, setCategoryLoading] = useState(false);
+    const [allProductsLoading, setAllProductsLoading] = useState(false);
     const [sortBy, setSortBy] = useState('newest');
     const [priceFilter, setPriceFilter] = useState('all');
     const [minPrice, setMinPrice] = useState('');
@@ -41,6 +38,39 @@ function ShopContent() {
 
     useEffect(() => {
         setMounted(true);
+    }, []);
+
+    const fetchAllProducts = useCallback(async ({ category }) => {
+        const batchSize = 300;
+        let offset = 0;
+        let hasMore = true;
+        const merged = [];
+
+        while (hasMore) {
+            const params = new URLSearchParams({
+                limit: String(batchSize),
+                offset: String(offset),
+                includeOutOfStock: 'true',
+            });
+
+            if (category) {
+                params.set('category', category);
+            }
+
+            const res = await fetch(`/api/products?${params.toString()}`);
+            const data = await res.json();
+            const batch = Array.isArray(data?.products) ? data.products : [];
+
+            merged.push(...batch);
+
+            if (batch.length < batchSize) {
+                hasMore = false;
+            } else {
+                offset += batchSize;
+            }
+        }
+
+        return merged;
     }, []);
 
     // Save search to history (DB for logged in users, localStorage for guests)
@@ -82,40 +112,45 @@ function ShopContent() {
     }, [search, user, getToken]);
 
     useEffect(() => {
-        // Fetch category products directly to avoid global list overrides
         let isActive = true;
 
-        if (categoryParam) {
-            setCategoryLoading(true);
-            fetch(`/api/products?category=${encodeURIComponent(categoryParam)}&limit=300&includeOutOfStock=true`)
-                .then((res) => res.json())
-                .then((data) => {
+        const run = async () => {
+            if (categoryParam) {
+                setCategoryLoading(true);
+                try {
+                    const items = await fetchAllProducts({ category: categoryParam });
                     if (!isActive) return;
-                    setCategoryProducts(Array.isArray(data.products) ? data.products : []);
-                })
-                .catch(() => {
+                    setCategoryProducts(items);
+                } catch {
                     if (!isActive) return;
                     setCategoryProducts([]);
-                })
-                .finally(() => {
+                } finally {
                     if (!isActive) return;
                     setCategoryLoading(false);
-                });
-            return () => {
-                isActive = false;
-            };
-        }
+                }
+                return;
+            }
 
-        // Fallback: ensure general list is available when no category filter
-        if (!categoryParam && !fetchedRef.current.general && !loading) {
-            fetchedRef.current.general = true;
-            dispatch(fetchProducts({ limit: 300, includeOutOfStock: true }));
-        }
+            setAllProductsLoading(true);
+            try {
+                const items = await fetchAllProducts({ category: null });
+                if (!isActive) return;
+                setAllProducts(items);
+            } catch {
+                if (!isActive) return;
+                setAllProducts([]);
+            } finally {
+                if (!isActive) return;
+                setAllProductsLoading(false);
+            }
+        };
+
+        run();
 
         return () => {
             isActive = false;
         };
-    }, [dispatch, categoryParam, loading]);
+    }, [categoryParam, fetchAllProducts]);
 
     const normalizeText = useCallback((value) => {
         if (value === null || value === undefined) return '';
@@ -172,7 +207,7 @@ function ShopContent() {
         return hasBadge || hasTag;
     }, []);
 
-    const sourceProducts = categoryParam ? categoryProducts : products;
+    const sourceProducts = categoryParam ? categoryProducts : allProducts;
 
     // Filter by search
     const filteredProducts = useMemo(() => {
@@ -367,7 +402,7 @@ function ShopContent() {
                 </div>
 
                 {/* Products Grid - Full Width (No Sidebar) */}
-                {!mounted || (categoryParam ? categoryLoading : loading) ? (
+                {!mounted || (categoryParam ? categoryLoading : allProductsLoading) ? (
                     <div className="text-center py-16 bg-white rounded-lg border border-gray-200">
                         <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500 mb-4"></div>
                         <p className="text-gray-500 text-lg">Loading products...</p>

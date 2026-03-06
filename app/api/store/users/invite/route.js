@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import connectDB from '@/lib/mongodb';
 import Store from '@/models/Store';
 import StoreUser from '@/models/StoreUser';
+import authSeller from '@/middlewares/authSeller';
 import { getAuth } from '@/lib/firebase-admin';
 import { randomBytes } from "crypto";
 import { Resend } from 'resend';
@@ -26,13 +27,16 @@ export async function POST(request) {
     const { email } = await request.json();
     if (!email) return NextResponse.json({ error: 'Missing email' }, { status: 400 });
 
-    // Find the store owned/admin by this user
-    const store = await Store.findOne({ userId }).lean();
+    // Resolve store access for owner or team member
+    const storeId = await authSeller(userId);
+    if (!storeId) return NextResponse.json({ error: 'Store not found' }, { status: 404 });
+
+    const store = await Store.findById(storeId).lean();
     if (!store) return NextResponse.json({ error: 'Store not found' }, { status: 404 });
 
     // Check if already invited or member
     const existing = await StoreUser.findOne({ 
-      storeId: store._id.toString(), 
+      storeId: storeId.toString(), 
       email 
     }).lean();
     if (existing && ["invited", "pending", "approved"].includes(existing.status)) {
@@ -45,7 +49,7 @@ export async function POST(request) {
 
     // Create invite in DB
     await StoreUser.create({
-      storeId: store._id.toString(),
+      storeId: storeId.toString(),
       email,
       role: 'member',
       status: 'invited',

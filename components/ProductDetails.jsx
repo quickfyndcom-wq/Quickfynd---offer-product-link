@@ -1,6 +1,6 @@
 'use client'
 
-import { StarIcon, Share2Icon, HeartIcon, MinusIcon, PlusIcon, ShoppingCartIcon } from "lucide-react";
+import { StarIcon, Share2Icon, HeartIcon, MinusIcon, PlusIcon, ShoppingCartIcon, ZoomInIcon, X } from "lucide-react";
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 
@@ -31,11 +31,23 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
   const [showOfferPopup, setShowOfferPopup] = useState(false);
   const [expandedOfferIndex, setExpandedOfferIndex] = useState(null);
   const [showSecurityInfo, setShowSecurityInfo] = useState(false);
+  const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
+  const [quickViewZoom, setQuickViewZoom] = useState(1);
   const { isSignedIn, userId } = useAuth();
   const router = useRouter();
   const dispatch = useDispatch();
   const cartCount = useSelector((state) => state.cart.total);
   const cartItems = useSelector((state) => state.cart.cartItems);
+
+  const openQuickView = () => {
+    setQuickViewZoom(1);
+    setIsQuickViewOpen(true);
+  };
+
+  const closeQuickView = () => {
+    setIsQuickViewOpen(false);
+    setQuickViewZoom(1);
+  };
 
   // FBT (Frequently Bought Together) state
   const [fbtProducts, setFbtProducts] = useState([]);
@@ -131,16 +143,15 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
   // Variants support
   const variants = Array.isArray(product.variants) ? product.variants : [];
   const bulkVariants = variants.filter(v => v?.options && (v.options.bundleQty || v.options.bundleQty === 0));
+  const sortedBulkVariants = bulkVariants.slice().sort((a, b) => Number(a.options.bundleQty) - Number(b.options.bundleQty));
   const variantColors = [...new Set(variants.map(v => v.options?.color).filter(Boolean))];
   const variantSizes = [...new Set(variants.map(v => v.options?.size).filter(Boolean))];
   const [selectedColor, setSelectedColor] = useState(variantColors[0] || product.colors?.[0] || null);
   const [selectedSize, setSelectedSize] = useState(variantSizes[0] || product.sizes?.[0] || null);
-  const [selectedBundleQty, setSelectedBundleQty] = useState(
-    bulkVariants.length ? Number(bulkVariants[0].options.bundleQty) : null
-  );
+  const [selectedBundleIndex, setSelectedBundleIndex] = useState(sortedBulkVariants.length ? 0 : null);
 
   const selectedVariant = (bulkVariants.length
-    ? bulkVariants.find(v => Number(v.options?.bundleQty) === Number(selectedBundleQty))
+    ? (selectedBundleIndex !== null ? (sortedBulkVariants[selectedBundleIndex] || sortedBulkVariants[0] || null) : null)
     : variants.find(v => {
         const cOk = v.options?.color ? v.options.color === selectedColor : true;
         const sOk = v.options?.size ? v.options.size === selectedSize : true;
@@ -186,6 +197,11 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
     : product.inStock === false || !hasBaseStock;
   const discountPercent = effMrp > effPrice
     ? Math.round(((effMrp - effPrice) / effMrp) * 100)
+    : 0;
+  const displayPrice = (Number(effPrice) || 0) * Math.max(1, Number(quantity) || 1);
+  const displayMrp = (Number(effMrp) || 0) * Math.max(1, Number(quantity) || 1);
+  const displayDiscountPercent = displayMrp > displayPrice
+    ? Math.round(((displayMrp - displayPrice) / displayMrp) * 100)
     : 0;
 
   const paymentOffers = [
@@ -514,7 +530,7 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
           variantOptions: {
             color: selectedColor || null,
             size: selectedSize || null,
-            bundleQty: selectedBundleQty || null
+            bundleQty: selectedVariant?.options?.bundleQty ?? null
           }
         };
         
@@ -551,7 +567,7 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
         variantOptions: {
           color: selectedColor || null,
           size: selectedSize || null,
-          bundleQty: selectedBundleQty || null
+          bundleQty: selectedVariant?.options?.bundleQty ?? null
         }
       };
       
@@ -713,7 +729,10 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
                   {/* Wishlist - Top Right */}
                   <div className="absolute top-4 right-4 z-10">
                     <button
-                      onClick={handleWishlist}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleWishlist();
+                      }}
                       disabled={wishlistLoading}
                       className="w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center hover:border-gray-300 transition"
                     >
@@ -726,7 +745,21 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
                     </button>
                   </div>
 
-                  <div className="overflow-hidden w-full h-full relative">
+                  <div className="absolute bottom-4 left-4 z-10">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openQuickView();
+                      }}
+                      className="h-9 px-3 rounded-full bg-white/95 border border-gray-200 text-gray-700 text-sm font-medium shadow-sm hover:bg-white transition inline-flex items-center gap-1.5"
+                    >
+                      <ZoomInIcon size={25} />
+                      
+                    </button>
+                  </div>
+
+                  <div className="overflow-hidden w-full h-full relative cursor-zoom-in" onClick={openQuickView}>
                     <Image
                       src={mainImage || 'https://ik.imagekit.io/jrstupuke/placeholder.png'}
                       alt={product.name}
@@ -760,7 +793,10 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
                 {/* Wishlist - Top Right */}
                 <div className="absolute top-4 right-4 z-10">
                   <button
-                    onClick={handleWishlist}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleWishlist();
+                    }}
                     disabled={wishlistLoading}
                     className="w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center hover:border-gray-300 transition"
                   >
@@ -773,15 +809,31 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
                   </button>
                 </div>
 
-                <Image
-                  src={mainImage || 'https://ik.imagekit.io/jrstupuke/placeholder.png'}
-                  alt={product.name}
-                  fill
-                  unoptimized
-                  className="object-cover"
-                  priority
-                  onError={(e) => { e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png'; }}
-                />
+                <div className="absolute bottom-4 left-4 z-10">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openQuickView();
+                    }}
+                    className="h-9 px-3 rounded-full bg-white/95 border border-gray-200 text-gray-700 text-sm font-medium shadow-sm hover:bg-white transition inline-flex items-center gap-1.5"
+                  >
+                    <ZoomInIcon size={25} />
+                    
+                  </button>
+                </div>
+
+                <div className="w-full h-full cursor-zoom-in" onClick={openQuickView}>
+                  <Image
+                    src={mainImage || 'https://ik.imagekit.io/jrstupuke/placeholder.png'}
+                    alt={product.name}
+                    fill
+                    unoptimized
+                    className="object-cover"
+                    priority
+                    onError={(e) => { e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png'; }}
+                  />
+                </div>
               </div>
             </div>
 
@@ -962,26 +1014,26 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
               )}
               <div className="flex items-baseline gap-3 flex-wrap">
                 <span className={`${isSpecialOffer ? 'text-green-600' : 'text-red-600'} text-4xl font-bold`}>
-                  {currency}  {effPrice.toLocaleString()}
+                  {currency}  {displayPrice.toLocaleString()}
                 </span>
-                {effMrp > effPrice && (
+                {displayMrp > displayPrice && (
                   <>
                     <span className="text-gray-400 text-xl line-through">
-                      {currency} {effMrp.toLocaleString()}
+                      {currency} {displayMrp.toLocaleString()}
                     </span>
                     <span className="bg-red-50 text-red-600 text-sm font-semibold px-3 py-1.5 rounded">
-                      Save {discountPercent}%
+                      Save {displayDiscountPercent}%
                     </span>
                   </>
                 )}
               </div>
-              {effMrp > effPrice && (
+              {displayMrp > displayPrice && (
                 <div className="flex items-center gap-2">
                   <svg className="w-5 h-5 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd"/>
                   </svg>
                   <span className="text-orange-600 text-sm font-semibold">
-                    Save ₹ {(effMrp - effPrice).toLocaleString()} 
+                    Save ₹ {(displayMrp - displayPrice).toLocaleString()} 
                   </span>
                 </div>
               )}
@@ -1207,12 +1259,10 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
                 <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">
                   BUNDLE AND SAVE MORE!
                 </p>
-                {bulkVariants
-                  .slice()
-                  .sort((a,b)=>Number(a.options.bundleQty)-Number(b.options.bundleQty))
+                {sortedBulkVariants
                   .map((v, idx)=>{
                     const qty = Number(v.options.bundleQty) || 1;
-                    const isSelected = Number(selectedBundleQty) === qty;
+                    const isSelected = selectedBundleIndex === idx;
                     const price = Number(v.price);
                     const mrp = Number(v.mrp ?? v.price);
                     const save = mrp > price ? (mrp - price) : 0;
@@ -1228,7 +1278,7 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
                         )}
                         <button
                           type="button"
-                          onClick={()=> setSelectedBundleQty(qty)}
+                          onClick={()=> setSelectedBundleIndex(idx)}
                           className={`w-full text-left border rounded-lg p-3 flex items-center justify-between gap-3 transition-all ${
                             isSelected 
                               ? 'border-orange-500 bg-orange-50' 
@@ -1258,41 +1308,6 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
                   })}
               </div>
             )}
-
-            {/* Features Grid */}
-            <div className="grid grid-cols-2 gap-3">
-              {/* 1 Year Warranty */}
-              <div className="flex items-center gap-2 bg-white border border-gray-200 p-3 rounded-lg">
-                <svg className="w-8 h-8 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-                </svg>
-                <span className="text-sm font-medium text-gray-800">100% Trusted Product</span>
-              </div>
-
-              {/* Arrives in 2 days */}
-              <div className="flex items-center gap-2 bg-white border border-gray-200 p-3 rounded-lg">
-                <svg className="w-8 h-8 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
-                </svg>
-                <span className="text-sm font-medium text-gray-800">Arrives in 2-5 days</span>
-              </div>
-
-              {/* Fast Shipping */}
-              <div className="flex items-center gap-2 bg-white border border-gray-200 p-3 rounded-lg">
-                <svg className="w-8 h-8 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
-                </svg>
-                <span className="text-sm font-medium text-gray-800">Free Shipping</span>
-              </div>
-
-              {/* Cash On Delivery */}
-              <div className="flex items-center gap-2 bg-white border border-gray-200 p-3 rounded-lg">
-                <svg className="w-8 h-8 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
-                </svg>
-                <span className="text-sm font-medium text-gray-800">Cash On Delivery</span>
-              </div>
-            </div>
 
             {/* Quantity */}
             {isSelectionInStock && (
@@ -1329,34 +1344,54 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
               <button 
                 onClick={handleOrderNow}
                 disabled={!isSelectionInStock || isOrderingNow}
-                className={`flex-1 py-3.5 px-6 rounded-lg font-semibold text-base transition flex items-center justify-center gap-2 ${
-                  (!isSelectionInStock || isOrderingNow)
-                    ? 'bg-gray-400 text-white cursor-not-allowed opacity-70'
-                    : 'bg-red-500 text-white hover:bg-red-600'
+                className={`flex-1 py-3.5 px-6 rounded-xl font-semibold text-base transition-all duration-200 flex items-center justify-center gap-2 border shadow-sm ${
+                  !isSelectionInStock
+                    ? 'bg-gray-400 border-gray-400 text-white cursor-not-allowed opacity-70'
+                    : isOrderingNow
+                      ? 'bg-red-500 border-red-500 text-white cursor-wait'
+                      : 'bg-gradient-to-r from-rose-500 to-red-500 border-red-500 text-white hover:from-rose-600 hover:to-red-600'
                 }`}
               >
-                {!isSelectionInStock ? 'Out of Stock' : isOrderingNow ? 'Processing...' : 'Order Now'}
-                {isSelectionInStock && !isOrderingNow && (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
+                {!isSelectionInStock ? (
+                  'Out of Stock'
+                ) : isOrderingNow ? (
+                  <span className="relative w-full h-full flex items-center justify-center py-0.5">
+                    <span className="relative flex items-center gap-2 text-white">
+                      <ShoppingCartIcon size={17} className="animate-pulse" />
+                      <span className="text-sm font-semibold tracking-wide">Placing</span>
+                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
+                      </span>
+                    </span>
+                  </span>
+                ) : (
+                  <>
+                    Order Now
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                  </>
                 )}
-                {isOrderingNow && <span className="w-4 h-4 border-2 border-white/70 border-t-white rounded-full animate-spin" />}
               </button>
 
               {isSelectionInStock && (
                 cartItems[product._id] ? (
                   <button
                     onClick={() => router.push('/cart')}
-                    className="flex-1 bg-green-600 text-white py-3.5 px-6 rounded-lg font-semibold text-base hover:bg-green-700 transition flex items-center justify-center gap-2"
+                    aria-label="Go to Cart"
+                    title="Go to Cart"
+                    className="relative w-12 h-12 rounded-xl transition-all duration-200 flex items-center justify-center flex-shrink-0 text-white bg-emerald-600 hover:bg-emerald-700 border border-emerald-600 shadow-sm"
                   >
-                    Go to Cart
                     <ShoppingCartIcon size={20} />
                   </button>
                 ) : (
                   <button 
                     onClick={handleAddToCart}
-                    className="relative w-12 h-12 rounded-lg transition flex items-center justify-center flex-shrink-0 text-white"
+                    aria-label="Add to Cart"
+                    title="Add to Cart"
+                    className="relative w-12 h-12 rounded-xl transition-all duration-200 flex items-center justify-center flex-shrink-0 text-white border border-transparent shadow-sm"
                     style={{ backgroundColor: cartCount > 0 ? '#262626' : '#DC013C' }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = cartCount > 0 ? '#1a1a1a' : '#b8012f'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = cartCount > 0 ? '#262626' : '#DC013C'}
@@ -1370,6 +1405,41 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
                   </button>
                 )
               )}
+            </div>
+
+            {/* Features Grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* 1 Year Warranty */}
+              <div className="flex items-center gap-2 bg-white border border-gray-200 p-3 rounded-lg">
+                <svg className="w-8 h-8 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                </svg>
+                <span className="text-sm font-medium text-gray-800">100% Trusted Product</span>
+              </div>
+
+              {/* Arrives in 2 days */}
+              <div className="flex items-center gap-2 bg-white border border-gray-200 p-3 rounded-lg">
+                <svg className="w-8 h-8 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
+                </svg>
+                <span className="text-sm font-medium text-gray-800">Arrives in 2-5 days</span>
+              </div>
+
+              {/* Fast Shipping */}
+              <div className="flex items-center gap-2 bg-white border border-gray-200 p-3 rounded-lg">
+                <svg className="w-8 h-8 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+                </svg>
+                <span className="text-sm font-medium text-gray-800">Free Shipping</span>
+              </div>
+
+              {/* Cash On Delivery */}
+              <div className="flex items-center gap-2 bg-white border border-gray-200 p-3 rounded-lg">
+                <svg className="w-8 h-8 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
+                </svg>
+                <span className="text-sm font-medium text-gray-800">Cash On Delivery</span>
+              </div>
             </div>
 
             {/* Wishlist & Share */}
@@ -1547,6 +1617,56 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
                   </button>
                   <p className="text-xs text-gray-500 text-center">Select addons you want to include</p>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isQuickViewOpen && (
+        <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4" onClick={closeQuickView}>
+          <div className="relative w-full max-w-5xl h-[85vh] bg-white rounded-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              aria-label="Close quick view"
+              onClick={closeQuickView}
+              className="absolute top-3 right-3 z-20 w-9 h-9 rounded-full bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 transition flex items-center justify-center"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="absolute top-3 left-3 z-20 flex items-center gap-2 bg-white/95 border border-gray-200 rounded-full px-2 py-1.5 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setQuickViewZoom((z) => Math.max(1, z - 0.25))}
+                disabled={quickViewZoom <= 1}
+                className="w-7 h-7 rounded-full border border-gray-200 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-100 transition flex items-center justify-center"
+              >
+                <MinusIcon size={14} />
+              </button>
+              <span className="text-xs font-semibold text-gray-700 min-w-[44px] text-center">{Math.round(quickViewZoom * 100)}%</span>
+              <button
+                type="button"
+                onClick={() => setQuickViewZoom((z) => Math.min(3, z + 0.25))}
+                disabled={quickViewZoom >= 3}
+                className="w-7 h-7 rounded-full border border-gray-200 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-100 transition flex items-center justify-center"
+              >
+                <PlusIcon size={14} />
+              </button>
+            </div>
+
+            <div className="w-full h-full bg-gray-100 overflow-auto">
+              <div className="w-full h-full flex items-center justify-center p-4">
+                <img
+                  src={mainImage || 'https://ik.imagekit.io/jrstupuke/placeholder.png'}
+                  alt={product.name}
+                  className="max-w-full max-h-full object-contain select-none"
+                  style={{
+                    transform: `scale(${quickViewZoom})`,
+                    transformOrigin: 'center center',
+                    transition: 'transform 150ms ease'
+                  }}
+                />
               </div>
             </div>
           </div>

@@ -2,15 +2,111 @@
 import React, { useMemo, useState } from 'react';
 import { GoogleMap, MarkerF, InfoWindowF, useJsApiLoader } from '@react-google-maps/api';
 
+function GoogleMapCanvas({ locationGroups, mapOptions, selectedMarker, setSelectedMarker, apiKey }) {
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: 'quickfynd-google-maps',
+    googleMapsApiKey: apiKey,
+  });
+
+  if (loadError) {
+    return (
+      <div className="p-6 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
+        <p className="font-medium">Google Maps could not load</p>
+        <p className="text-sm mt-1">
+          Billing is not enabled for this Google Cloud project. Enable billing for the Maps JavaScript API,
+          or keep maps disabled via NEXT_PUBLIC_ENABLE_GOOGLE_MAPS=false.
+        </p>
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="p-6 bg-gray-50 border border-gray-200 rounded-lg text-gray-600">
+        <p>Loading map...</p>
+      </div>
+    );
+  }
+
+  return (
+    <GoogleMap mapContainerClassName="w-full rounded-lg border border-gray-200 shadow-sm" mapContainerStyle={{ height: '500px' }} options={mapOptions}>
+      {Object.values(locationGroups).map((group, idx) => (
+        <MarkerF
+          key={idx}
+          position={{ lat: group.latitude, lng: group.longitude }}
+          onClick={() => setSelectedMarker(group)}
+          icon={
+            group.count > 1
+              ? {
+                  path: window.google?.maps?.SymbolPath?.CIRCLE,
+                  scale: 8,
+                  fillColor: '#ef4444',
+                  fillOpacity: 0.8,
+                  strokeColor: '#fff',
+                  strokeWeight: 2,
+                }
+              : {
+                  path: window.google?.maps?.SymbolPath?.CIRCLE,
+                  scale: 6,
+                  fillColor: '#3b82f6',
+                  fillOpacity: 0.8,
+                  strokeColor: '#fff',
+                  strokeWeight: 2,
+                }
+          }
+        >
+          {selectedMarker?.latitude === group.latitude &&
+            selectedMarker?.longitude === group.longitude && (
+              <InfoWindowF
+                onCloseClick={() => setSelectedMarker(null)}
+              >
+                <div className="p-2 text-sm max-w-xs">
+                  <p className="font-semibold text-gray-900">
+                    {group.city}, {group.country}
+                  </p>
+                  <p className="text-gray-600">{group.deviceType}</p>
+                  <p className="text-gray-600">{group.browser}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {group.count} visit{group.count > 1 ? 's' : ''} from this location
+                  </p>
+                  <div className="mt-2 space-y-1 text-xs">
+                    {group.locations.slice(0, 3).map((loc, i) => (
+                      <p key={i} className="text-gray-500">
+                        {new Date(loc.timestamp).toLocaleDateString()} at{' '}
+                        {new Date(loc.timestamp).toLocaleTimeString()}
+                      </p>
+                    ))}
+                    {group.locations.length > 3 && (
+                      <p className="text-gray-500">
+                        +{group.locations.length - 3} more visits
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </InfoWindowF>
+            )}
+        </MarkerF>
+      ))}
+    </GoogleMap>
+  );
+}
+
 export default function CustomerLocationMap({ locations = [] }) {
   const [selectedMarker, setSelectedMarker] = useState(null);
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const mapsEnabled = process.env.NEXT_PUBLIC_ENABLE_GOOGLE_MAPS === 'true';
 
-  const { isLoaded } = useJsApiLoader({
-    id: 'quickfynd-google-maps',
-    googleMapsApiKey: apiKey || '',
-  });
+  if (!mapsEnabled) {
+    return (
+      <div className="p-6 bg-gray-50 border border-gray-200 rounded-lg text-gray-700">
+        <p className="font-medium">Map view is disabled</p>
+        <p className="text-sm mt-1">
+          Set NEXT_PUBLIC_ENABLE_GOOGLE_MAPS=true to enable map loading.
+        </p>
+      </div>
+    );
+  }
 
   if (!apiKey) {
     return (
@@ -86,71 +182,13 @@ export default function CustomerLocationMap({ locations = [] }) {
         </div>
       </div>
 
-      {!isLoaded ? (
-        <div className="p-6 bg-gray-50 border border-gray-200 rounded-lg text-gray-600">
-          <p>Loading map...</p>
-        </div>
-      ) : (
-        <GoogleMap mapContainerClassName="w-full rounded-lg border border-gray-200 shadow-sm" mapContainerStyle={{ height: '500px' }} options={mapOptions}>
-          {Object.values(locationGroups).map((group, idx) => (
-            <MarkerF
-              key={idx}
-              position={{ lat: group.latitude, lng: group.longitude }}
-              onClick={() => setSelectedMarker(group)}
-              icon={
-                group.count > 1
-                  ? {
-                      path: window.google?.maps?.SymbolPath?.CIRCLE,
-                      scale: 8,
-                      fillColor: '#ef4444',
-                      fillOpacity: 0.8,
-                      strokeColor: '#fff',
-                      strokeWeight: 2,
-                    }
-                  : {
-                      path: window.google?.maps?.SymbolPath?.CIRCLE,
-                      scale: 6,
-                      fillColor: '#3b82f6',
-                      fillOpacity: 0.8,
-                      strokeColor: '#fff',
-                      strokeWeight: 2,
-                    }
-              }
-            >
-              {selectedMarker?.latitude === group.latitude &&
-                selectedMarker?.longitude === group.longitude && (
-                  <InfoWindowF
-                    onCloseClick={() => setSelectedMarker(null)}
-                  >
-                    <div className="p-2 text-sm max-w-xs">
-                      <p className="font-semibold text-gray-900">
-                        {group.city}, {group.country}
-                      </p>
-                      <p className="text-gray-600">{group.deviceType}</p>
-                      <p className="text-gray-600">{group.browser}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {group.count} visit{group.count > 1 ? 's' : ''} from this location
-                      </p>
-                      <div className="mt-2 space-y-1 text-xs">
-                        {group.locations.slice(0, 3).map((loc, i) => (
-                          <p key={i} className="text-gray-500">
-                            {new Date(loc.timestamp).toLocaleDateString()} at{' '}
-                            {new Date(loc.timestamp).toLocaleTimeString()}
-                          </p>
-                        ))}
-                        {group.locations.length > 3 && (
-                          <p className="text-gray-500">
-                            +{group.locations.length - 3} more visits
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </InfoWindowF>
-                )}
-            </MarkerF>
-          ))}
-        </GoogleMap>
-      )}
+      <GoogleMapCanvas
+        locationGroups={locationGroups}
+        mapOptions={mapOptions}
+        selectedMarker={selectedMarker}
+        setSelectedMarker={setSelectedMarker}
+        apiKey={apiKey}
+      />
 
       {/* Location Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

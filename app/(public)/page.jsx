@@ -37,7 +37,6 @@ const CarouselSliderSkeleton = () => (
     </div>
 );
 
-// Below-the-fold components - lazy load
 const BannerSlider = dynamic(() => import("@/components/BannerSlider"), {
     ssr: true,
     loading: () => <BannerSliderSkeleton />,

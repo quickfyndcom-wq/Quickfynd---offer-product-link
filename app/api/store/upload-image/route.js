@@ -48,16 +48,14 @@ export async function POST(request) {
         });
         
         // Return transformed URL based on type
-        const transformation = type === 'logo' 
-            ? [{ quality: "auto" }, { format: "webp" }, { width: "200", height: "200" }]
-            : type === 'banner'
-            ? [{ quality: "auto" }, { format: "webp" }, { width: "1200" }]
-            : [{ quality: "auto" }, { format: "webp" }, { width: "800" }];
-        
-        const url = imagekit.url({
-            path: response.filePath,
-            transformation: transformation
-        });
+        const url = type === 'banner'
+            ? response.url
+            : imagekit.url({
+                path: response.filePath,
+                transformation: type === 'logo'
+                    ? [{ quality: "auto" }, { format: "webp" }, { width: "200", height: "200" }]
+                    : [{ quality: "auto" }, { format: "webp" }, { width: "800" }]
+            });
         return Response.json({ 
             success: true, 
             url: url 
