@@ -208,14 +208,14 @@ const OrderSummary = ({ totalPrice, items }) => {
                             'Content-Type': 'application/json'
                         }
                     });
-                    // Handle array of orders for guests
-                    if (data && ((data.orders && Array.isArray(data.orders) && data.orders.length > 0) || (data.order && data.order.id))) {
+                    // Expect a single order object only
+                    if (data && data.order && data.order.id) {
                         if (paymentMethod === 'STRIPE') {
                             window.location.href = data.session.url;
                         } else {
                             dispatch(clearCart());
                             toast.success(data.message);
-                            const orderId = data.orders ? data.orders[0].id : data.order.id;
+                            const orderId = data.order.id;
                             // If COD, show prepaid upsell before redirect
                             if (paymentMethod === 'COD') {
                                 setUpsellOrderId(orderId);
@@ -225,7 +225,8 @@ const OrderSummary = ({ totalPrice, items }) => {
                             }
                         }
                     } else {
-                        router.push('/order-failed');
+                        const reason = data && data.error ? encodeURIComponent(data.error) : 'Order creation failed (no order returned)';
+                        router.push(`/order-failed?reason=${reason}`);
                     }
                 } catch (err) {
                     console.error('Guest order error:', err);
@@ -306,9 +307,10 @@ const OrderSummary = ({ totalPrice, items }) => {
                     // Fetch updated cart from server to sync
                     dispatch(fetchCart({getToken}));
                 }
-            }else{
+            } else {
                 setLoading(false);
-                router.push('/order-failed');
+                const reason = data && data.error ? encodeURIComponent(data.error) : 'Order creation failed (no order returned)';
+                router.push(`/order-failed?reason=${reason}`);
             }
         } catch (error) {
             console.error('Order placement error:', error);

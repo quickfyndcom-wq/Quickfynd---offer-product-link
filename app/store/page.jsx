@@ -151,7 +151,7 @@ export default function Dashboard() {
     const codOrders = orders.filter(o => (o.paymentMethod || '').toLowerCase() === 'cod');
     const cardOrders = orders.filter(o => (o.paymentMethod || '').toLowerCase() !== 'cod');
     const inTransitOrders = orders.filter(o => ['SHIPPED', 'OUT_FOR_DELIVERY', 'IN_TRANSIT'].includes(o.status));
-    const pendingPaymentOrders = orders.filter(o => !o.isPaid && (o.status !== 'CANCELLED'));
+    const pendingPaymentOrders = orders.filter(o => !o.isPaid && o.status !== 'CANCELLED');
     const canceledOrders = orders.filter(o => o.status === 'CANCELLED');
     const todayOrders = orders.filter(o => isToday(o.createdAt));
     const deliveredEarnings = deliveredOrders.reduce((sum, o) => sum + (o.total || 0), 0);
@@ -171,7 +171,7 @@ export default function Dashboard() {
 
             {/* Detailed Order/Earnings Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 my-8">
-                <SummaryCard label="Today's Orders" value={todayOrders.length} />
+                <SummaryCard label="Today's Orders" value={dashboardData.todaysOrdersCount ?? todayOrders.length} />
                 <SummaryCard label="Total Delivered" value={deliveredOrders.length} />
                 <SummaryCard label="Paid by Card" value={cardOrders.length} />
                 <SummaryCard label="COD Orders" value={codOrders.length} />

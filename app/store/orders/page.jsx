@@ -254,7 +254,8 @@ export default function StoreOrders() {
             RETURNED: orders.filter(o => o.status === 'RETURNED').length,
             RETURN_REQUESTED: orders.filter(o => o.returns && o.returns.some(r => r.status === 'REQUESTED')).length,
             PENDING_PAYMENT: orders.filter(o => {
-                return !isOrderPaid(o);
+                // Exclude cancelled and returned orders from pending payment
+                return !isOrderPaid(o) && o.status !== 'CANCELLED' && o.status !== 'RETURNED';
             }).length,
             PENDING_SHIPMENT: orders.filter(o => !o.trackingId && ['ORDER_PLACED', 'PROCESSING'].includes(o.status)).length,
         };
@@ -519,20 +520,18 @@ export default function StoreOrders() {
         const paymentMethod = (order.paymentMethod || '').toLowerCase();
         const status = (order.status || '').toUpperCase();
         const resolvedPaid = isOrderPaid(order);
-        
-        console.log('[PAYMENT STATUS DEBUG]', {
-            orderId: order._id,
-            paymentMethod: order.paymentMethod,
-            status: order.status,
-            isPaid: order.isPaid,
-            paymentStatus: order.paymentStatus,
-            normalizedPaymentMethod: paymentMethod,
-            normalizedStatus: status,
-            resolvedPaid,
-            delhiveryPaymentCollected: order.delhivery?.payment?.is_cod_recovered,
-        });
 
-        return resolvedPaid;
+        // Enhanced payment status string for cancelled/returned
+        if (status === 'CANCELLED') {
+            return resolvedPaid ? 'Cancelled (Paid)' : 'Cancelled (Unpaid)';
+        }
+        if (status === 'RETURNED') {
+            return resolvedPaid ? 'Returned (Paid)' : 'Returned (Unpaid)';
+        }
+        if (status === 'PAYMENT_FAILED') {
+            return 'Payment Failed';
+        }
+        return resolvedPaid ? '✓ Paid' : 'Pending';
     };
 
     const fetchOrders = async () => {
@@ -966,9 +965,17 @@ export default function StoreOrders() {
                                     </td>
                                     <td className="px-4 py-3 font-medium text-slate-800">{currency}{order.total}</td>
                                     <td className="px-4 py-3">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatus(order) ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                            {getPaymentStatus(order) ? '✓ Paid' : 'Pending'}
-                                        </span>
+                                        {(() => {
+                                            const paymentStatusLabel = getPaymentStatus(order);
+                                            let colorClass = 'bg-gray-100 text-gray-700';
+                                            if (paymentStatusLabel.includes('Paid')) colorClass = 'bg-green-100 text-green-700';
+                                            else if (paymentStatusLabel.includes('Unpaid') || paymentStatusLabel === 'Pending') colorClass = 'bg-red-100 text-red-700';
+                                            else if (paymentStatusLabel === 'Payment Failed') colorClass = 'bg-orange-100 text-orange-700';
+                                            else if (paymentStatusLabel.includes('Returned')) colorClass = 'bg-blue-100 text-blue-700';
+                                            return (
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>{paymentStatusLabel}</span>
+                                            );
+                                        })()}
                                     </td>
                                     <td className="px-4 py-3" onClick={e => { e.stopPropagation(); }}>
                                         {(() => {
@@ -1512,7 +1519,7 @@ export default function StoreOrders() {
                                     </div>
                                     <div>
                                         <p className="text-slate-500">Payment Status</p>
-                                        <p className="font-medium text-slate-900">{getPaymentStatus(selectedOrder) ? "✓ Paid" : "Pending"}</p>
+                                        <p className="font-medium text-slate-900">{getPaymentStatus(selectedOrder)}</p>
                                     </div>
                                     
                                     {/* Delhivery Payment Collection Info */}

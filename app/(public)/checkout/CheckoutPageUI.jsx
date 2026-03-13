@@ -1245,10 +1245,10 @@ export default function CheckoutPage() {
         return;
       }
       const data = await res.json();
-      if (data._id || data.id) {
+      if (data.order && (data.order._id || data.order.id)) {
         // Order created successfully - clear cart and show prepaid upsell before redirect
-        const createdOrderId = data._id || data.id;
-        const orderTotal = data.total || totalAfterWallet;
+        const createdOrderId = data.order._id || data.order.id;
+        const orderTotal = data.order.total || totalAfterWallet;
         dispatch(clearCart());
         if (totalAfterWallet <= 0) {
           router.push(`/order-success?orderId=${createdOrderId}`);
@@ -1261,7 +1261,8 @@ export default function CheckoutPage() {
         // No order ID returned - treat as failure
         setFormError("Order creation failed. Please try again.");
         setPlacingOrder(false);
-        router.push(`/order-failed?reason=${encodeURIComponent('Order creation failed')}`);
+        const reason = data && data.error ? encodeURIComponent(data.error) : 'Order creation failed (no order returned)';
+        router.push(`/order-failed?reason=${reason}`);
       }
 
     } catch (err) {

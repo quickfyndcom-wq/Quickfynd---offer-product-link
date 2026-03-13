@@ -66,46 +66,41 @@ function OrderSuccessContent() {
   const order = orders && orders.length > 0 ? orders[0] : null;
   function getOrderNumber(orderObj) {
     if (!orderObj) return '';
-    return String(orderObj.shortOrderNumber || orderObj._id.slice(0, 8));
+    if (orderObj.shortOrderNumber) return String(orderObj.shortOrderNumber);
+    if (orderObj._id) return String(orderObj._id).slice(0, 8);
+    return '';
   }
   // Calculate totals
-  const products = order ? order.orderItems : [];
+  const products = order && order.orderItems ? order.orderItems : [];
   const subtotal = products.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   // Use shippingFee from order if available
-  const shipping = typeof order?.shippingFee === 'number' ? order.shippingFee : 0;
-  const discount = order?.coupon?.discount ? (order.coupon.discountType === 'percentage' ? (order.coupon.discount / 100 * subtotal) : Math.min(order.coupon.discount, subtotal)) : 0;
-  const walletDiscount = Number(order?.walletDiscount || 0);
-  const total = typeof order?.total === 'number' ? order.total : (subtotal + shipping - discount - walletDiscount);
-  const orderDate = order?.createdAt ? new Date(order.createdAt).toLocaleDateString() : new Date().toLocaleDateString();
-  const currency = order?.currency || '₹';
-  const paymentMethod = String(order?.paymentMethod || 'COD').toUpperCase();
-  const isPaid = order?.isPaid === true || paymentMethod === 'WALLET' || paymentMethod === 'CARD' || paymentMethod === 'STRIPE';
+  const shipping = order && typeof order.shippingFee === 'number' ? order.shippingFee : 0;
+  const discount = order && order.coupon && order.coupon.discount ? (order.coupon.discountType === 'percentage' ? (order.coupon.discount / 100 * subtotal) : Math.min(order.coupon.discount, subtotal)) : 0;
+  const walletDiscount = order ? Number(order.walletDiscount || 0) : 0;
+  const total = order && typeof order.total === 'number' ? order.total : (subtotal + shipping - discount - walletDiscount);
+  const orderDate = order && order.createdAt ? new Date(order.createdAt).toLocaleDateString() : new Date().toLocaleDateString();
+  const currency = order && order.currency ? order.currency : '₹';
+  const paymentMethod = order && order.paymentMethod ? String(order.paymentMethod).toUpperCase() : 'COD';
+  const isPaid = order && (order.isPaid === true || paymentMethod === 'WALLET' || paymentMethod === 'CARD' || paymentMethod === 'STRIPE');
   const paidAmount = isPaid ? total : 0;
   const dueAmount = isPaid ? 0 : total;
 
   // Meta Pixel Purchase event with attribution data
   useEffect(() => {
     if (order && typeof window !== 'undefined' && window.fbq) {
-      const orderEventId = String(order?._id || order?.shortOrderNumber || params.get('orderId') || 'unknown');
+      const orderEventId = String(order._id || order.shortOrderNumber || params.get('orderId') || 'unknown');
       const purchaseEventKey = `meta_purchase_sent_${orderEventId}`;
-
-      // Prevent duplicate browser Purchase events (StrictMode/re-renders/back navigation)
       if (sessionStorage.getItem(purchaseEventKey)) return;
-
-      // Get attribution data if available (from ads)
       const attributionData = window.attributionData || {};
-      
       window.fbq('track', 'Purchase', {
         value: total,
         currency: currency,
         eventID: `purchase_${orderEventId}`,
-        // Include attribution parameters for ad tracking
         utm_source: attributionData.utm_source || 'organic',
         utm_medium: attributionData.utm_medium || 'direct',
         utm_campaign: attributionData.utm_campaign || 'none',
         utm_id: attributionData.utm_id || null
       });
-
       sessionStorage.setItem(purchaseEventKey, '1');
     }
   }, [order, total, currency, params]);
@@ -115,8 +110,8 @@ function OrderSuccessContent() {
     <>
       {loading ? (
         <Loading />
-      ) : !orders || orders.length === 0 ? (
-        <div className='p-8 text-center text-red-600'>Order not found or failed.</div>
+      ) : !order ? (
+        <div className='p-8 text-center text-red-600'>Order not found or failed.<br/>If you placed an order and see this message, please check your email for confirmation or contact support with your payment details.</div>
       ) : (
         <div className='min-h-screen bg-gray-50 flex flex-col items-center justify-center py-8'>
           <div className='max-w-2xl w-full bg-white rounded-xl shadow p-8'>

@@ -77,16 +77,22 @@ export async function POST(request) {
         }
 
         // Update order status
-        order.status = status;
 
-        // Auto-mark COD orders as PAID when delivered
+        order.status = status;
         const normalizedStatus = String(status || '').toUpperCase();
         const paymentMethod = (order.paymentMethod || '').toLowerCase();
-        
+
+        // Cancel/revert payment if order is cancelled or payment failed
+        if (normalizedStatus === 'CANCELLED' || normalizedStatus === 'PAYMENT_FAILED') {
+            order.isPaid = false;
+            order.paymentStatus = (normalizedStatus === 'CANCELLED') ? 'CANCELLED' : 'FAILED';
+        }
+
+        // Auto-mark COD orders as PAID when delivered
         if (normalizedStatus === 'DELIVERED' && paymentMethod === 'cod') {
             order.isPaid = true;
         }
-        
+
         // Also check if Delhivery has reported payment collected
         if (order.delhivery?.payment?.is_cod_recovered && paymentMethod === 'cod') {
             order.isPaid = true;

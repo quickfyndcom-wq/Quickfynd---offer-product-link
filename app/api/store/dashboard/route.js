@@ -33,8 +33,23 @@ export async function GET(request) {
       }
 
       await dbConnect();
-      // Get all orders for seller
-      const orders = await Order.find({ storeId }).lean();
+         // Get all orders for seller
+         const orders = await Order.find({ storeId }).lean();
+
+         // Calculate today's orders (all orders created today, regardless of status/payment)
+         // Use IST (UTC+5:30) for 12am-12am window
+         const now = new Date();
+         // Get current IST date
+         const istOffset = 5.5 * 60 * 60 * 1000;
+         const nowIST = new Date(now.getTime() + istOffset);
+         const startOfTodayIST = new Date(Date.UTC(nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate(), 0, 0, 0));
+         const endOfTodayIST = new Date(Date.UTC(nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate() + 1, 0, 0, 0));
+         const todaysOrders = orders.filter(order => {
+            const created = new Date(order.createdAt);
+            // Convert createdAt to IST
+            const createdIST = new Date(created.getTime() + istOffset);
+            return createdIST >= startOfTodayIST && createdIST < endOfTodayIST;
+         });
 
       // Get all products with ratings for seller
       const products = await Product.find({ storeId }).lean();
@@ -50,13 +65,15 @@ export async function GET(request) {
       // Get abandoned carts for this store
       const abandonedCarts = await AbandonedCart.countDocuments({ storeId });
 
+
       const dashboardData = {
          ratings,
          totalOrders: orders.length,
          totalEarnings: Math.round(orders.reduce((acc, order) => acc + (order.total || 0), 0)),
          totalProducts: products.length,
          totalCustomers,
-         abandonedCarts
+         abandonedCarts,
+         todaysOrdersCount: todaysOrders.length
       };
 
       return NextResponse.json({ dashboardData });

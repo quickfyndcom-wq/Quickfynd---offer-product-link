@@ -554,6 +554,7 @@ export async function POST(request) {
             console.log('ORDER API DEBUG: orderData keys:', Object.keys(orderData));
             console.log('ORDER API DEBUG: orderData before Order.create:', JSON.stringify(orderData, null, 2));
             const order = await Order.create(orderData);
+            orderIds.push(order._id);
 
             // --- AUTOMATIC DELHIVERY SHIPMENT CREATION ---
             try {
@@ -654,27 +655,22 @@ export async function POST(request) {
             await User.findByIdAndUpdate(userId, { cart: {} });
         }
 
-        // Return orders
-        if (isGuest) {
-            const orders = await Order.find({ _id: { $in: orderIds } })
+        // Always return a single order object for both guest and logged-in users
+        // Use the result of Order.create directly for the response
+        let createdOrder = null;
+        if (orderIds && orderIds.length > 0) {
+            createdOrder = await Order.findById(orderIds[orderIds.length - 1])
                 .populate('userId')
                 .populate({
                     path: 'orderItems.productId',
                     model: 'Product'
                 })
                 .lean();
-            return NextResponse.json({ message: 'Orders Placed Successfully', orders, id: orders[0]?._id.toString(), orderId: orders[0]?._id.toString() });
-        } else {
-            // Return the last order
-            const order = await Order.findById(orderIds[orderIds.length - 1])
-                .populate('userId')
-                .populate({
-                    path: 'orderItems.productId',
-                    model: 'Product'
-                })
-                .lean();
-            return NextResponse.json({ message: 'Orders Placed Successfully', order, id: order._id.toString(), orderId: order._id.toString() });
         }
+        if (!createdOrder) {
+            return NextResponse.json({ error: 'Order creation failed. No order returned from database.' }, { status: 500 });
+        }
+        return NextResponse.json({ message: 'Orders Placed Successfully', order: createdOrder, id: createdOrder._id.toString(), orderId: createdOrder._id.toString() });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: error.code || error.message }, { status: 400 });
@@ -685,12 +681,15 @@ export async function POST(request) {
 export async function GET(request) {
     try {
         await connectDB();
-        
         const { searchParams } = new URL(request.url);
         const orderId = searchParams.get('orderId');
-        
+
         // If orderId is provided, allow guest access to fetch that specific order
         if (orderId) {
+            if (!orderId || typeof orderId !== 'string' || orderId.length < 8) {
+                console.error('GET /api/orders: Missing or invalid orderId:', orderId);
+                return NextResponse.json({ error: 'Missing or invalid orderId parameter.' }, { status: 400 });
+            }
             console.log('GET /api/orders: Fetching order by orderId:', orderId);
             try {
                 let order = await Order.findById(orderId)
@@ -700,23 +699,23 @@ export async function GET(request) {
                     })
                     .populate('addressId')
                     .lean();
-                
+
                 if (!order) {
-                    console.log('GET /api/orders: Order not found');
-                    return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+                    console.log('GET /api/orders: Order not found for orderId:', orderId);
+                    return NextResponse.json({ error: 'Order not found for the provided orderId.' }, { status: 404 });
                 }
-                
+
                 // Ensure shortOrderNumber exists (for old orders without it)
                 if (!order.shortOrderNumber) {
                     const hex = order._id.toString().slice(-6);
                     order.shortOrderNumber = parseInt(hex, 16);
                 }
-                
+
                 console.log('GET /api/orders: Order found, isGuest:', order.isGuest);
                 return NextResponse.json({ order });
             } catch (err) {
-                console.error('GET /api/orders: Error fetching order:', err);
-                return NextResponse.json({ error: 'Invalid order ID' }, { status: 400 });
+                console.error('GET /api/orders: Error fetching order:', err, 'orderId:', orderId);
+                return NextResponse.json({ error: 'Invalid orderId format or internal error.' }, { status: 400 });
             }
         }
         
