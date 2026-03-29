@@ -341,7 +341,9 @@ export default function CategorySliderPage() {
             ) : (
               <div className="space-y-4">
                 {sliders.map((slider) => {
-                  const isOwnSlider = !slider.storeId || slider.storeId === user?.uid;
+                  // When in "My Sliders Only" mode the API already scoped results to this seller,
+                  // so every returned slider is editable. Only mark "Other Store" in the public view.
+                  const isOwnSlider = !showAllSliders || !slider.storeId || slider.storeId === user?.uid;
                   return (
                   <div key={slider.id} className={`bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition border-l-4 ${isOwnSlider ? 'border-blue-500' : 'border-orange-500'}`}>
                     <div className="flex justify-between items-start mb-4">

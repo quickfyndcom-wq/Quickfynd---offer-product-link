@@ -1,5 +1,7 @@
-import { redirect } from "next/navigation";
+"use client";
 
-export default function CarouselSliderRedirectPage() {
-  redirect("/store/storefront/hero-slider");
+import CarouselProducts from "@/components/admin/CarouselProducts";
+
+export default function CarouselSliderPage() {
+  return <CarouselProducts />;
 }

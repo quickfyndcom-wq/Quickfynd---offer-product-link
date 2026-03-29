@@ -33,6 +33,7 @@ export default function StoreShippingSettings() {
     estimatedDays: '3-5',
     enableCOD: true,
     codFee: 0,
+    minCODAmount: 0,
     maxCODAmount: 0,
     enableExpressShipping: false,
     expressShippingFee: 20,
@@ -69,6 +70,7 @@ export default function StoreShippingSettings() {
             estimatedDays: data.setting.estimatedDays || '3-5',
             enableCOD: Boolean(data.setting.enableCOD),
             codFee: Number(data.setting.codFee || 0),
+            minCODAmount: Number(data.setting.minCODAmount || 0),
             maxCODAmount: Number(data.setting.maxCODAmount || 0),
             enableExpressShipping: Boolean(data.setting.enableExpressShipping),
             expressShippingFee: Number(data.setting.expressShippingFee || 20),
@@ -385,6 +387,16 @@ export default function StoreShippingSettings() {
               {form.enableCOD && (
                 <div className='space-y-4'>
                   <div>
+                    <label className='block text-sm font-medium text-slate-700 mb-2'>Minimum COD Amount</label>
+                    <div className='flex items-center gap-2'>
+                      <span className='text-slate-600'>{currency}</span>
+                      <input type='number' step='0.01' value={form.minCODAmount || ''}
+                        onChange={(e) => setForm(s => ({ ...s, minCODAmount: Number(e.target.value) || 0 }))}
+                        className='w-40 border border-slate-300 rounded px-3 py-2' />
+                    </div>
+                    <p className='text-xs text-slate-500 mt-2'>Minimum order total for COD (use 0 for no minimum)</p>
+                  </div>
+                  <div>
                     <label className='block text-sm font-medium text-slate-700 mb-2'>COD Processing Fee</label>
                     <div className='flex items-center gap-2'>
                       <span className='text-slate-600'>{currency}</span>
@@ -399,15 +411,7 @@ export default function StoreShippingSettings() {
                     <div className='flex items-center gap-2'>
                       <span className='text-slate-600'>{currency}</span>
                       <input type='number' step='0.01' value={form.maxCODAmount || ''}
-                        onChange={(e) => {
-                          const value = Number(e.target.value) || 0;
-                          console.log('MaxCODAmount input changed:', e.target.value, '-> Number:', value);
-                          setForm(s => {
-                            const newState = { ...s, maxCODAmount: value };
-                            console.log('New form state:', newState);
-                            return newState;
-                          });
-                        }}
+                        onChange={(e) => setForm(s => ({ ...s, maxCODAmount: Number(e.target.value) || 0 }))}
                         className='w-40 border border-slate-300 rounded px-3 py-2' />
                     </div>
                     <p className='text-xs text-slate-500 mt-2'>Max order total for COD (use 0 for unlimited)</p>

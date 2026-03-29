@@ -20,23 +20,42 @@ export default function SettingsClient() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deletingAccount, setDeletingAccount] = useState(false)
+  const [unsubscribeHandled, setUnsubscribeHandled] = useState(false)
   const searchParams = useSearchParams()
+  const unsubscribeType = searchParams.get('unsubscribe')
+  const emailParam = searchParams.get('email')
+  const preferenceEmail = user?.email || emailParam || ''
+  const isPublicEmailPreferencesView = !user && !!emailParam
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUser(u ?? null))
     return () => unsub()
   }, [])
 
+  useEffect(() => {
+    const fetchPreferences = async () => {
+      if (!preferenceEmail) return
+      try {
+        const response = await fetch(`/api/email-preferences?email=${encodeURIComponent(preferenceEmail)}`)
+        const data = await response.json()
+        if (response.ok && data?.preferences) {
+          setEmailPreferences(data.preferences)
+        }
+      } catch (error) {
+        console.error('Error loading email preferences:', error)
+      }
+    }
+
+    fetchPreferences()
+  }, [preferenceEmail])
+
   // Handle unsubscribe from email link
   useEffect(() => {
-    const unsubscribeType = searchParams.get('unsubscribe')
-    const emailParam = searchParams.get('email')
-
-    if (unsubscribeType && emailParam) {
+    if (unsubscribeType && emailParam && !unsubscribeHandled) {
       // Auto-unsubscribe from the specific type
       handleUnsubscribe(unsubscribeType, emailParam)
     }
-  }, [searchParams])
+  }, [unsubscribeType, emailParam, unsubscribeHandled])
 
   const handleUnsubscribe = async (type, email) => {
     try {
@@ -60,8 +79,9 @@ export default function SettingsClient() {
         }))
         setMessage({
           type: 'success',
-          text: `You have been unsubscribed from ${type} emails.`
+          text: `You have been unsubscribed from ${type} emails for ${email}.`
         })
+        setUnsubscribeHandled(true)
       } else {
         setMessage({
           type: 'error',
@@ -86,7 +106,7 @@ export default function SettingsClient() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: user?.email,
+          email: preferenceEmail,
           type,
           value
         })
@@ -156,7 +176,7 @@ export default function SettingsClient() {
 
   if (user === undefined) return <Loading />
 
-  if (user === null) {
+  if (user === null && !isPublicEmailPreferencesView) {
     return (
       <>
         <div className="max-w-4xl mx-auto px-4 py-10">
@@ -165,6 +185,104 @@ export default function SettingsClient() {
           <Link href="/" className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg">Go to Home</Link>
         </div>
       </>
+    )
+  }
+
+  if (isPublicEmailPreferencesView) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-12">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-gradient-to-r from-slate-900 to-slate-700 px-6 py-8 text-white">
+            <div className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide mb-3">
+              Email Preferences
+            </div>
+            <h1 className="text-3xl font-bold">Manage Your Email Subscription</h1>
+            <p className="mt-2 text-sm text-slate-200">
+              Preferences for <span className="font-semibold text-white">{preferenceEmail}</span>
+            </p>
+          </div>
+
+          <div className="p-6 sm:p-8">
+            {message && (
+              <div className={`mb-6 rounded-xl border p-4 ${
+                message.type === 'success'
+                  ? 'bg-green-50 border-green-200 text-green-800'
+                  : 'bg-red-50 border-red-200 text-red-800'
+              }`}>
+                <div className="font-semibold">{message.type === 'success' ? 'Preferences updated' : 'Update failed'}</div>
+                <div className="text-sm mt-1">{message.text}</div>
+              </div>
+            )}
+
+            {unsubscribeHandled && unsubscribeType && (
+              <div className="mb-6 rounded-xl bg-emerald-50 border border-emerald-200 p-4">
+                <div className="text-emerald-800 font-semibold">You are unsubscribed from {unsubscribeType} emails.</div>
+                <div className="text-sm text-emerald-700 mt-1">
+                  You can still re-enable this preference below at any time.
+                </div>
+              </div>
+            )}
+
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 mb-6">
+              <h2 className="text-lg font-semibold text-slate-800 mb-2">Choose what you want to receive</h2>
+              <p className="text-sm text-slate-600">These settings are linked to your email address directly. You do not need to sign in to manage them from an email link.</p>
+            </div>
+
+            <div className="space-y-4">
+              <label className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 cursor-pointer"
+                  checked={emailPreferences.promotional}
+                  onChange={(e) => handlePreferenceChange('promotional', e.target.checked)}
+                  disabled={loading}
+                />
+                <div className="flex-1">
+                  <span className="text-slate-700 font-medium">Promotional Emails</span>
+                  <p className="text-sm text-slate-500">Special offers, discounts, abandoned checkout reminders, and campaigns</p>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 cursor-pointer"
+                  checked={emailPreferences.orders}
+                  onChange={(e) => handlePreferenceChange('orders', e.target.checked)}
+                  disabled={loading}
+                />
+                <div className="flex-1">
+                  <span className="text-slate-700 font-medium">Order Updates</span>
+                  <p className="text-sm text-slate-500">Order confirmations, shipping, delivery, and returns</p>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 cursor-pointer"
+                  checked={emailPreferences.updates}
+                  onChange={(e) => handlePreferenceChange('updates', e.target.checked)}
+                  disabled={loading}
+                />
+                <div className="flex-1">
+                  <span className="text-slate-700 font-medium">Product Updates</span>
+                  <p className="text-sm text-slate-500">Important service updates and relevant product announcements</p>
+                </div>
+              </label>
+            </div>
+
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link href="/" className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
+                Go to Home
+              </Link>
+              <Link href="/login" className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                Sign In
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
     )
   }
 

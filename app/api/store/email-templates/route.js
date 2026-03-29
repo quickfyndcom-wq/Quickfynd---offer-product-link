@@ -3,12 +3,15 @@ import EmailTemplate from '@/models/EmailTemplate'
 import authSeller from '@/middlewares/authSeller'
 import { NextResponse } from 'next/server'
 
+const EMAIL_LOGO_URL = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://quickfynd.com'}/assets/logo/logo3.png`
+
 // Default product notification template
 const DEFAULT_TEMPLATE = {
   subject: 'New Product Alert: {{productName}}',
   template: `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; color: white;">
+        <img src="${EMAIL_LOGO_URL}" alt="QuickFynd" style="display:block; margin: 0 auto 14px auto; width: 170px; max-width: 100%; height: auto;" />
         <h1 style="margin: 0;">🎉 New Product Arrived!</h1>
       </div>
       

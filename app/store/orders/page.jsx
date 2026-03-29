@@ -61,6 +61,13 @@ const updateTrackingDetails = async (orderId, trackingId, trackingUrl, courier, 
 
 export default function StoreOrders() {
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '₹';
+    const formatDateTimeLocalValue = (date) => {
+        const source = date instanceof Date ? date : new Date(date);
+        if (Number.isNaN(source.getTime())) return '';
+        const localDate = new Date(source.getTime() - source.getTimezoneOffset() * 60000);
+        return localDate.toISOString().slice(0, 16);
+    };
+
     const getImageSrc = (image) => {
         if (typeof image === 'string' && image.trim()) return image
         if (image && typeof image === 'object') return image.url || image.src || '/placeholder.png'
@@ -140,6 +147,8 @@ export default function StoreOrders() {
     const STATUS_OPTIONS = [
         { value: 'ORDER_PLACED', label: 'Order Placed', color: 'bg-blue-100 text-blue-700' },
         { value: 'PROCESSING', label: 'Processing', color: 'bg-yellow-100 text-yellow-700' },
+        { value: 'MANIFESTED', label: 'Manifested', color: 'bg-cyan-100 text-cyan-700' },
+        { value: 'PICKUP_SCHEDULED', label: 'Pickup Scheduled', color: 'bg-amber-100 text-amber-700' },
         { value: 'WAITING_FOR_PICKUP', label: 'Waiting For Pickup', color: 'bg-yellow-50 text-yellow-700' },
         { value: 'PICKUP_REQUESTED', label: 'Pickup Requested', color: 'bg-yellow-100 text-yellow-700' },
         { value: 'PICKED_UP', label: 'Picked Up', color: 'bg-purple-100 text-purple-700' },
@@ -149,6 +158,7 @@ export default function StoreOrders() {
         { value: 'DELIVERED', label: 'Delivered', color: 'bg-green-100 text-green-700' },
         { value: 'CANCELLED', label: 'Cancelled', color: 'bg-red-100 text-red-700' },
         { value: 'PAYMENT_FAILED', label: 'Payment Failed', color: 'bg-orange-100 text-orange-700' },
+        { value: 'RTO', label: 'RTO', color: 'bg-fuchsia-100 text-fuchsia-700' },
         { value: 'RETURNED', label: 'Returned', color: 'bg-indigo-100 text-indigo-700' },
         { value: 'RETURN_INITIATED', label: 'Return Initiated', color: 'bg-pink-100 text-pink-700' },
         { value: 'RETURN_APPROVED', label: 'Return Approved', color: 'bg-pink-100 text-pink-700' },
@@ -179,6 +189,16 @@ export default function StoreOrders() {
         if (texts.length === 0) return null;
         const combined = texts.join(' | ');
 
+        if (combined.includes('manifested') || combined.includes('manifest')) return 'MANIFESTED';
+        if (combined.includes('pickup scheduled')) return 'PICKUP_SCHEDULED';
+        if (
+            combined.includes('rto') ||
+            combined.includes('return to origin') ||
+            combined.includes('return accepted') ||
+            combined.includes('dispatched for rto')
+        ) {
+            return 'RTO';
+        }
         if (combined.includes('delivered')) return 'DELIVERED';
         if (combined.includes('out for delivery')) return 'OUT_FOR_DELIVERY';
         if (combined.includes('picked up') || combined.includes('picked-up')) return 'PICKED_UP';
@@ -247,15 +267,18 @@ export default function StoreOrders() {
             TOTAL: orders.length,
             ORDER_PLACED: orders.filter(o => o.status === 'ORDER_PLACED').length,
             PROCESSING: orders.filter(o => o.status === 'PROCESSING').length,
+            MANIFESTED: orders.filter(o => o.status === 'MANIFESTED').length,
+            PICKUP_SCHEDULED: orders.filter(o => o.status === 'PICKUP_SCHEDULED').length,
             SHIPPED: orders.filter(o => o.status === 'SHIPPED').length,
             DELIVERED: orders.filter(o => o.status === 'DELIVERED').length,
             CANCELLED: orders.filter(o => o.status === 'CANCELLED').length,
             PAYMENT_FAILED: orders.filter(o => o.status === 'PAYMENT_FAILED').length,
+            RTO: orders.filter(o => o.status === 'RTO').length,
             RETURNED: orders.filter(o => o.status === 'RETURNED').length,
             RETURN_REQUESTED: orders.filter(o => o.returns && o.returns.some(r => r.status === 'REQUESTED')).length,
             PENDING_PAYMENT: orders.filter(o => {
                 // Exclude cancelled and returned orders from pending payment
-                return !isOrderPaid(o) && o.status !== 'CANCELLED' && o.status !== 'RETURNED';
+                return !isOrderPaid(o) && o.status !== 'CANCELLED' && o.status !== 'RETURNED' && o.status !== 'RTO';
             }).length,
             PENDING_SHIPMENT: orders.filter(o => !o.trackingId && ['ORDER_PLACED', 'PROCESSING'].includes(o.status)).length,
         };
@@ -263,8 +286,8 @@ export default function StoreOrders() {
     };
     const getDateRange = () => {
         if (!fromDate && !toDate) return { start: null, end: null };
-        const start = fromDate ? new Date(`${fromDate}T00:00:00`) : null;
-        const end = toDate ? new Date(`${toDate}T23:59:59`) : null;
+        const start = fromDate ? new Date(fromDate) : null;
+        const end = toDate ? new Date(toDate) : null;
         return { start, end };
     };
 
@@ -292,6 +315,138 @@ export default function StoreOrders() {
 
     const stats = getOrderStats();
     const filteredOrders = getFilteredOrders();
+
+    const exportOrdersToCsv = () => {
+        if (!filteredOrders.length) {
+            toast.error('No orders available to export for the selected filters.');
+            return;
+        }
+
+        const sanitizeCsvValue = (value) => {
+            const normalized = value === null || value === undefined ? '' : String(value);
+            return `"${normalized.replace(/"/g, '""')}"`;
+        };
+
+        const getCustomerName = (order) => {
+            if (order?.isGuest) return order?.guestName || 'Guest User';
+            return order?.shippingAddress?.name || order?.userId?.name || order?.userId?.email || 'Unknown';
+        };
+
+        const getCustomerEmail = (order) => {
+            if (order?.isGuest) return order?.guestEmail || order?.shippingAddress?.email || '';
+            return order?.shippingAddress?.email || order?.userId?.email || '';
+        };
+
+        const getCustomerPhone = (order) => {
+            if (order?.isGuest) {
+                return [order?.shippingAddress?.phoneCode, order?.guestPhone].filter(Boolean).join(' ');
+            }
+            return [order?.shippingAddress?.phoneCode, order?.shippingAddress?.phone].filter(Boolean).join(' ');
+        };
+
+        const getAlternatePhone = (order) => {
+            return [
+                order?.alternatePhoneCode || order?.shippingAddress?.alternatePhoneCode || order?.shippingAddress?.phoneCode,
+                order?.alternatePhone || order?.shippingAddress?.alternatePhone,
+            ].filter(Boolean).join(' ');
+        };
+
+        const getShippingAddress = (order) => {
+            return [
+                order?.shippingAddress?.street,
+                order?.shippingAddress?.city,
+                order?.shippingAddress?.district,
+                order?.shippingAddress?.state,
+                order?.shippingAddress?.zip || order?.shippingAddress?.pincode,
+                order?.shippingAddress?.country,
+            ].filter(Boolean).join(', ');
+        };
+
+        const headers = [
+            'Order No',
+            'Order ID',
+            'Created At',
+            'Customer Name',
+            'Customer Email',
+            'Customer Phone',
+            'Alternate Phone',
+            'Guest Order',
+            'Payment Method',
+            'Payment Status',
+            'Order Status',
+            'Order Total',
+            'Shipping Fee',
+            'Tracking ID',
+            'Tracking URL',
+            'Courier',
+            'Shipping Address',
+            'Item Name',
+            'Item SKU/Product ID',
+            'Item Quantity',
+            'Item Price',
+            'Coupon Code',
+            'Coupon Discount',
+            'Notes',
+        ];
+
+        const rows = filteredOrders.flatMap((order) => {
+            const orderItems = Array.isArray(order?.orderItems) && order.orderItems.length > 0
+                ? order.orderItems
+                : [{ name: '', productId: '', quantity: '', price: '' }];
+
+            return orderItems.map((item) => {
+                const productId = typeof item?.productId === 'object'
+                    ? item?.productId?._id || item?.productId?.id || ''
+                    : item?.productId || '';
+                const itemName = item?.name || item?.productId?.name || item?.productId?.title || '';
+
+                return [
+                    order?.shortOrderNumber || String(order?._id || '').slice(0, 8),
+                    order?._id || '',
+                    order?.createdAt ? new Date(order.createdAt).toLocaleString('en-IN') : '',
+                    getCustomerName(order),
+                    getCustomerEmail(order),
+                    getCustomerPhone(order),
+                    getAlternatePhone(order),
+                    order?.isGuest ? 'Yes' : 'No',
+                    order?.paymentMethod || '',
+                    getPaymentStatus(order),
+                    order?.status || '',
+                    order?.total || 0,
+                    order?.shippingFee || 0,
+                    order?.trackingId || '',
+                    order?.trackingUrl || '',
+                    order?.courier || '',
+                    getShippingAddress(order),
+                    itemName,
+                    productId,
+                    item?.quantity || 0,
+                    item?.price || 0,
+                    order?.coupon?.code || '',
+                    order?.coupon?.discountAmount || 0,
+                    order?.notes || '',
+                ];
+            });
+        });
+
+        const csvContent = [headers, ...rows]
+            .map((row) => row.map(sanitizeCsvValue).join(','))
+            .join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const fromLabel = (fromDate || 'all').replace(/[\s:T]/g, '-');
+        const toLabel = (toDate || 'all').replace(/[\s:T]/g, '-');
+
+        link.href = url;
+        link.setAttribute('download', `orders_${fromLabel}_to_${toLabel}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        toast.success('Orders exported to CSV.');
+    };
 
     // Function to update tracking details (AWB), auto-set status and notify customer
     const updateTrackingDetails = async () => {
@@ -525,6 +680,9 @@ export default function StoreOrders() {
         if (status === 'CANCELLED') {
             return resolvedPaid ? 'Cancelled (Paid)' : 'Cancelled (Unpaid)';
         }
+        if (status === 'RTO') {
+            return resolvedPaid ? 'RTO (Paid)' : 'RTO (Unpaid)';
+        }
         if (status === 'RETURNED') {
             return resolvedPaid ? 'Returned (Paid)' : 'Returned (Unpaid)';
         }
@@ -622,24 +780,22 @@ export default function StoreOrders() {
 
     useEffect(() => {
         const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, '0');
-        const dd = String(today.getDate()).padStart(2, '0');
-        const todayStr = `${yyyy}-${mm}-${dd}`;
+        const startOfToday = new Date(today);
+        startOfToday.setHours(0, 0, 0, 0);
+        const endOfToday = new Date(today);
+        endOfToday.setHours(23, 59, 59, 999);
 
         if (datePreset === 'TODAY') {
-            setFromDate(todayStr);
-            setToDate(todayStr);
+            setFromDate(formatDateTimeLocalValue(startOfToday));
+            setToDate(formatDateTimeLocalValue(endOfToday));
             return;
         }
         if (datePreset === 'LAST_7_DAYS') {
             const lastWeek = new Date(today);
             lastWeek.setDate(today.getDate() - 6);
-            const wyyyy = lastWeek.getFullYear();
-            const wmm = String(lastWeek.getMonth() + 1).padStart(2, '0');
-            const wdd = String(lastWeek.getDate()).padStart(2, '0');
-            setFromDate(`${wyyyy}-${wmm}-${wdd}`);
-            setToDate(todayStr);
+            lastWeek.setHours(0, 0, 0, 0);
+            setFromDate(formatDateTimeLocalValue(lastWeek));
+            setToDate(formatDateTimeLocalValue(endOfToday));
             return;
         }
         if (datePreset === 'ALL') {
@@ -814,7 +970,7 @@ export default function StoreOrders() {
 
             {/* Status Filter Tabs */}
             <div className="mb-6 flex flex-wrap gap-2">
-                {['ALL', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'PAYMENT_FAILED', 'RETURNED', 'RETURN_REQUESTED'].map(status => (
+                {['ALL', 'PROCESSING', 'MANIFESTED', 'PICKUP_SCHEDULED', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'PAYMENT_FAILED', 'RTO', 'RETURNED', 'RETURN_REQUESTED'].map(status => (
                     <button
                         key={status}
                         onClick={() => setFilterStatus(status)}
@@ -858,11 +1014,11 @@ export default function StoreOrders() {
                         Last 7 Days
                     </button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                     <div>
-                        <label className="text-xs text-slate-500">From</label>
+                        <label className="text-xs text-slate-500">From Date & Time</label>
                         <input
-                            type="date"
+                            type="datetime-local"
                             value={fromDate}
                             onChange={(e) => {
                                 setFromDate(e.target.value);
@@ -872,9 +1028,9 @@ export default function StoreOrders() {
                         />
                     </div>
                     <div>
-                        <label className="text-xs text-slate-500">To</label>
+                        <label className="text-xs text-slate-500">To Date & Time</label>
                         <input
-                            type="date"
+                            type="datetime-local"
                             value={toDate}
                             onChange={(e) => {
                                 setToDate(e.target.value);
@@ -883,8 +1039,21 @@ export default function StoreOrders() {
                             className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
                         />
                     </div>
-                    <div className="sm:col-span-2 flex items-end">
-                        <div className="text-xs text-slate-500">Showing orders by date range</div>
+                    <div className="sm:col-span-2 lg:col-span-2 flex flex-col sm:flex-row sm:items-end gap-3">
+                        <div className="text-xs text-slate-500 sm:flex-1">Showing orders by date range</div>
+                        <button
+                            type="button"
+                            onClick={exportOrdersToCsv}
+                            disabled={filteredOrders.length === 0}
+                            className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
+                                filteredOrders.length === 0
+                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                    : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm'
+                            }`}
+                        >
+                            <Download size={16} />
+                            <span>Export CSV</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -904,7 +1073,7 @@ export default function StoreOrders() {
                                 <th className="px-4 py-3">Status</th>
                                 <th className="px-4 py-3">Need to Pick</th>
                                 <th className="px-4 py-3">Tracking</th>
-                                <th className="px-4 py-3">Date</th>
+                                <th className="px-4 py-3">Date & Time</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -999,7 +1168,7 @@ export default function StoreOrders() {
                                             <span className="text-slate-400 text-xs">Not shipped</span>
                                         )}
                                     </td>
-                                    <td className="px-4 py-3 text-gray-500 text-xs">{new Date(order.createdAt).toLocaleDateString()}</td>
+                                    <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{new Date(order.createdAt).toLocaleString()}</td>
                                   </tr>
                                 );
                             })}

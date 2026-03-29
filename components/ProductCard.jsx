@@ -197,7 +197,7 @@ const ProductCard = ({ product }) => {
                                 alt={displayName}
                                 fill
                                 unoptimized
-                                className={`object-cover transition-transform duration-300 group-hover:scale-105 ${hovered && videoReady ? 'invisible' : 'visible'}`}
+                                className={`object-contain p-1.5 transition-transform duration-300 scale-[1.06] group-hover:scale-[1.12] ${hovered && videoReady ? 'invisible' : 'visible'}`}
                                 onError={(e) => {
                                     if (e.currentTarget.src !== 'https://ik.imagekit.io/jrstupuke/placeholder.png') {
                                         e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png'
@@ -233,7 +233,7 @@ const ProductCard = ({ product }) => {
                             alt={displayName}
                             fill
                             unoptimized
-                            className="object-cover transition-transform duration-300 group-hover:scale-105"
+                            className="object-contain p-1.5 transition-transform duration-300 scale-[1.06] group-hover:scale-[1.12]"
                             onError={(e) => {
                                 if (e.currentTarget.src !== 'https://ik.imagekit.io/jrstupuke/placeholder.png') {
                                     e.currentTarget.src = 'https://ik.imagekit.io/jrstupuke/placeholder.png'
@@ -244,38 +244,72 @@ const ProductCard = ({ product }) => {
                 </div>
 
                 {/* Product Details */}
-                <div className="flex flex-col p-2 sm:p-2.5 flex-1">
-                    <h3 className="font-semibold text-gray-900 text-xs sm:text-sm leading-tight line-clamp-1 mb-0.5">
+                <div className="flex flex-col p-2 sm:p-2.5">
+                    <h3 className="min-h-[2rem] text-xs font-semibold leading-tight text-gray-900 line-clamp-2 sm:min-h-[2.5rem] sm:text-sm mb-1">
                         {displayName}
                     </h3>
 
-                    <div className="flex items-center justify-between mb-0.5">
-                        <div className="flex items-center gap-0.5">
-                            {ratingCount > 0 ? (
-                                <>
-                                    <div className="flex items-center">
-                                        {Array(5).fill('').map((_, index) => (
-                                            <StarIcon
-                                                key={index}
-                                                size={10}
-                                                className="text-yellow-400"
-                                                fill={averageRating >= index + 1 ? '#FBBF24' : 'none'}
-                                                stroke={averageRating >= index + 1 ? '#FBBF24' : '#D1D5DB'}
-                                                strokeWidth={1.5}
-                                            />
-                                        ))}
-                                    </div>
-                                    <span className="text-[10px] sm:text-[11px] text-gray-400">({ratingCount})</span>
-                                </>
-                            ) : (
-                                <span className="text-[10px] sm:text-[11px] text-red-400">No reviews</span>
+                    <div className="mt-1 flex items-end justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-0.5">
+                                {ratingCount > 0 ? (
+                                    <>
+                                        <div className="flex items-center">
+                                            {Array(5).fill('').map((_, index) => (
+                                                <StarIcon
+                                                    key={index}
+                                                    size={10}
+                                                    className="text-yellow-400"
+                                                    fill={averageRating >= index + 1 ? '#FBBF24' : 'none'}
+                                                    stroke={averageRating >= index + 1 ? '#FBBF24' : '#D1D5DB'}
+                                                    strokeWidth={1.5}
+                                                />
+                                            ))}
+                                        </div>
+                                        <span className="text-[10px] sm:text-[11px] text-gray-400">({ratingCount})</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="flex items-center">
+                                            {Array(5).fill('').map((_, index) => (
+                                                <StarIcon
+                                                    key={index}
+                                                    size={10}
+                                                    className="text-gray-300"
+                                                    fill="none"
+                                                    stroke="#D1D5DB"
+                                                    strokeWidth={1.5}
+                                                />
+                                            ))}
+                                        </div>
+                                        <span className="text-[10px] sm:text-[11px] text-gray-400">(0)</span>
+                                    </>
+                                )}
+                            </div>
+
+                            {showPrice && (
+                                <div className="mt-1 flex min-h-[2.6rem] flex-col justify-end gap-0.5">
+                                    {priceNum > 0 && (
+                                        <p className="text-sm font-bold text-gray-900 sm:text-base">{currency} {priceNum.toFixed(2)}</p>
+                                    )}
+                                    {mrpNum > 0 && mrpNum > priceNum && priceNum > 0 && (
+                                        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                                            <p className="text-[10px] text-gray-400 line-through sm:text-xs">{currency} {mrpNum.toFixed(2)}</p>
+                                            {discount > 0 && (
+                                                <span className="text-[10px] font-semibold text-green-600 sm:text-xs">
+                                                    {discount}% off
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             )}
                         </div>
 
                         <button
                             onClick={handleAddToCart}
                             disabled={isOutOfStock}
-                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 relative flex-shrink-0"
+                            className="mb-0.5 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 relative flex-shrink-0"
                             style={{ backgroundColor: isOutOfStock ? '#9CA3AF' : (itemQuantity > 0 ? '#262626' : '#DC013C') }}
                             onMouseEnter={(e) => {
                                 if (isOutOfStock) return
@@ -294,24 +328,6 @@ const ProductCard = ({ product }) => {
                             )}
                         </button>
                     </div>
-
-                    {showPrice && (
-                        <div className="flex items-center gap-1.5">
-                            {priceNum > 0 && (
-                                <p className="text-sm sm:text-base font-bold text-gray-900">{currency} {priceNum.toFixed(2)}</p>
-                            )}
-                            {mrpNum > 0 && mrpNum > priceNum && priceNum > 0 && (
-                                <div className="flex items-center gap-1.5">
-                                    <p className="text-[10px] sm:text-xs text-gray-400 line-through">{currency} {mrpNum.toFixed(2)}</p>
-                                    {discount > 0 && (
-                                        <span className="text-[10px] sm:text-xs font-semibold text-green-600">
-                                            {discount}% off
-                                        </span>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
                 </div>
             </div>
         </Link>

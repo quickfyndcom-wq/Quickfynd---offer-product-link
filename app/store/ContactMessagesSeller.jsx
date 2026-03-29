@@ -21,15 +21,15 @@ export default function ContactMessagesSeller() {
   };
 
   return (
-    <div id="contact-messages" className="bg-white rounded-lg shadow p-6 mt-8">
-      <h2 className="text-xl font-bold mb-4">Contact Us Messages</h2>
+    <div id="contact-messages" className="bg-white rounded-lg shadow p-4 sm:p-6 mt-8 overflow-hidden">
+      <h2 className="text-lg sm:text-xl font-bold mb-4">Contact Us Messages</h2>
       {loading ? (
         <div>Loading...</div>
       ) : messages.length === 0 ? (
         <div className="text-gray-500 text-center py-8">No contact messages have been received yet.</div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <table className="min-w-[640px] w-full text-sm">
             <thead>
               <tr className="bg-gray-100">
                 <th className="p-2 text-left">Name</th>

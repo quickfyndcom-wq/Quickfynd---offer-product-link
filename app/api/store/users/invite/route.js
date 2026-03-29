@@ -12,6 +12,7 @@ import { Resend } from 'resend';
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const EMAIL_FROM = process.env.EMAIL_FROM;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const EMAIL_LOGO_URL = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://quickfynd.com'}/assets/logo/logo3.png`;
 
 export async function POST(request) {
   try {
@@ -64,6 +65,9 @@ export async function POST(request) {
     const emailSubject = `🚀 You're invited to join ${store.name} on Quickfynd!`;
     const emailBody = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
+        <div style="text-align:center; padding: 20px 0 8px 0;">
+          <img src="${EMAIL_LOGO_URL}" alt="QuickFynd" style="width: 170px; max-width: 100%; height: auto;" />
+        </div>
         <h2 style="color: #ff6600;">Quickfynd Store Invitation</h2>
         <p>Hello,</p>
         <p><b>${store.name}</b> has invited you to join their store team on <a href="https://quickfynd.com" style="color: #ff6600;">Quickfynd</a>.</p>

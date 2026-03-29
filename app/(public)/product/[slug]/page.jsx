@@ -11,36 +11,80 @@ import { onAuthStateChanged } from "firebase/auth";
 
 // Skeleton Loader Components
 const ProductDetailsSkeleton = () => (
-    <div className="animate-pulse">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-            {/* Image Skeleton */}
-            <div>
-                <div className="bg-slate-200 rounded-lg h-96 mb-4"></div>
-                <div className="flex gap-2">
-                    {[1, 2, 3, 4].map(i => (
-                        <div key={i} className="bg-slate-200 rounded h-20 w-20"></div>
-                    ))}
+    <div className="bg-gray-50 animate-pulse">
+        {/* Breadcrumb bar */}
+        <div className="bg-white border-b border-gray-200">
+            <div className="max-w-[1450px] mx-auto px-4 sm:px-6 lg:px-8 py-3">
+                <div className="flex items-center gap-2">
+                    <div className="h-4 bg-slate-200 rounded w-10"></div>
+                    <div className="h-3 bg-slate-200 rounded w-2"></div>
+                    <div className="h-4 bg-slate-200 rounded w-16"></div>
+                    <div className="h-3 bg-slate-200 rounded w-2"></div>
+                    <div className="h-4 bg-slate-200 rounded w-48"></div>
                 </div>
             </div>
-            
-            {/* Details Skeleton */}
-            <div className="space-y-4">
-                <div className="h-8 bg-slate-200 rounded w-3/4"></div>
-                <div className="h-6 bg-slate-200 rounded w-1/4"></div>
-                <div className="space-y-2">
-                    <div className="h-4 bg-slate-200 rounded w-full"></div>
-                    <div className="h-4 bg-slate-200 rounded w-5/6"></div>
-                    <div className="h-4 bg-slate-200 rounded w-4/6"></div>
+        </div>
+
+        <div className="max-w-[1450px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 lg:gap-8 items-start">
+
+                {/* LEFT: Thumbnail strip + Main image (desktop) */}
+                <div className="space-y-4">
+                    {/* Desktop layout */}
+                    <div className="hidden lg:flex gap-2">
+                        {/* Vertical thumbnail strip */}
+                        <div className="flex flex-col gap-2 w-14 flex-shrink-0">
+                            {[1, 2, 3, 4].map(i => (
+                                <div key={i} className="w-14 h-14 bg-slate-200 rounded"></div>
+                            ))}
+                        </div>
+                        {/* Main image */}
+                        <div className="flex-1 bg-slate-200 rounded h-[500px] xl:h-[560px]"></div>
+                    </div>
+
+                    {/* Mobile layout: just the main image */}
+                    <div className="lg:hidden bg-slate-200 rounded h-80 w-full"></div>
+                    {/* Mobile thumbnails */}
+                    <div className="lg:hidden flex gap-2 px-4">
+                        {[1, 2, 3, 4].map(i => (
+                            <div key={i} className="w-14 h-14 bg-slate-200 rounded flex-shrink-0"></div>
+                        ))}
+                    </div>
                 </div>
-                <div className="h-10 bg-slate-200 rounded w-full"></div>
-                <div className="h-10 bg-slate-200 rounded w-full"></div>
+
+                {/* RIGHT: Product details */}
+                <div className="px-4 lg:px-0 pt-4 lg:pt-0 space-y-4">
+                    {/* Title */}
+                    <div className="h-7 bg-slate-200 rounded w-3/4"></div>
+                    <div className="h-5 bg-slate-200 rounded w-1/2"></div>
+                    {/* Rating row */}
+                    <div className="flex items-center gap-2">
+                        <div className="h-4 bg-slate-200 rounded w-28"></div>
+                        <div className="h-4 bg-slate-200 rounded w-10"></div>
+                    </div>
+                    {/* Price */}
+                    <div className="h-8 bg-slate-200 rounded w-32"></div>
+                    <div className="flex gap-2">
+                        <div className="h-4 bg-slate-200 rounded w-20"></div>
+                        <div className="h-4 bg-slate-200 rounded w-16"></div>
+                    </div>
+                    {/* Description lines */}
+                    <div className="space-y-2 pt-2">
+                        <div className="h-4 bg-slate-200 rounded w-full"></div>
+                        <div className="h-4 bg-slate-200 rounded w-5/6"></div>
+                        <div className="h-4 bg-slate-200 rounded w-4/6"></div>
+                    </div>
+                    {/* Action buttons */}
+                    <div className="h-12 bg-slate-200 rounded-lg w-full mt-2"></div>
+                    <div className="h-12 bg-slate-200 rounded-lg w-full"></div>
+                </div>
             </div>
         </div>
     </div>
 );
 
 const ProductDescriptionSkeleton = () => (
-    <div className="animate-pulse space-y-4 mt-8">
+    <div className="animate-pulse max-w-[1450px] mx-auto px-4 sm:px-6 lg:px-8 space-y-4 mt-8 pb-8">
         <div className="h-6 bg-slate-200 rounded w-1/4"></div>
         <div className="space-y-2">
             <div className="h-4 bg-slate-200 rounded w-full"></div>
@@ -261,7 +305,7 @@ export default function ProductBySlug() {
 
     return (
         <div className="w-full">
-            <div className="max-w-[1250px] mx-auto px-2 sm:px-6 pb-24 lg:pb-0">
+            <div className="max-w-[1250px] mx-auto px-0 sm:px-6 pb-8 sm:pb-24 lg:pb-0">
                 {/* Product Details */}
                 {loading ? (
                     <>
@@ -277,7 +321,7 @@ export default function ProductBySlug() {
                         {loadingRelated ? (
                             <RelatedProductsSkeleton />
                         ) : relatedProducts.length > 0 && (
-                            <div className="px-4 mt-12 mb-16">
+                            <div className="px-4 mt-12 mb-4 sm:mb-16">
                                 <h2 className="text-2xl font-semibold text-slate-800 mb-6">Recommended Products</h2>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-5 gap-6">
                                     {relatedProducts.map((prod) => (

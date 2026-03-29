@@ -11,6 +11,10 @@ const AbandonedCartSchema = new mongoose.Schema({
   cartTotal: Number,
   currency: String,
   lastSeenAt: Date,
+  recoveryOfferToken: String,
+  recoveryOfferExpiresAt: Date,
+  recoveryEmailSentAt: Date,
+  recoveryProductId: String,
   source: { type: String, default: 'checkout' },
 }, { timestamps: true });
 

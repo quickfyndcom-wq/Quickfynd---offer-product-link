@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Menu } from 'lucide-react';
+import { ChevronRight, Menu } from 'lucide-react';
 
 const MAX_ITEMS = 12;
 const SKELETON_ITEMS = Array.from({ length: 8 });
@@ -10,6 +10,37 @@ const SKELETON_ITEMS = Array.from({ length: 8 });
 export default function NavbarMenuBar() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showScrollHint, setShowScrollHint] = useState(false);
+  const scrollContainerRef = useRef(null);
+
+  const handleScrollRight = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    container.scrollBy({
+      left: Math.max(container.clientWidth * 0.7, 180),
+      behavior: 'smooth',
+    });
+  };
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return undefined;
+
+    const updateScrollHint = () => {
+      const remainingScroll = container.scrollWidth - container.clientWidth - container.scrollLeft;
+      setShowScrollHint(remainingScroll > 16);
+    };
+
+    updateScrollHint();
+    container.addEventListener('scroll', updateScrollHint, { passive: true });
+    window.addEventListener('resize', updateScrollHint);
+
+    return () => {
+      container.removeEventListener('scroll', updateScrollHint);
+      window.removeEventListener('resize', updateScrollHint);
+    };
+  }, [items, loading]);
 
   useEffect(() => {
     const fetchMenu = async () => {
@@ -45,7 +76,9 @@ export default function NavbarMenuBar() {
   return (
     <div className="w-full bg-white text-gray-800 border-b border-gray-200">
       <div className="max-w-[1240px] mx-auto px-4 py-2.5">
+        <div className="relative">
         <div
+          ref={scrollContainerRef}
           className="flex items-center justify-start gap-3 overflow-x-auto whitespace-nowrap"
           style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}
         >
@@ -77,6 +110,21 @@ export default function NavbarMenuBar() {
               </Link>
             </div>
           ))}
+        </div>
+        {showScrollHint && (
+          <div className="absolute inset-y-0 right-0 flex items-center pr-1">
+            <div className="flex h-full items-center bg-gradient-to-r from-white/0 via-white/90 to-white pl-8">
+              <button
+                type="button"
+                onClick={handleScrollRight}
+                aria-label="Scroll menu right"
+                className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-orange-200 bg-white/95 text-orange-500 shadow-sm transition hover:border-orange-300 hover:bg-orange-50"
+              >
+                <ChevronRight size={15} className="animate-[pulse_1.4s_ease-in-out_infinite]" />
+              </button>
+            </div>
+          </div>
+        )}
         </div>
       </div>
     </div>

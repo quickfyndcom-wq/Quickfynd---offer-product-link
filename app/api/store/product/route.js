@@ -104,6 +104,20 @@ export async function POST(request) {
         });
         
         const sku = formData.get("sku") || null;
+        const metaTitle = (formData.get("metaTitle") || "").toString().trim();
+        const metaDescription = (formData.get("metaDescription") || "").toString().trim();
+        const seoKeywordsRaw = formData.get("seoKeywords");
+        let seoKeywords = [];
+        if (seoKeywordsRaw) {
+            try {
+                const parsedKeywords = JSON.parse(seoKeywordsRaw);
+                seoKeywords = Array.isArray(parsedKeywords)
+                    ? parsedKeywords.map((keyword) => String(keyword || '').trim()).filter(Boolean)
+                    : [];
+            } catch {
+                seoKeywords = [];
+            }
+        }
         const images = formData.getAll("images");
         const stockQuantity = formData.get("stockQuantity") ? Number(formData.get("stockQuantity")) : 0;
         // New: variants support
@@ -236,6 +250,9 @@ export async function POST(request) {
             slug,
             description,
             shortDescription,
+            metaTitle,
+            metaDescription,
+            seoKeywords,
             mrp: finalMrp,
             price: finalPrice,
             category: categories[0], // Keep first category for backward compatibility
@@ -380,6 +397,20 @@ export async function PUT(request) {
         const category = formData.get("category"); // Kept for backward compatibility
         const categoriesRaw = formData.get("categories"); // New: JSON array of category IDs
         const sku = formData.get("sku");
+        const metaTitle = formData.get("metaTitle")?.toString().trim();
+        const metaDescription = formData.get("metaDescription")?.toString().trim();
+        const seoKeywordsRaw = formData.get("seoKeywords");
+        let seoKeywords = [];
+        if (seoKeywordsRaw !== null && seoKeywordsRaw !== undefined) {
+            try {
+                const parsedKeywords = JSON.parse(seoKeywordsRaw);
+                seoKeywords = Array.isArray(parsedKeywords)
+                    ? parsedKeywords.map((keyword) => String(keyword || '').trim()).filter(Boolean)
+                    : [];
+            } catch {
+                seoKeywords = [];
+            }
+        }
         const images = formData.getAll("images");
         const stockQuantity = formData.get("stockQuantity") ? Number(formData.get("stockQuantity")) : undefined;
         // Variants support
@@ -410,6 +441,10 @@ export async function PUT(request) {
             return NextResponse.json({ error: "Invalid productId format" }, { status: 400 });
         }
         if (!product || product.storeId !== storeId) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+
+        if (seoKeywordsRaw === null || seoKeywordsRaw === undefined) {
+            seoKeywords = Array.isArray(product.seoKeywords) ? product.seoKeywords : [];
+        }
 
         let imagesUrl = product.images;
         // If images are all strings (URLs), treat as full replacement (for deletion)
@@ -487,6 +522,9 @@ export async function PUT(request) {
             name,
             description,
             shortDescription,
+            metaTitle: metaTitle ?? product.metaTitle ?? '',
+            metaDescription: metaDescription ?? product.metaDescription ?? '',
+            seoKeywords,
             mrp: finalMrp,
             price: finalPrice,
             category: categories[0], // Keep first category for backward compatibility

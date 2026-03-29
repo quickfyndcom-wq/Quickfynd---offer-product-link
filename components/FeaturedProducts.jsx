@@ -186,7 +186,7 @@ const ProductCard = ({ product }) => {
               />
             ))}
             <span className="text-gray-500 text-[8px] sm:text-xs ml-1 truncate">
-              {reviewCount > 0 ? `(${reviewCount})` : 'No reviews yet'}
+              {reviewCount > 0 ? `(${reviewCount})` : '(0)'}
             </span>
           </div>
         </div>

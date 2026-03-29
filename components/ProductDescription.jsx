@@ -133,39 +133,64 @@ const ProductDescription = ({ product, reviews = [], loadingReviews = false, onR
                     <h2 className="text-lg sm:text-xl font-bold text-gray-900">Product Description</h2>
                 </div>
                 <div className="p-4 sm:p-6">
-                    <div 
-                        className="max-w-none
-                        [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-gray-900 [&_h1]:mb-4 [&_h1]:mt-4
-                        [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-gray-900 [&_h2]:mb-3 [&_h2]:mt-3
-                        [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-gray-900 [&_h3]:mb-2 [&_h3]:mt-2
-                        [&_p]:text-gray-700 [&_p]:leading-relaxed [&_p]:mb-4
-                        [&_strong]:font-semibold [&_strong]:text-gray-900
-                        [&_em]:italic [&_em]:text-gray-800
-                        [&_u]:underline
-                        [&_ul]:list-disc [&_ul]:list-inside [&_ul]:text-gray-700 [&_ul]:mb-4 [&_ul]:ml-4
-                        [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:text-gray-700 [&_ol]:mb-4 [&_ol]:ml-4
-                        [&_li]:text-gray-700 [&_li]:mb-1
-                        [&_a]:text-blue-600 [&_a]:underline [&_a:hover]:text-blue-800
-                        [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:shadow-sm [&_img]:my-4
-                        [&_video]:max-w-full [&_video]:w-full [&_video]:h-auto [&_video]:rounded-lg [&_video]:shadow-sm [&_video]:my-4
-                        [&_figure]:my-6 [&_figure]:text-center
-                        [&_figcaption]:text-sm [&_figcaption]:text-gray-600 [&_figcaption]:mt-2
-                        [&_blockquote]:border-l-4 [&_blockquote]:border-orange-500 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-gray-700 [&_blockquote]:my-4
-                        [&_code]:bg-gray-100 [&_code]:px-2 [&_code]:py-1 [&_code]:rounded [&_code]:text-sm [&_code]:font-mono [&_code]:text-red-600
-                        [&_pre]:bg-gray-900 [&_pre]:text-gray-100 [&_pre]:p-4 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_pre]:my-4
-                        [&_pre_code]:bg-none [&_pre_code]:text-inherit [&_pre_code]:p-0
-                        [&_hr]:border-t-2 [&_hr]:border-gray-300 [&_hr]:my-6
-                        [&_table]:w-full [&_table]:border-collapse [&_table]:my-6 [&_table]:border [&_table]:border-gray-300
-                        [&_thead]:bg-gray-100
-                        [&_thead_th]:text-left [&_thead_th]:px-4 [&_thead_th]:py-3 [&_thead_th]:font-semibold [&_thead_th]:text-gray-800 [&_thead_th]:border [&_thead_th]:border-gray-300
-                        [&_tbody_tr]:border-b [&_tbody_tr]:border-gray-300
-                        [&_tbody_tr:hover]:bg-gray-50
-                        [&_tbody_tr:last-child]:border-b-0
-                        [&_tbody_td]:px-4 [&_tbody_td]:py-3 [&_tbody_td]:text-gray-700 [&_tbody_td]:border [&_tbody_td]:border-gray-300
-                        [&_tfoot_th]:text-left [&_tfoot_th]:px-4 [&_tfoot_th]:py-3 [&_tfoot_th]:font-semibold [&_tfoot_th]:text-gray-800 [&_tfoot_th]:border [&_tfoot_th]:border-gray-300 [&_tfoot_th]:bg-gray-50
-                        [&_br]:block"
-                        dangerouslySetInnerHTML={{ __html: product.description }}
-                    />
+                    {product?.description && product.description.trim() ? (
+                        <div 
+                            className="max-w-none prose prose-sm sm:prose dark:prose-invert
+                            [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:text-gray-900 [&_h1]:mb-4 [&_h1]:mt-6 [&_h1]:leading-tight
+                            [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:text-gray-900 [&_h2]:mb-3 [&_h2]:mt-5 [&_h2]:leading-tight
+                            [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-gray-900 [&_h3]:mb-3 [&_h3]:mt-4 [&_h3]:leading-tight
+                            [&_h4]:text-lg [&_h4]:font-semibold [&_h4]:text-gray-900 [&_h4]:mb-2 [&_h4]:mt-3
+                            [&_h5]:text-base [&_h5]:font-semibold [&_h5]:text-gray-900 [&_h5]:mb-2 [&_h5]:mt-2
+                            [&_h6]:text-sm [&_h6]:font-semibold [&_h6]:text-gray-900 [&_h6]:mb-2 [&_h6]:mt-2
+                            [&_p]:text-gray-700 [&_p]:leading-relaxed [&_p]:mb-4 [&_p]:text-base
+                            [&_strong]:font-bold [&_strong]:text-gray-900 [&_strong]:not-italic
+                            [&_b]:font-bold [&_b]:text-gray-900 [&_b]:not-italic
+                            [&_em]:italic [&_em]:text-gray-800 [&_em]:not-bold
+                            [&_i]:italic [&_i]:text-gray-800 [&_i]:not-bold
+                            [&_u]:underline [&_u]:decoration-solid [&_u]:underline-offset-2
+                            [&_s]:line-through [&_s]:text-gray-600
+                            [&_mark]:bg-yellow-100 [&_mark]:px-1
+                            [&_ul]:list-disc [&_ul]:list-outside [&_ul]:text-gray-700 [&_ul]:mb-4 [&_ul]:ml-6 [&_ul]:space-y-2
+                            [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:text-gray-700 [&_ol]:mb-4 [&_ol]:ml-6 [&_ol]:space-y-2
+                            [&_li]:text-gray-700 [&_li]:mb-0 [&_li]:pl-2
+                            [&_li_p]:mb-0
+                            [&_dl]:space-y-3
+                            [&_dt]:font-semibold [&_dt]:text-gray-900 [&_dt]:mt-2
+                            [&_dd]:ml-6 [&_dd]:text-gray-700
+                            [&_a]:text-blue-600 [&_a]:underline [&_a:hover]:text-blue-800 [&_a]:break-words [&_a]:transition-colors
+                            [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:shadow-md [&_img]:my-6 [&_img]:border [&_img]:border-gray-200
+                            [&_video]:max-w-full [&_video]:w-full [&_video]:h-auto [&_video]:rounded-lg [&_video]:shadow-md [&_video]:my-6 [&_video]:border [&_video]:border-gray-200
+                            [&_figure]:my-6 [&_figure]:text-center [&_figure]:flex [&_figure]:flex-col [&_figure]:items-center
+                            [&_figcaption]:text-sm [&_figcaption]:text-gray-600 [&_figcaption]:mt-2 [&_figcaption]:italic
+                            [&_blockquote]:border-l-4 [&_blockquote]:border-orange-500 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-gray-700 [&_blockquote]:my-4 [&_blockquote]:bg-gray-50 [&_blockquote]:py-3
+                            [&_code]:bg-gray-100 [&_code]:px-2 [&_code]:py-1 [&_code]:rounded [&_code]:text-sm [&_code]:font-mono [&_code]:text-red-600 [&_code]:not-italic
+                            [&_pre]:bg-gray-900 [&_pre]:text-gray-100 [&_pre]:p-4 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_pre]:my-4 [&_pre]:text-sm [&_pre]:shadow-lg
+                            [&_pre_code]:bg-none [&_pre_code]:text-inherit [&_pre_code]:p-0 [&_pre_code]:font-mono
+                            [&_hr]:border-t-2 [&_hr]:border-gray-300 [&_hr]:my-6 [&_hr]:mx-0
+                            [&_table]:w-full [&_table]:border-collapse [&_table]:my-6 [&_table]:border [&_table]:border-gray-300 [&_table]:shadow-sm
+                            [&_thead]:bg-gray-100
+                            [&_thead_th]:text-left [&_thead_th]:px-4 [&_thead_th]:py-3 [&_thead_th]:font-semibold [&_thead_th]:text-gray-800 [&_thead_th]:border [&_thead_th]:border-gray-300 [&_thead_th]:bg-gray-100
+                            [&_tbody_tr]:border-b [&_tbody_tr]:border-gray-300 [&_tbody_tr]:transition-colors
+                            [&_tbody_tr:hover]:bg-gray-50
+                            [&_tbody_tr:last-child]:border-b
+                            [&_tbody_td]:px-4 [&_tbody_td]:py-3 [&_tbody_td]:text-gray-700 [&_tbody_td]:border [&_tbody_td]:border-gray-300
+                            [&_tfoot]:bg-gray-50
+                            [&_tfoot_tr]:border-t-2 [&_tfoot_tr]:border-gray-300
+                            [&_tfoot_th]:text-left [&_tfoot_th]:px-4 [&_tfoot_th]:py-3 [&_tfoot_th]:font-semibold [&_tfoot_th]:text-gray-800 [&_tfoot_th]:border [&_tfoot_th]:border-gray-300
+                            [&_br]:block
+                            [&_.text-center]:text-center
+                            [&_.text-left]:text-left
+                            [&_.text-right]:text-right
+                            [&_.text-justify]:text-justify
+                            [&_.font-bold]:font-bold
+                            [&_.italic]:italic
+                            [&_.underline]:underline
+                            [&_.line-through]:line-through"
+                            dangerouslySetInnerHTML={{ __html: product.description }}
+                        />
+                    ) : (
+                        <p className="text-gray-500 text-center py-8">No description available for this product.</p>
+                    )}
                 </div>
             </div>
 

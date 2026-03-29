@@ -78,9 +78,10 @@ export default function ProductForm({ product = null, onClose, onSubmitSuccess }
         const [variants, setVariants] = useState([]);
         const [images, setImages] = useState({ "1": null, "2": null, "3": null, "4": null, "5": null, "6": null, "7": null, "8": null });
         const [productInfo, setProductInfo] = useState({
-            name: '', slug: '', brand: '', shortDescription: '', description: '', mrp: '', price: '', category: '', sku: '', stockQuantity: 0, colors: [], sizes: [], fastDelivery: false, allowReturn: true, allowReplacement: true, reviews: [], badges: [], imageAspectRatio: '1:1', tags: [], deliveredBy: '', soldBy: '', paymentInfo: ''
+            name: '', slug: '', brand: '', shortDescription: '', description: '', metaTitle: '', metaDescription: '', seoKeywords: [], mrp: '', price: '', category: '', sku: '', stockQuantity: 0, colors: [], sizes: [], fastDelivery: false, allowReturn: true, allowReplacement: true, reviews: [], badges: [], imageAspectRatio: '1:1', tags: [], deliveredBy: '', soldBy: '', paymentInfo: ''
         });
         const [tagInput, setTagInput] = useState('');
+        const [seoKeywordInput, setSeoKeywordInput] = useState('');
         const [loading, setLoading] = useState(false);
         const [reviewInput, setReviewInput] = useState({ name: '', rating: 5, comment: '', image: null });
         const aspectRatioOptions = ['1:1', '4:5', '3:4', '16:9'];
@@ -280,6 +281,9 @@ export default function ProductForm({ product = null, onClose, onSubmitSuccess }
                 brand: product.brand || "",
                 shortDescription: product.shortDescription || "",
                 description: product.description || "",
+                metaTitle: product.metaTitle || "",
+                metaDescription: product.metaDescription || "",
+                seoKeywords: Array.isArray(product.seoKeywords) ? product.seoKeywords : [],
                 mrp: product.mrp || "",
                 price: product.price || "",
                 category: product.category?._id || product.category || "",
@@ -454,7 +458,7 @@ export default function ProductForm({ product = null, onClose, onSubmitSuccess }
             const token = await getToken()
 
             Object.entries(productInfo).forEach(([key, value]) => {
-                if (["colors", "sizes"].includes(key)) {
+                if (["colors", "sizes", "seoKeywords"].includes(key)) {
                     formData.append(key, JSON.stringify(value))
                 } else if (key === 'reviews') {
                     const cleanReviews = value.map(({ name, rating, comment }) => ({ name, rating, comment }))
@@ -727,6 +731,89 @@ export default function ProductForm({ product = null, onClose, onSubmitSuccess }
                 <div>
                     <label className="block text-sm font-medium mb-1">Short Description</label>
                     <input name="shortDescription" value={productInfo.shortDescription || ''} onChange={onChangeHandler} className="w-full border rounded px-3 py-2" placeholder="One-liner overview" />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Meta Title (optional)</label>
+                        <input
+                            name="metaTitle"
+                            value={productInfo.metaTitle || ''}
+                            onChange={onChangeHandler}
+                            className="w-full border rounded px-3 py-2"
+                            placeholder="SEO title for this product page"
+                            maxLength={70}
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Recommended: up to 60–70 characters</p>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Meta Description (optional)</label>
+                        <input
+                            name="metaDescription"
+                            value={productInfo.metaDescription || ''}
+                            onChange={onChangeHandler}
+                            className="w-full border rounded px-3 py-2"
+                            placeholder="SEO description for this product page"
+                            maxLength={180}
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Recommended: up to 150–160 characters</p>
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium mb-2">SEO Keywords (optional)</label>
+                    <div className="flex gap-2 mb-2">
+                        <input
+                            type="text"
+                            value={seoKeywordInput}
+                            onChange={(e) => setSeoKeywordInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const trimmedKeyword = seoKeywordInput.trim();
+                                    if (trimmedKeyword && !productInfo.seoKeywords.includes(trimmedKeyword)) {
+                                        setProductInfo(prev => ({ ...prev, seoKeywords: [...prev.seoKeywords, trimmedKeyword] }));
+                                        setSeoKeywordInput('');
+                                    }
+                                }
+                            }}
+                            className="flex-1 border rounded px-3 py-2"
+                            placeholder="Type a keyword and press Enter (e.g., wireless earbuds, noise cancelling)"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const trimmedKeyword = seoKeywordInput.trim();
+                                if (trimmedKeyword && !productInfo.seoKeywords.includes(trimmedKeyword)) {
+                                    setProductInfo(prev => ({ ...prev, seoKeywords: [...prev.seoKeywords, trimmedKeyword] }));
+                                    setSeoKeywordInput('');
+                                }
+                            }}
+                            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
+                        >
+                            Add Keyword
+                        </button>
+                    </div>
+                    {productInfo.seoKeywords && productInfo.seoKeywords.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                            {productInfo.seoKeywords.map((keyword, idx) => (
+                                <span
+                                    key={idx}
+                                    className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
+                                >
+                                    {keyword}
+                                    <button
+                                        type="button"
+                                        onClick={() => setProductInfo(prev => ({ ...prev, seoKeywords: prev.seoKeywords.filter((_, i) => i !== idx) }))}
+                                        className="ml-1 text-indigo-600 hover:text-indigo-900 font-bold"
+                                    >
+                                        ×
+                                    </button>
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">Add multiple SEO keywords to improve discoverability on search engines</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

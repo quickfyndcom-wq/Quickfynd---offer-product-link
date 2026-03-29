@@ -39,6 +39,57 @@ export default function Cart() {
         return 'https://ik.imagekit.io/jrstupuke/placeholder.png';
     };
 
+    const computeLineTotal = (price, quantity, bundleQty) => {
+        const numericPrice = Number(price) || 0;
+        const numericQty = Number(quantity) || 0;
+        const numericBundleQty = Number(bundleQty) || 0;
+        if (numericBundleQty > 1) {
+            return (numericPrice / numericBundleQty) * numericQty;
+        }
+        return numericPrice * numericQty;
+    };
+
+    const resolveCartUnitPrice = (product, cartValue) => {
+        const storedPrice = typeof cartValue === 'object' ? cartValue?.price : undefined;
+        if (storedPrice !== undefined && storedPrice !== null) {
+            return Number(storedPrice) || 0;
+        }
+
+        const variantOptions = typeof cartValue === 'object' ? cartValue?.variantOptions || {} : {};
+        const variants = Array.isArray(product?.variants) ? product.variants : [];
+        const matchedVariant = variants.find((variant) => {
+            const options = variant?.options || {};
+            const colorMatch = variantOptions?.color ? options?.color === variantOptions.color : true;
+            const sizeMatch = variantOptions?.size ? options?.size === variantOptions.size : true;
+            if (variantOptions?.bundleQty === null || variantOptions?.bundleQty === undefined) {
+                const optionBundleQty = Number(options?.bundleQty);
+                const isBundleVariant = Number.isFinite(optionBundleQty) && optionBundleQty > 1;
+                return colorMatch && sizeMatch && !isBundleVariant;
+            }
+            const bundleMatch = Number(options?.bundleQty || 0) === Number(variantOptions?.bundleQty || 0);
+            return colorMatch && sizeMatch && bundleMatch;
+        });
+
+        return Number(matchedVariant?.salePrice ?? matchedVariant?.price ?? product?.salePrice ?? product?.price ?? 0) || 0;
+    };
+
+    const getCartVariant = (product, cartValue) => {
+        const variantOptions = typeof cartValue === 'object' ? cartValue?.variantOptions || {} : {};
+        const variants = Array.isArray(product?.variants) ? product.variants : [];
+        return variants.find((variant) => {
+            const options = variant?.options || {};
+            const colorMatch = variantOptions?.color ? options?.color === variantOptions.color : true;
+            const sizeMatch = variantOptions?.size ? options?.size === variantOptions.size : true;
+            if (variantOptions?.bundleQty === null || variantOptions?.bundleQty === undefined) {
+                const optionBundleQty = Number(options?.bundleQty);
+                const isBundleVariant = Number.isFinite(optionBundleQty) && optionBundleQty > 1;
+                return colorMatch && sizeMatch && !isBundleVariant;
+            }
+            const bundleMatch = Number(options?.bundleQty || 0) === Number(variantOptions?.bundleQty || 0);
+            return colorMatch && sizeMatch && bundleMatch;
+        }) || null;
+    };
+
 
     // Ensure products list is loaded for cart display
     useEffect(() => {
@@ -113,32 +164,50 @@ export default function Cart() {
     const createCartArray = () => {
         let total = 0;
         const arr = [];
-        const invalidKeys = [];
 
         for (const [key, value] of Object.entries(cartItems || {})) {
             const product = products.find((p) => String(p._id) === String(key));
             const qty = typeof value === 'number' ? value : value?.quantity || 0;
             
             if (product && qty > 0) {
-                const unitPrice = (typeof value === 'object' ? value?.price : undefined) ?? product.price ?? 0;
-                arr.push({ ...product, quantity: qty, _cartPrice: unitPrice, _cartKey: key });
+                const cartVariantOptions = typeof value === 'object' ? value?.variantOptions || {} : {};
+                const cartBundleQty = Number(cartVariantOptions?.bundleQty || 0);
+                const unitPrice = resolveCartUnitPrice(product, value);
+                const bulkVariants = Array.isArray(product?.variants)
+                    ? product.variants
+                        .filter((variant) => Number(variant?.options?.bundleQty) > 0)
+                        .slice()
+                        .sort((a, b) => Number(a?.options?.bundleQty) - Number(b?.options?.bundleQty))
+                    : [];
+                const nonBundleUnitPrice = resolveCartUnitPrice(product, {
+                    variantOptions: {
+                        ...cartVariantOptions,
+                        bundleQty: null,
+                    },
+                });
+                const baseUnitPrice = Number(nonBundleUnitPrice || unitPrice || 0);
+                const lineTotal = computeLineTotal(unitPrice, qty, cartBundleQty);
+
+                arr.push({
+                    ...product,
+                    quantity: qty,
+                    _cartPrice: unitPrice,
+                    _cartKey: key,
+                    _cartBundleQty: cartBundleQty > 0 ? cartBundleQty : null,
+                    _cartVariantOptions: cartVariantOptions,
+                    _cartBulkVariants: bulkVariants,
+                    _baseUnitPrice: baseUnitPrice,
+                    _lineTotal: lineTotal,
+                });
                 const isOutOfStock = product.inStock === false || (typeof product.stockQuantity === 'number' && product.stockQuantity <= 0);
                 if (!isOutOfStock) {
-                    total += unitPrice * qty;
+                    total += lineTotal;
                 }
             } else if (!product && qty > 0) {
                 // Product not found - could be still loading or deleted
                 // Don't delete it, just skip display for now
                 console.warn('[Cart Page] Product not found in list:', key, 'qty:', qty);
-                invalidKeys.push(key);
             }
-        }
-
-        // Only delete after products are confirmed loaded
-        // (to avoid deleting valid items during initial load)
-        if (productsLoaded && invalidKeys.length > 0) {
-            invalidKeys.forEach((key) => dispatch(deleteItemFromCart({ productId: key })));
-            dispatch(uploadCart({ getToken }));
         }
 
         setCartArray(arr);
@@ -249,7 +318,33 @@ export default function Cart() {
 
     const getMaxQty = (item) => {
         if (item?.inStock === false) return 0;
-        if (typeof item?.stockQuantity === 'number') return Math.max(0, item.stockQuantity);
+        const cartValue = cartItems?.[item?._cartKey || item?._id];
+        const variantOptions = typeof cartValue === 'object' ? cartValue?.variantOptions || {} : {};
+        const selectedVariant = getCartVariant(item, cartValue);
+        const bundleQty = Number(item?._cartBundleQty || 0);
+        const nonBundleVariant = getCartVariant(item, {
+            variantOptions: {
+                ...variantOptions,
+                bundleQty: null,
+            },
+        });
+
+        const selectedMaxQty = typeof selectedVariant?.stock === 'number'
+            ? Math.max(0, bundleQty > 1 ? selectedVariant.stock * bundleQty : selectedVariant.stock)
+            : null;
+        const nonBundleMaxQty = typeof nonBundleVariant?.stock === 'number'
+            ? Math.max(0, nonBundleVariant.stock)
+            : null;
+        const productMaxQty = typeof item?.stockQuantity === 'number'
+            ? Math.max(0, item.stockQuantity)
+            : null;
+
+        const candidates = [selectedMaxQty, nonBundleMaxQty, productMaxQty]
+            .filter((value) => typeof value === 'number' && Number.isFinite(value));
+        if (candidates.length > 0) {
+            return Math.max(...candidates);
+        }
+
         return null;
     };
 
@@ -318,12 +413,17 @@ export default function Cart() {
                                                         <p className="text-lg font-bold text-orange-600">{currency} {(item._cartPrice ?? item.price ?? 0).toLocaleString()}</p>
                                                     </div>
                                                     <div className="flex items-center gap-3">
-                                                        <Counter productId={item._cartKey || item._id} maxQty={maxQty} />
+                                                        <Counter
+                                                            productId={item._cartKey || item._id}
+                                                            maxQty={maxQty}
+                                                            bulkVariants={item._cartBulkVariants}
+                                                            baseUnitPrice={item._baseUnitPrice}
+                                                        />
                                                     </div>
                                                 </div>
 
                                                 <div className="flex items-center justify-between mt-3 md:hidden">
-                                                    <p className="text-sm font-semibold text-gray-900">Total: {currency}{((item._cartPrice ?? item.price ?? 0) * item.quantity).toLocaleString()}</p>
+                                                    <p className="text-sm font-semibold text-gray-900">Total: {currency}{Number(item._lineTotal || 0).toLocaleString()}</p>
                                                     <button
                                                         onClick={() => handleDeleteItemFromCart(item._cartKey || item._id)}
                                                         disabled={!!deletingKeys[item._cartKey]}
@@ -344,7 +444,7 @@ export default function Cart() {
                                                 >
                                                     <Trash2Icon size={20} />
                                                 </button>
-                                                <p className="text-lg font-bold text-gray-900">{currency}{((item._cartPrice ?? item.price ?? 0) * item.quantity).toLocaleString()}</p>
+                                                <p className="text-lg font-bold text-gray-900">{currency}{Number(item._lineTotal || 0).toLocaleString()}</p>
                                             </div>
                                         </div>
                                             );
@@ -382,12 +482,17 @@ export default function Cart() {
                                                                 <p className="text-lg font-bold text-orange-600">{currency} {(item._cartPrice ?? item.price ?? 0).toLocaleString()}</p>
                                                             </div>
                                                             <div className="flex items-center gap-3">
-                                                                <Counter productId={item._cartKey || item._id} maxQty={0} />
+                                                                <Counter
+                                                                    productId={item._cartKey || item._id}
+                                                                    maxQty={0}
+                                                                    bulkVariants={item._cartBulkVariants}
+                                                                    baseUnitPrice={item._baseUnitPrice}
+                                                                />
                                                             </div>
                                                         </div>
 
                                                         <div className="flex items-center justify-between mt-3 md:hidden">
-                                                            <p className="text-sm font-semibold text-gray-900">Total: {currency}{((item._cartPrice ?? item.price ?? 0) * item.quantity).toLocaleString()}</p>
+                                                            <p className="text-sm font-semibold text-gray-900">Total: {currency}{Number(item._lineTotal || 0).toLocaleString()}</p>
                                                             <button
                                                                 onClick={() => handleDeleteItemFromCart(item._cartKey || item._id)}
                                                                 disabled={!!deletingKeys[item._cartKey]}
@@ -408,7 +513,7 @@ export default function Cart() {
                                                         >
                                                             <Trash2Icon size={20} />
                                                         </button>
-                                                        <p className="text-lg font-bold text-gray-900">{currency}{((item._cartPrice ?? item.price ?? 0) * item.quantity).toLocaleString()}</p>
+                                                        <p className="text-lg font-bold text-gray-900">{currency}{Number(item._lineTotal || 0).toLocaleString()}</p>
                                                     </div>
                                                 </div>
                                             </div>

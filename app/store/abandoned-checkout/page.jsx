@@ -104,6 +104,7 @@ export default function AbandonedCheckoutPage() {
                 <th className="text-left p-3">Source</th>
                 <th className="text-left p-3">Customer</th>
                 <th className="text-left p-3">Contact</th>
+                <th className="text-left p-3">Recovery Mail</th>
                 <th className="text-left p-3">Location</th>
                 <th className="text-left p-3">Products in Cart</th>
                 <th className="text-left p-3">Total</th>
@@ -124,6 +125,26 @@ export default function AbandonedCheckoutPage() {
                   <td className="p-3">
                     <div className={!c.email ? "text-slate-400 italic" : ""}>{c.email || "Email not provided"}</div>
                     <div className="text-xs text-slate-500">{c.phone || "-"}</div>
+                  </td>
+                  <td className="p-3">
+                    {c.recoveryEmailSentAt ? (
+                      <div className="space-y-1">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                          <span>✉️</span>
+                          <span>Auto Mail Sent</span>
+                        </span>
+                        <div className="text-xs text-slate-600">
+                          Sent: {new Date(c.recoveryEmailSentAt).toLocaleString()}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          Expires: {c.recoveryOfferExpiresAt ? new Date(c.recoveryOfferExpiresAt).toLocaleString() : "-"}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
+                        Not sent
+                      </span>
+                    )}
                   </td>
                   <td className="p-3">
                     <div className="text-sm max-w-xs">

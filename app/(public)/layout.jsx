@@ -17,6 +17,7 @@ function PublicLayoutContent({ children }) {
     const isHomePage = pathname === '/';
     const isCheckout = pathname === '/checkout';
     const isCartPage = pathname === '/cart';
+    const isProductDetailPage = pathname?.startsWith('/product/') || pathname?.startsWith('/offer/');
     const isShopCategoryPage = pathname === '/shop' && Boolean(searchParams.get('category'));
 
     useEffect(() => { 
@@ -35,7 +36,7 @@ function PublicLayoutContent({ children }) {
             <UtmTracker />
             <AdsAttribution />
             {/* <Banner />/ */}
-            <main className={`flex-1 ${isHomePage ? 'pb-8' : 'pb-20'} lg:pb-0`}>{children}</main>
+            <main className={`flex-1 ${isHomePage ? 'pb-8' : (isProductDetailPage || isCheckout) ? 'pb-0' : 'pb-20'} lg:pb-0`}>{children}</main>
             {!isHomePage && !isCheckout && <MobileBottomNav />}
         </div>
     );

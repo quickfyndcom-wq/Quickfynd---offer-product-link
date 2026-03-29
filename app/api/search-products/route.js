@@ -11,6 +11,60 @@ const resolveImageUrl = (image) => {
   return 'https://ik.imagekit.io/jrstupuke/placeholder.png';
 };
 
+const escapeRegExp = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const tokenizeText = (value = '') => String(value)
+  .toLowerCase()
+  .split(/[^a-z0-9]+/)
+  .map((token) => token.trim())
+  .filter(Boolean);
+
+const boundedLevenshtein = (a = '', b = '', maxDistance = 1) => {
+  if (a === b) return 0;
+  const lenA = a.length;
+  const lenB = b.length;
+  if (!lenA) return lenB;
+  if (!lenB) return lenA;
+  if (Math.abs(lenA - lenB) > maxDistance) return maxDistance + 1;
+
+  let prev = new Array(lenB + 1);
+  let curr = new Array(lenB + 1);
+  for (let j = 0; j <= lenB; j++) prev[j] = j;
+
+  for (let i = 1; i <= lenA; i++) {
+    curr[0] = i;
+    let rowMin = curr[0];
+
+    for (let j = 1; j <= lenB; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(
+        prev[j] + 1,
+        curr[j - 1] + 1,
+        prev[j - 1] + cost
+      );
+      if (curr[j] < rowMin) rowMin = curr[j];
+    }
+
+    if (rowMin > maxDistance) return maxDistance + 1;
+    [prev, curr] = [curr, prev];
+  }
+
+  return prev[lenB];
+};
+
+const isFuzzyTokenMatch = (token = '', words = []) => {
+  if (!token || !Array.isArray(words) || words.length === 0) return false;
+  if (words.includes(token)) return true;
+  if (token.length < 4) return false;
+
+  const tolerance = token.length >= 8 ? 2 : 1;
+  return words.some((word) => {
+    if (!word) return false;
+    if (Math.abs(word.length - token.length) > tolerance) return false;
+    return boundedLevenshtein(token, word, tolerance) <= tolerance;
+  });
+};
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -65,11 +119,36 @@ export async function GET(request) {
     
     console.log(`Search for keyword: ${keyword}`);
     
-    // Strategy 1: Try exact phrase match
+    const keywordTokens = keyword
+      .trim()
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter(Boolean);
+
+    const tokenConditions = keywordTokens.map((token) => {
+      const tokenRegex = new RegExp(escapeRegExp(token), 'i');
+      return {
+        $or: [
+          { name: tokenRegex },
+          { category: tokenRegex },
+          { tags: tokenRegex },
+          { shortDescription: tokenRegex },
+        ],
+      };
+    });
+
+    // Strategy 1: Match across fields with token-aware conditions
     let products = await Product.find({
-      $or: [
-        { name: { $regex: keyword, $options: 'i' } },
-      ],
+      ...(tokenConditions.length > 0
+        ? { $and: tokenConditions }
+        : {
+            $or: [
+              { name: { $regex: keyword, $options: 'i' } },
+              { category: { $regex: keyword, $options: 'i' } },
+              { tags: { $regex: keyword, $options: 'i' } },
+              { shortDescription: { $regex: keyword, $options: 'i' } },
+            ],
+          }),
       inStock: { $ne: false }
     })
     .select('_id name slug images price mrp category tags inStock')
@@ -131,6 +210,32 @@ export async function GET(request) {
         .sort({ createdAt: -1 })
         .limit(limit)
         .lean();
+    }
+
+    // Strategy 6: Typo-tolerant fallback (small spelling mistakes)
+    if (products.length === 0 && keywordTokens.length > 0) {
+      const candidateLimit = Math.max(120, limit * 20);
+      const candidates = await Product.find({ inStock: { $ne: false } })
+        .select('_id name slug images price mrp category tags shortDescription inStock')
+        .sort({ createdAt: -1 })
+        .limit(candidateLimit)
+        .lean();
+
+      products = candidates
+        .filter((product) => {
+          const haystack = [
+            product?.name,
+            product?.category,
+            Array.isArray(product?.tags) ? product.tags.join(' ') : '',
+            product?.shortDescription,
+          ].join(' ');
+          const words = tokenizeText(haystack);
+          return keywordTokens.every((token) => {
+            if (words.includes(token)) return true;
+            return isFuzzyTokenMatch(token, words);
+          });
+        })
+        .slice(0, limit);
     }
 
     console.log(`Found ${products.length} products for keyword: ${keyword}`);

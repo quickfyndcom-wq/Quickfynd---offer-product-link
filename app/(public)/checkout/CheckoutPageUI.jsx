@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import axios from "axios";
 import { countryCodes } from "@/assets/countryCodes";
@@ -79,6 +79,7 @@ export default function CheckoutPage() {
   const [editingAddressId, setEditingAddressId] = useState(null);
   const [showAlternatePhone, setShowAlternatePhone] = useState(false);
   const [abandonSaved, setAbandonSaved] = useState(false);
+  const recoveryTriggeredRef = useRef(false);
 
   // Wallet / Coins
   const [walletInfo, setWalletInfo] = useState({ coins: 0, rupeesValue: 0 });
@@ -106,6 +107,63 @@ export default function CheckoutPage() {
       if (normalized && !isZeroOnlyPincode(normalized)) return normalized;
     }
     return '';
+  };
+
+  const computeLineTotal = (price, quantity, bundleQty) => {
+    const numericPrice = Number(price) || 0;
+    const numericQty = Number(quantity) || 0;
+    const numericBundleQty = Number(bundleQty) || 0;
+    if (numericBundleQty > 1) {
+      return (numericPrice / numericBundleQty) * numericQty;
+    }
+    return numericPrice * numericQty;
+  };
+
+  const buildAbandonedCheckoutPayload = () => {
+    const cartEntries = Object.entries(cartItems || {});
+    if (cartEntries.length === 0) return null;
+
+    const items = cartEntries.map(([id, value]) => {
+      const quantity = typeof value === 'number' ? value : value?.quantity || 0;
+      const product = products.find((p) => p._id === id);
+      const price = typeof value === 'object'
+        ? Number(value?.price || 0)
+        : Number(product?.salePrice || product?.price || 0);
+      return {
+        productId: id,
+        quantity,
+        price,
+        name: product?.name || 'Product',
+        variantOptions: typeof value === 'object' ? value?.variantOptions || null : null,
+      };
+    }).filter((item) => item.quantity > 0);
+
+    if (items.length === 0) return null;
+
+    const cartTotal = items.reduce((sum, item) => {
+      const bundleQty = Number(item?.variantOptions?.bundleQty || 0);
+      return sum + computeLineTotal(item.price, item.quantity, bundleQty);
+    }, 0);
+
+    return {
+      items,
+      cartTotal,
+      currency: process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '₹',
+      userId: user?.uid || null,
+      customer: {
+        name: form.name || null,
+        email: form.email || user?.email || null,
+        phone: form.phone || null,
+        address: {
+          country: form.country,
+          state: form.state,
+          district: form.district,
+          city: form.city,
+          street: form.street,
+          pincode: form.pincode,
+        },
+      },
+    };
   };
   
   const handleApplyCoupon = async (e) => {
@@ -149,11 +207,10 @@ export default function CheckoutPage() {
       
       // Calculate total for validation
       const itemsTotal = cartItemsArray.reduce((sum, item) => {
-        const product = products.find((p) => p._id === item.productId);
-        if (!product) return sum;
-        const variant = product.variants?.find((v) => v._id === item.variantId);
-        const price = variant?.salePrice || variant?.price || product.salePrice || product.price || 0;
-        return sum + price * item.quantity;
+        const cartEntry = cartItems?.[item.productId];
+        const price = typeof cartEntry === 'object' ? Number(cartEntry?.price || 0) : 0;
+        const bundleQty = typeof cartEntry === 'object' ? Number(cartEntry?.variantOptions?.bundleQty || 0) : 0;
+        return sum + computeLineTotal(price, item.quantity, bundleQty);
       }, 0);
       
       // Get current product IDs in cart
@@ -259,47 +316,12 @@ export default function CheckoutPage() {
   // Capture abandoned checkout (debounced)
   useEffect(() => {
     if (placingOrder || payingNow) return;
-    const cartEntries = Object.entries(cartItems || {});
-    if (cartEntries.length === 0) return;
+    if (Object.keys(cartItems || {}).length === 0) return;
 
     const timer = setTimeout(async () => {
       try {
-        const items = cartEntries.map(([id, value]) => {
-          const quantity = typeof value === 'number' ? value : value?.quantity || 0;
-          const product = products.find((p) => p._id === id);
-          const price = product?.salePrice || product?.price || 0;
-          return {
-            productId: id,
-            quantity,
-            price,
-            name: product?.name || 'Product',
-            variantOptions: typeof value === 'object' ? value?.variantOptions || null : null,
-          };
-        }).filter(it => it.quantity > 0);
-
-        if (items.length === 0) return;
-
-        const cartTotal = items.reduce((sum, it) => sum + (Number(it.price) * Number(it.quantity)), 0);
-
-        const payload = {
-          items,
-          cartTotal,
-          currency: process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '₹',
-          userId: user?.uid || null,
-          customer: {
-            name: form.name || null,
-            email: form.email || user?.email || null,
-            phone: form.phone || null,
-            address: {
-              country: form.country,
-              state: form.state,
-              district: form.district,
-              city: form.city,
-              street: form.street,
-              pincode: form.pincode,
-            },
-          },
-        };
+        const payload = buildAbandonedCheckoutPayload();
+        if (!payload) return;
 
         await fetch('/api/abandoned-checkout', {
           method: 'POST',
@@ -315,6 +337,37 @@ export default function CheckoutPage() {
     }, 1500);
 
     return () => clearTimeout(timer);
+  }, [form, cartItems, products, user, placingOrder, payingNow]);
+
+  useEffect(() => {
+    const triggerRecoveryOnLeave = () => {
+      if (recoveryTriggeredRef.current || placingOrder || payingNow) return;
+      const payload = buildAbandonedCheckoutPayload();
+      if (!payload?.customer?.email) return;
+
+      recoveryTriggeredRef.current = true;
+      const body = JSON.stringify({ ...payload, triggerRecoveryEmail: true });
+
+      try {
+        if (navigator.sendBeacon) {
+          const blob = new Blob([body], { type: 'application/json' });
+          const queued = navigator.sendBeacon('/api/abandoned-checkout', blob);
+          if (queued) return;
+        }
+      } catch (error) {
+        // Fallback to keepalive fetch below.
+      }
+
+      fetch('/api/abandoned-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true,
+      }).catch(() => {});
+    };
+
+    window.addEventListener('pagehide', triggerRecoveryOnLeave);
+    return () => window.removeEventListener('pagehide', triggerRecoveryOnLeave);
   }, [form, cartItems, products, user, placingOrder, payingNow]);
 
   // Fetch addresses for logged-in users
@@ -622,6 +675,218 @@ export default function CheckoutPage() {
 
   // Build cart array
   const cartArray = [];
+  const resolveCheckoutCartUnitPrice = (product, cartValue) => {
+    const storedPrice = typeof cartValue === 'object' ? cartValue?.price : undefined;
+    if (storedPrice !== undefined && storedPrice !== null) return Number(storedPrice) || 0;
+
+    const variantOptions = typeof cartValue === 'object' ? cartValue?.variantOptions || {} : {};
+    const variants = Array.isArray(product?.variants) ? product.variants : [];
+    const matchedVariant = variants.find((variant) => {
+      const options = variant?.options || {};
+      const colorMatch = variantOptions?.color ? options?.color === variantOptions.color : true;
+      const sizeMatch = variantOptions?.size ? options?.size === variantOptions.size : true;
+      if (variantOptions?.bundleQty === null || variantOptions?.bundleQty === undefined) {
+        const optionBundleQty = Number(options?.bundleQty);
+        const isBundleVariant = Number.isFinite(optionBundleQty) && optionBundleQty > 1;
+        return colorMatch && sizeMatch && !isBundleVariant;
+      }
+      const bundleMatch = Number(options?.bundleQty || 0) === Number(variantOptions?.bundleQty || 0);
+      return colorMatch && sizeMatch && bundleMatch;
+    });
+
+    return Number(matchedVariant?.salePrice ?? matchedVariant?.price ?? product?.salePrice ?? product?.price ?? 0) || 0;
+  };
+
+  const getCheckoutCartVariant = (product, cartValue) => {
+    const variantOptions = typeof cartValue === 'object' ? cartValue?.variantOptions || {} : {};
+    const variants = Array.isArray(product?.variants) ? product.variants : [];
+    return variants.find((variant) => {
+      const options = variant?.options || {};
+      const colorMatch = variantOptions?.color ? options?.color === variantOptions.color : true;
+      const sizeMatch = variantOptions?.size ? options?.size === variantOptions.size : true;
+      if (variantOptions?.bundleQty === null || variantOptions?.bundleQty === undefined) {
+        const optionBundleQty = Number(options?.bundleQty);
+        const isBundleVariant = Number.isFinite(optionBundleQty) && optionBundleQty > 1;
+        return colorMatch && sizeMatch && !isBundleVariant;
+      }
+      const bundleMatch = Number(options?.bundleQty || 0) === Number(variantOptions?.bundleQty || 0);
+      return colorMatch && sizeMatch && bundleMatch;
+    }) || null;
+  };
+
+  const getCheckoutMaxQty = (item) => {
+    if (item?.inStock === false) return 0;
+    const cartValue = cartItems?.[item?._cartKey || item?._id];
+    const variantOptions = typeof cartValue === 'object' ? cartValue?.variantOptions || {} : {};
+    const selectedVariant = getCheckoutCartVariant(item, cartValue);
+    const bundleQty = Number(item?._cartBundleQty || 0);
+    const nonBundleVariant = getCheckoutCartVariant(item, {
+      variantOptions: {
+        ...variantOptions,
+        bundleQty: null,
+      },
+    });
+
+    const selectedMaxQty = typeof selectedVariant?.stock === 'number'
+      ? Math.max(0, bundleQty > 1 ? selectedVariant.stock * bundleQty : selectedVariant.stock)
+      : null;
+    const nonBundleMaxQty = typeof nonBundleVariant?.stock === 'number'
+      ? Math.max(0, nonBundleVariant.stock)
+      : null;
+    const productMaxQty = typeof item?.stockQuantity === 'number'
+      ? Math.max(0, item.stockQuantity)
+      : null;
+
+    const candidates = [selectedMaxQty, nonBundleMaxQty, productMaxQty]
+      .filter((value) => typeof value === 'number' && Number.isFinite(value));
+    if (candidates.length > 0) {
+      return Math.max(...candidates);
+    }
+
+    return null;
+  };
+
+  const switchCheckoutBundle = (item, targetBundle) => {
+    const productId = item?._cartKey || item?._id;
+    if (!productId) return;
+    const targetBundleQty = Number(targetBundle?.options?.bundleQty) || 0;
+    if (targetBundleQty <= 0) return;
+    if (typeof targetBundle?.stock === 'number' && targetBundle.stock <= 0) return;
+
+    const maxQty = getCheckoutMaxQty(item);
+    if (maxQty !== null && targetBundleQty > maxQty) return;
+
+    const cartEntry = cartItems?.[productId];
+    const variantOptions = typeof cartEntry === 'object' ? cartEntry?.variantOptions || {} : {};
+    const offerToken = typeof cartEntry === 'object' ? cartEntry?.offerToken : undefined;
+    const discountPercent = typeof cartEntry === 'object' ? cartEntry?.discountPercent : undefined;
+
+    dispatch(deleteItemFromCart({ productId }));
+    for (let i = 0; i < targetBundleQty; i++) {
+      dispatch(addToCart({
+        productId,
+        price: Number(targetBundle?.price) || 0,
+        maxQty,
+        variantOptions: {
+          ...variantOptions,
+          bundleQty: targetBundleQty,
+        },
+        ...(offerToken !== undefined ? { offerToken } : {}),
+        ...(discountPercent !== undefined ? { discountPercent } : {}),
+      }));
+    }
+  };
+
+  const switchCheckoutToNonBundle = (item, newQty) => {
+    const productId = item?._cartKey || item?._id;
+    if (!productId) return;
+    const normalizedQty = Math.max(0, Number(newQty) || 0);
+    if (normalizedQty <= 0) {
+      dispatch(deleteItemFromCart({ productId }));
+      return;
+    }
+
+    const maxQty = getCheckoutMaxQty(item);
+    if (maxQty !== null && normalizedQty > maxQty) return;
+
+    const cartEntry = cartItems?.[productId];
+    const variantOptions = typeof cartEntry === 'object' ? cartEntry?.variantOptions || {} : {};
+    const offerToken = typeof cartEntry === 'object' ? cartEntry?.offerToken : undefined;
+    const discountPercent = typeof cartEntry === 'object' ? cartEntry?.discountPercent : undefined;
+    const fallbackPrice = Number(item?._cartPrice ?? item?.price ?? 0) || 0;
+    const perUnitPrice = Number(item?._baseUnitPrice || 0);
+    const nextPrice = Number.isFinite(perUnitPrice) && perUnitPrice > 0 ? perUnitPrice : fallbackPrice;
+
+    dispatch(deleteItemFromCart({ productId }));
+    for (let i = 0; i < normalizedQty; i++) {
+      dispatch(addToCart({
+        productId,
+        price: nextPrice,
+        maxQty,
+        variantOptions: {
+          ...variantOptions,
+          bundleQty: null,
+        },
+        ...(offerToken !== undefined ? { offerToken } : {}),
+        ...(discountPercent !== undefined ? { discountPercent } : {}),
+      }));
+    }
+  };
+
+  const handleIncreaseCartQty = (item) => {
+    const productId = item?._cartKey || item?._id;
+    if (!productId) return;
+
+    const cartEntry = cartItems?.[productId];
+    const qty = typeof cartEntry === 'number' ? cartEntry : cartEntry?.quantity || item?.quantity || 0;
+    const variantOptions = typeof cartEntry === 'object' ? cartEntry?.variantOptions || {} : {};
+    const bundleQty = Number(variantOptions?.bundleQty || 0);
+    const maxQty = getCheckoutMaxQty(item);
+    if (bundleQty <= 1 && maxQty !== null && qty >= maxQty) return;
+    const bulkVariants = Array.isArray(item?._cartBulkVariants) ? item._cartBulkVariants : [];
+
+    if (bundleQty > 1 && bulkVariants.length > 0) {
+      const nextBundle = bulkVariants.find((variant) => Number(variant?.options?.bundleQty) > bundleQty);
+      if (nextBundle) {
+        switchCheckoutBundle(item, nextBundle);
+        return;
+      }
+      switchCheckoutToNonBundle(item, qty + 1);
+      return;
+    }
+
+    const offerToken = typeof cartEntry === 'object' ? cartEntry?.offerToken : undefined;
+    const discountPercent = typeof cartEntry === 'object' ? cartEntry?.discountPercent : undefined;
+
+    dispatch(addToCart({
+      productId,
+      price: item?._cartPrice ?? item?.price,
+      maxQty,
+      variantOptions: {
+        ...variantOptions,
+        bundleQty: null,
+      },
+      ...(offerToken !== undefined ? { offerToken } : {}),
+      ...(discountPercent !== undefined ? { discountPercent } : {}),
+    }));
+  };
+
+  const handleDecreaseCartQty = (item) => {
+    const productId = item?._cartKey || item?._id;
+    if (!productId) return;
+
+    const cartEntry = cartItems?.[productId];
+    const qty = typeof cartEntry === 'number' ? cartEntry : cartEntry?.quantity || item?.quantity || 0;
+    const variantOptions = typeof cartEntry === 'object' ? cartEntry?.variantOptions || {} : {};
+    const bundleQty = Number(variantOptions?.bundleQty || 0);
+    const bulkVariants = Array.isArray(item?._cartBulkVariants) ? item._cartBulkVariants : [];
+
+    if (bundleQty > 1 && bulkVariants.length > 0) {
+      const currentIndex = bulkVariants.findIndex((variant) => Number(variant?.options?.bundleQty) === bundleQty);
+      if (currentIndex <= 0) {
+        dispatch(deleteItemFromCart({ productId }));
+        return;
+      }
+      const previousBundle = bulkVariants[currentIndex - 1];
+      switchCheckoutBundle(item, previousBundle);
+      return;
+    }
+
+    const nextQty = qty - 1;
+    if (nextQty <= 0) {
+      dispatch(deleteItemFromCart({ productId }));
+      return;
+    }
+
+    const targetBundle = bulkVariants.find((variant) => Number(variant?.options?.bundleQty) === nextQty);
+    if (targetBundle) {
+      switchCheckoutBundle(item, targetBundle);
+      return;
+    }
+
+    dispatch(removeFromCart({ productId }));
+  };
+
   const isPurchasableProduct = (product) => {
     if (!product) return false;
     if (product.inStock === false) return false;
@@ -634,12 +899,38 @@ export default function CheckoutPage() {
   for (const [key, value] of Object.entries(cartItems || {})) {
     const product = products?.find((p) => String(p._id) === String(key));
     const qty = typeof value === 'number' ? value : value?.quantity || 0;
-    const priceOverride = typeof value === 'number' ? undefined : value?.price;
     if (product && qty > 0) {
       if (isPurchasableProduct(product)) {
         console.log('Found purchasable product for key:', key, product.name);
-        const unitPrice = Number(priceOverride ?? product.salePrice ?? product.price ?? 0) || 0;
-        cartArray.push({ ...product, quantity: qty, _cartPrice: unitPrice, _cartKey: key });
+        const cartVariantOptions = typeof value === 'object' ? value?.variantOptions || {} : {};
+        const cartBundleQty = Number(cartVariantOptions?.bundleQty || 0);
+        const unitPrice = resolveCheckoutCartUnitPrice(product, value);
+        const bulkVariants = Array.isArray(product?.variants)
+          ? product.variants
+              .filter((variant) => Number(variant?.options?.bundleQty) > 0)
+              .slice()
+              .sort((a, b) => Number(a?.options?.bundleQty) - Number(b?.options?.bundleQty))
+          : [];
+        const nonBundleUnitPrice = resolveCheckoutCartUnitPrice(product, {
+          variantOptions: {
+            ...cartVariantOptions,
+            bundleQty: null,
+          },
+        });
+        const baseUnitPrice = Number(nonBundleUnitPrice || unitPrice || 0);
+        const lineTotal = computeLineTotal(unitPrice, qty, cartBundleQty);
+
+        cartArray.push({
+          ...product,
+          quantity: qty,
+          _cartPrice: unitPrice,
+          _cartKey: key,
+          _cartBundleQty: cartBundleQty > 0 ? cartBundleQty : null,
+          _cartVariantOptions: cartVariantOptions,
+          _cartBulkVariants: bulkVariants,
+          _baseUnitPrice: baseUnitPrice,
+          _lineTotal: lineTotal,
+        });
       }
     } else {
       console.log('No product found for key:', key);
@@ -648,7 +939,7 @@ export default function CheckoutPage() {
   
   console.log('Checkout - Final Cart Array:', cartArray);
 
-  const subtotal = cartArray.reduce((sum, item) => sum + (item._cartPrice ?? item.price ?? 0) * item.quantity, 0);
+  const subtotal = cartArray.reduce((sum, item) => sum + Number(item?._lineTotal || 0), 0);
   
   // Calculate coupon discount
   const couponDiscountRaw = Number(appliedCoupon?.discountAmount || 0);
@@ -662,6 +953,7 @@ export default function CheckoutPage() {
   const totalAfterWallet = Math.max(0, Number((total - walletDiscount).toFixed(2)));
   const isWalletOnly = totalAfterWallet === 0 && safeRedeemCoins > 0;
   const needsPaymentSelection = totalAfterWallet > 0;
+  const minCODAmount = shippingSetting?.minCODAmount || 0;
   const maxCODAmount = shippingSetting?.maxCODAmount || 0;
   const hasPersonalizedOfferItem = Object.values(cartItems || {}).some(
     (entry) => typeof entry === 'object' && !!entry?.offerToken
@@ -669,6 +961,7 @@ export default function CheckoutPage() {
   const isCODDisabledForOrder =
     hasPersonalizedOfferItem ||
     shippingSetting?.enableCOD === false ||
+    (minCODAmount > 0 && totalAfterWallet < minCODAmount) ||
     (maxCODAmount > 0 && totalAfterWallet > maxCODAmount);
   const isPaymentMissing = needsPaymentSelection && !form.payment;
   const isInvalidPaymentSelection = form.payment === 'cod' && isCODDisabledForOrder;
@@ -1090,6 +1383,7 @@ export default function CheckoutPage() {
           return;
         }
 
+        const minCODAmount = shippingSetting?.minCODAmount || 0;
         const maxCODAmount = shippingSetting?.maxCODAmount || 0;
         const remainingAmount = totalAfterWallet;
         
@@ -1099,6 +1393,12 @@ export default function CheckoutPage() {
           return;
         }
         
+        if (minCODAmount > 0 && remainingAmount < minCODAmount) {
+          setFormError(`COD is available only for orders of ₹${minCODAmount} or more. Your order amount after wallet is ₹${remainingAmount.toFixed(2)}. Please use online payment.`);
+          setPlacingOrder(false);
+          return;
+        }
+
         if (maxCODAmount > 0 && remainingAmount > maxCODAmount) {
           setFormError(`COD is not available for orders above ₹${maxCODAmount}. Your order amount after wallet is ₹${remainingAmount.toFixed(2)}. Please use online payment.`);
           setPlacingOrder(false);
@@ -1473,7 +1773,7 @@ export default function CheckoutPage() {
         contentIds={cartArray.map((item) => String(item?._id || item?._cartKey || '')).filter(Boolean)}
         numItems={cartArray.reduce((sum, item) => sum + Number(item?.quantity || 0), 0)}
       />
-      <div className="py-10 bg-white md:pb-0 pb-32 min-h-[35dvh]">
+      <div className="py-10 bg-white md:pb-0 pb-24 min-h-[35dvh]">
       <div className="max-w-[1250px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Left column: address, form, payment */}
         <div className="md:col-span-2">
@@ -1507,11 +1807,7 @@ export default function CheckoutPage() {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            if (item.quantity > 1) {
-                              dispatch(removeFromCart({ productId: item._cartKey || item._id }));
-                            } else {
-                              dispatch(deleteItemFromCart({ productId: item._cartKey || item._id }));
-                            }
+                            handleDecreaseCartQty(item);
                           }}
                         >-</button>
                         <span className="px-2 text-sm">{item.quantity}</span>
@@ -1521,8 +1817,13 @@ export default function CheckoutPage() {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            dispatch(addToCart({ productId: item._cartKey || item._id, price: item._cartPrice ?? item.price }));
+                            handleIncreaseCartQty(item);
                           }}
+                          disabled={(() => {
+                            if (Number(item?._cartBundleQty || 0) > 1) return false;
+                            const maxQty = getCheckoutMaxQty(item);
+                            return maxQty !== null && Number(item?.quantity || 0) >= maxQty;
+                          })()}
                         >+</button>
                       </div>
                       <button 
@@ -2115,9 +2416,11 @@ export default function CheckoutPage() {
 
                 {/* Cash on Delivery Option */}
                 {!hasPersonalizedOfferItem && (() => {
+                  const minCODAmount = shippingSetting?.minCODAmount || 0;
                   const maxCODAmount = shippingSetting?.maxCODAmount || 0;
                   const remainingAmount = total - walletDiscount;
                   const isCODDisabled = isWalletOnly || shippingSetting?.enableCOD === false || 
+                    (minCODAmount > 0 && remainingAmount < minCODAmount) ||
                     (maxCODAmount > 0 && remainingAmount > maxCODAmount);
                   
                   return (
@@ -2145,6 +2448,9 @@ export default function CheckoutPage() {
                             <div className="text-xs text-gray-600">Pay when you receive</div>
                           </div>
                         </div>
+                        {isCODDisabled && minCODAmount > 0 && remainingAmount < minCODAmount && (
+                          <span className="text-xs text-red-600 ml-8">Min order ₹{minCODAmount}</span>
+                        )}
                         {isCODDisabled && maxCODAmount > 0 && remainingAmount > maxCODAmount && (
                           <span className="text-xs text-red-600 ml-8">Max limit ₹{maxCODAmount}</span>
                         )}
@@ -2294,25 +2600,31 @@ export default function CheckoutPage() {
           <button
             type="submit"
             form="checkout-form"
-            className={`hidden md:block relative w-full text-white font-bold py-3 rounded text-lg transition shadow-md hover:shadow-lg ${isPlaceOrderDisabled ? 'bg-gray-400 cursor-not-allowed opacity-75' : 'bg-red-600 hover:bg-red-700'} ${placingOrder ? 'animate-bounce' : ''}`}
+            className={`hidden md:block relative w-full overflow-hidden rounded-xl py-3.5 text-lg font-bold text-white transition-all duration-300 ${isPlaceOrderDisabled ? 'bg-gray-400 cursor-not-allowed opacity-75' : 'bg-gradient-to-r from-red-600 via-rose-600 to-orange-500 shadow-[0_12px_28px_rgba(239,68,68,0.22)] hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(239,68,68,0.28)]'} ${placingOrder ? 'scale-[0.99]' : ''}`}
             disabled={isPlaceOrderDisabled}
             aria-busy={placingOrder}
           >
+            {!isPlaceOrderDisabled && (
+              <>
+                <span className={`pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(255,255,255,0.18),transparent_28%),radial-gradient(circle_at_80%_50%,rgba(255,255,255,0.14),transparent_24%)] transition-opacity duration-300 ${placingOrder ? 'opacity-100' : 'opacity-70'}`} />
+                <span className={`pointer-events-none absolute inset-y-0 left-[-35%] w-1/2 -skew-x-12 bg-white/15 blur-xl transition-transform duration-1000 ${placingOrder ? 'translate-x-[260%]' : 'translate-x-0'}`} />
+              </>
+            )}
+
             {placingOrder ? (
-              <span className="inline-flex items-center gap-2">
-                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                </svg>
-                Placing order...
+              <span className="relative z-10 flex items-center justify-center gap-3">
+                <span className="flex items-end gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-white/95 animate-[bounce_1s_infinite]" />
+                  <span className="h-4.5 w-2.5 rounded-full bg-white/80 animate-[bounce_1s_infinite_150ms]" />
+                  <span className="h-6 w-2.5 rounded-full bg-white/95 animate-[bounce_1s_infinite_300ms]" />
+                </span>
+                <span className="flex flex-col items-start leading-none">
+                  <span className="text-sm font-extrabold uppercase tracking-[0.24em]">Placing</span>
+                  <span className="mt-1 text-[10px] font-medium uppercase tracking-[0.22em] text-white/75">Securing Your Order</span>
+                </span>
               </span>
             ) : (
-              'Place order'
-            )}
-            {placingOrder && (
-              <span className="absolute left-0 top-0 h-full w-full overflow-hidden rounded opacity-20">
-                <span className="block h-full w-1/3 bg-white animate-[shimmer_1.2s_ease_infinite]" />
-              </span>
+              <span className="relative z-10">Place order</span>
             )}
           </button>
           
@@ -2390,36 +2702,39 @@ export default function CheckoutPage() {
           <button
             type="submit"
             form="checkout-form"
-            className={`relative w-full text-white font-bold py-4 rounded-lg text-base transition shadow-md hover:shadow-lg flex items-center justify-between px-6 ${
+            className={`relative w-full overflow-hidden rounded-xl py-4 text-base font-bold text-white transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-between px-6 ${
               (!form.addressId && !(form.name && form.phone && form.pincode && form.city && form.state && form.street)) || isPlaceOrderDisabled 
                 ? 'bg-gray-400 cursor-not-allowed opacity-75' 
                 : form.payment === 'cod' 
-                  ? 'bg-green-600 hover:bg-green-700' 
+                  ? 'bg-gradient-to-r from-emerald-600 to-green-600' 
                   : form.payment === 'card'
-                    ? 'bg-blue-600 hover:bg-blue-700'
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600'
                     : form.payment === 'wallet'
-                      ? 'bg-green-600 hover:bg-green-700'
-                    : 'bg-red-600 hover:bg-red-700'
-            } ${placingOrder ? 'animate-bounce' : ''}`}
+                      ? 'bg-gradient-to-r from-emerald-600 to-green-600'
+                    : 'bg-gradient-to-r from-red-600 via-rose-600 to-orange-500'
+            } ${placingOrder ? 'scale-[0.99]' : ''}`}
             disabled={(!form.addressId && !(form.name && form.phone && form.pincode && form.city && form.state && form.street)) || isPlaceOrderDisabled}
             aria-busy={placingOrder}
           >
-            <span className="text-lg font-bold">₹ {totalAfterWallet.toLocaleString()}</span>
+            {(!((!form.addressId && !(form.name && form.phone && form.pincode && form.city && form.state && form.street)) || isPlaceOrderDisabled)) && (
+              <>
+                <span className={`pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_50%,rgba(255,255,255,0.16),transparent_24%),radial-gradient(circle_at_82%_50%,rgba(255,255,255,0.12),transparent_24%)] transition-opacity duration-300 ${placingOrder ? 'opacity-100' : 'opacity-70'}`} />
+                <span className={`pointer-events-none absolute inset-y-0 left-[-35%] w-1/2 -skew-x-12 bg-white/15 blur-xl transition-transform duration-1000 ${placingOrder ? 'translate-x-[260%]' : 'translate-x-0'}`} />
+              </>
+            )}
+
+            <span className="relative z-10 text-lg font-bold">₹ {totalAfterWallet.toLocaleString()}</span>
             {placingOrder ? (
-              <span className="inline-flex items-center gap-2">
-                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                </svg>
-                Placing...
+              <span className="relative z-10 inline-flex items-center gap-3">
+                <span className="flex items-end gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-white/95 animate-[bounce_1s_infinite]" />
+                  <span className="h-4.5 w-2.5 rounded-full bg-white/80 animate-[bounce_1s_infinite_150ms]" />
+                  <span className="h-6 w-2.5 rounded-full bg-white/95 animate-[bounce_1s_infinite_300ms]" />
+                </span>
+                <span className="text-sm uppercase tracking-[0.18em]">Placing</span>
               </span>
             ) : (
-              <span className="text-base uppercase tracking-wide">Place Order</span>
-            )}
-            {placingOrder && (
-              <span className="absolute left-0 top-0 h-full w-full overflow-hidden rounded opacity-20">
-                <span className="block h-full w-1/3 bg-white animate-[shimmer_1.2s_ease_infinite]" />
-              </span>
+              <span className="relative z-10 text-base uppercase tracking-wide">Place Order</span>
             )}
           </button>
         </div>
@@ -2583,11 +2898,10 @@ export default function CheckoutPage() {
                   }));
                   
                   const itemsTotal = cartItemsArray.reduce((sum, item) => {
-                    const product = products.find((p) => p._id === item.productId);
-                    if (!product) return sum;
-                    const variant = product.variants?.find((v) => v._id === item.variantId);
-                    const price = variant?.salePrice || variant?.price || product.salePrice || product.price || 0;
-                    return sum + price * item.quantity;
+                    const cartEntry = cartItems?.[item.productId];
+                    const price = typeof cartEntry === 'object' ? Number(cartEntry?.price || 0) : 0;
+                    const bundleQty = typeof cartEntry === 'object' ? Number(cartEntry?.variantOptions?.bundleQty || 0) : 0;
+                    return sum + computeLineTotal(price, item.quantity, bundleQty);
                   }, 0);
                   
                   const cartProductIds = cartItemsArray.map(item => item.productId);

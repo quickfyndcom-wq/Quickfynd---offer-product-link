@@ -24,7 +24,7 @@ export async function GET(request) {
       setting = await ShippingSetting.findOne({}).lean();
     }
     
-    console.log('Retrieved setting - maxCODAmount:', setting?.maxCODAmount, 'codFee:', setting?.codFee);
+    console.log('Retrieved setting - minCODAmount:', setting?.minCODAmount, 'maxCODAmount:', setting?.maxCODAmount, 'codFee:', setting?.codFee);
     console.log('Full setting:', JSON.stringify(setting));
     
     return NextResponse.json({
@@ -44,6 +44,7 @@ export async function GET(request) {
         estimatedDays: "3-5",
         enableCOD: true,
         codFee: 0,
+        minCODAmount: 0,
         maxCODAmount: 0,
         enableExpressShipping: false,
         expressShippingFee: 0,
@@ -91,6 +92,7 @@ export async function PUT(request) {
     const body = await request.json();
     
     console.log('=== SHIPPING API PUT ===');
+    console.log('Received body.minCODAmount:', body.minCODAmount, 'Type:', typeof body.minCODAmount);
     console.log('Received body.maxCODAmount:', body.maxCODAmount, 'Type:', typeof body.maxCODAmount);
     console.log('Received body.codFee:', body.codFee, 'Type:', typeof body.codFee);
     console.log('Received body.enableCOD:', body.enableCOD);
@@ -119,6 +121,7 @@ export async function PUT(request) {
       // COD
       enableCOD: Boolean(body.enableCOD ?? true),
       codFee: Number(body.codFee ?? 0),
+      minCODAmount: Number(body.minCODAmount ?? 0),
       maxCODAmount: Number(body.maxCODAmount ?? 0),
       // Express
       enableExpressShipping: Boolean(body.enableExpressShipping ?? false),
@@ -134,7 +137,7 @@ export async function PUT(request) {
         : []
     };
     
-    console.log('Data to save - maxCODAmount:', data.maxCODAmount, 'codFee:', data.codFee);
+    console.log('Data to save - minCODAmount:', data.minCODAmount, 'maxCODAmount:', data.maxCODAmount, 'codFee:', data.codFee);
 
     await dbConnect();
     const setting = await ShippingSetting.findOneAndUpdate(
@@ -142,7 +145,7 @@ export async function PUT(request) {
       data,
       { upsert: true, new: true }
     );
-    console.log('Saved setting - maxCODAmount:', setting.maxCODAmount, 'codFee:', setting.codFee);
+    console.log('Saved setting - minCODAmount:', setting.minCODAmount, 'maxCODAmount:', setting.maxCODAmount, 'codFee:', setting.codFee);
     return NextResponse.json({ setting });
   } catch (e) {
     console.error(e);

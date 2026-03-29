@@ -4,14 +4,14 @@
 import Link from "next/link"
 import Image from "next/image";
 import { useState } from "react";
-import { LogOut } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
 import Logo from "../../assets/Asset11.png";
 import { useAuth } from "@/lib/useAuth";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
 
-const StoreNavbar = ({ storeInfo }) => {
+const StoreNavbar = ({ storeInfo, onOpenSidebar }) => {
     const { user } = useAuth();
     const [showConfirm, setShowConfirm] = useState(false);
 
@@ -27,22 +27,33 @@ const StoreNavbar = ({ storeInfo }) => {
     };
 
     return (
-        <div className="flex items-center justify-between px-12 py-3 border-b border-slate-200 transition-all">
-            <Link href="/store" className="relative text-4xl font-semibold text-slate-700">
+        <div className="sticky top-0 z-30 flex items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-12 border-b border-slate-200 transition-all bg-white">
+            <div className="flex items-center gap-3 min-w-0">
+                <button
+                    type="button"
+                    onClick={onOpenSidebar}
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-200 p-2 text-slate-700 transition hover:bg-slate-50 lg:hidden"
+                    aria-label="Open sidebar"
+                >
+                    <Menu size={20} />
+                </button>
+
+                <Link href="/store" className="relative text-4xl font-semibold text-slate-700 shrink-0">
                   <Image
                               src={Logo}  
                               alt="Quickfynd Logo"
                               width={180}
                               height={48}
-                              className="object-contain"
+                              className="object-contain w-[120px] sm:w-[150px] lg:w-[180px] h-auto"
                               priority
                             />
-            </Link>
-            <div className="flex items-center gap-3">
-                <p>Hi, {storeInfo?.name || user?.displayName || user?.name || user?.email || ''}</p>
+                </Link>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <p className="hidden sm:block text-sm text-slate-700 truncate max-w-[180px] lg:max-w-[260px]">Hi, {storeInfo?.name || user?.displayName || user?.name || user?.email || ''}</p>
                 <button
                     onClick={() => setShowConfirm(true)}
-                    className="ml-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
+                    className="px-3 py-2 sm:px-4 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm sm:text-base"
                 >
                     Logout
                 </button>

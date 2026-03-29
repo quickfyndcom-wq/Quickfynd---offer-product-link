@@ -160,20 +160,14 @@ const ProductCard = ({ product }) => {
           </h3>
           <div className="flex items-center mt-1">
             <div className="flex items-center min-w-0">
-              {reviewCount > 0 ? (
-                <>
-                  {[...Array(5)].map((_, i) => (
-                    <FaStar
-                      key={i}
-                      size={12}
-                      className={i < ratingValue ? 'text-yellow-400' : 'text-gray-300'}
-                    />
-                  ))}
-                  <span className="text-gray-500 text-xs ml-1 truncate">({reviewCount})</span>
-                </>
-              ) : (
-                <span className="text-xs text-gray-400 ml-1">No reviews</span>
-              )}
+              {[...Array(5)].map((_, i) => (
+                <FaStar
+                  key={i}
+                  size={12}
+                  className={i < ratingValue ? 'text-yellow-400' : 'text-gray-300'}
+                />
+              ))}
+              <span className="text-gray-500 text-xs ml-1 truncate">({reviewCount > 0 ? reviewCount : 0})</span>
             </div>
           </div>
         </div>

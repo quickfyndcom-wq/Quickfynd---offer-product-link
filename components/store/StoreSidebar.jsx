@@ -1,9 +1,9 @@
 "use client"
 import { usePathname } from "next/navigation"
-import { HomeIcon, LayoutListIcon, SquarePenIcon, SquarePlusIcon, StarIcon, FolderIcon, TicketIcon, TruckIcon, RefreshCw, User as UserIcon, Users as UsersIcon, MessageSquare, Sparkles, BellIcon, MailIcon, Image as ImageIcon, ShoppingCart, Wallet, BarChart3, Target, Gift } from "lucide-react"
+import { HomeIcon, LayoutListIcon, SquarePenIcon, SquarePlusIcon, StarIcon, FolderIcon, TicketIcon, TruckIcon, RefreshCw, User as UserIcon, Users as UsersIcon, MessageSquare, Sparkles, BellIcon, MailIcon, Image as ImageIcon, ShoppingCart, Wallet, BarChart3, Target, Gift, X } from "lucide-react"
 import Link from "next/link"
 
-const StoreSidebar = ({storeInfo}) => {
+const StoreSidebar = ({ storeInfo, isOpen = false, onClose }) => {
     const pathname = usePathname()
 
     const sidebarLinks = [
@@ -27,7 +27,6 @@ const StoreSidebar = ({storeInfo}) => {
         { name: 'Customers', href: '/store/customers', icon: UsersIcon },
         { name: 'Manage Users', href: '/store/settings/users', icon: UserIcon },
         { name: 'Orders', href: '/store/orders', icon: LayoutListIcon },
-        { name: 'Courier', href: '/store/courier', icon: TruckIcon },
         { name: 'Balance', href: '/store/balance', icon: Wallet },
         { name: 'Sales Report', href: '/store/sales-report', icon: BarChart3 },
         { name: 'Marketing Expenses', href: '/store/marketing-expenses', icon: Target },
@@ -79,7 +78,6 @@ const StoreSidebar = ({storeInfo}) => {
                 '/store/orders',
                 '/store/abandoned-checkout',
                 '/store/shipping',
-                '/store/courier',
                 '/store/return-requests',
                 '/store/balance',
                 '/store/sales-report',
@@ -219,15 +217,39 @@ const StoreSidebar = ({storeInfo}) => {
     }
 
     return (
-        <div className="flex h-screen">
-            {/* Sidebar */}
-            <div className="w-72 bg-gradient-to-br from-slate-50 via-white to-slate-50 border-r border-slate-200 flex flex-col overflow-hidden shadow-lg">
+        <>
+            <div
+                className={`fixed inset-x-0 bottom-0 top-[61px] z-40 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-200 sm:top-[69px] lg:hidden ${
+                    isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+                }`}
+                onClick={onClose}
+            />
+
+            <aside
+                className={`fixed bottom-0 left-0 top-[61px] z-50 w-[18rem] max-w-[85vw] bg-gradient-to-br from-slate-50 via-white to-slate-50 border-r border-slate-200 flex min-h-0 flex-col overflow-hidden shadow-xl transition-transform duration-300 sm:top-[69px] lg:static lg:z-0 lg:h-full lg:w-72 lg:max-w-none lg:self-stretch lg:translate-x-0 lg:shadow-lg ${
+                    isOpen ? 'translate-x-0' : '-translate-x-full'
+                }`}
+            >
+                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur lg:hidden">
+                    <p className="text-sm font-semibold text-slate-700">Menu</p>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-lg border border-slate-200 p-2 text-slate-700 transition hover:bg-slate-50"
+                        aria-label="Close sidebar"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
                 
            
           
            
                 {/* Navigation Links */}
-                <div className="flex-1 overflow-y-auto scrollbar-hide px-3 py-4">
+                <div
+                    className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4 pb-8 touch-auto lg:pb-4 scrollbar-hide"
+                    style={{ WebkitOverflowScrolling: 'touch' }}
+                >
                     {/* Sectioned Navigation */}
                     {sidebarSections.map((section) => {
                         const SectionIcon = getSectionIcon(section.name)
@@ -252,6 +274,7 @@ const StoreSidebar = ({storeInfo}) => {
                                             <Link
                                                 key={`${section.name}-${link.href}`}
                                                 href={link.href}
+                                                onClick={() => onClose?.()}
                                                 className={`group flex items-center gap-3 px-4 py-3 text-sm rounded-xl transition-all duration-200 ${
                                                     isActive
                                                         ? `${theme.activeLink} scale-[1.01]`
@@ -275,9 +298,10 @@ const StoreSidebar = ({storeInfo}) => {
                     })}
                 </div>
                 {/* Settings Button */}
-                <div className="border-t border-slate-200 px-3 py-4 bg-slate-50/50">
+                <div className="border-t border-slate-200 px-3 py-4 bg-slate-50/90 shrink-0 lg:bg-slate-50/50">
                     <Link
                         href="/store/settings"
+                        onClick={() => onClose?.()}
                         className="group flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-slate-700 to-slate-600 text-white rounded-xl hover:from-slate-600 hover:to-slate-500 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] font-medium"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:rotate-90 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -287,8 +311,8 @@ const StoreSidebar = ({storeInfo}) => {
                         <span>Settings</span>
                     </Link>
                 </div>
-            </div>
-        </div>
+            </aside>
+        </>
     );
 }
 

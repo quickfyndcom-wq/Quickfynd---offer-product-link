@@ -227,6 +227,20 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
   const baseMrp = selectedVariant?.mrp ?? product.mrp ?? basePrice;
   const isSpecialOffer = !!product.specialOffer?.isSpecialOffer;
   const specialDiscountPercent = Number(product.specialOffer?.discountPercent);
+  const getEffectivePrice = (priceValue, mrpValue) => {
+    const normalizedPrice = Number(priceValue);
+    const normalizedMrp = Number(mrpValue);
+    const safePrice = Number.isFinite(normalizedPrice) ? normalizedPrice : 0;
+    const safeMrp = Number.isFinite(normalizedMrp) ? normalizedMrp : safePrice;
+
+    if (isSpecialOffer && Number.isFinite(specialDiscountPercent) && specialDiscountPercent > 0) {
+      const offerBase = safePrice > 0 ? safePrice : safeMrp;
+      const discounted = offerBase * (1 - (specialDiscountPercent / 100));
+      return Number.isFinite(discounted) ? Math.round(discounted * 100) / 100 : safePrice;
+    }
+
+    return safePrice;
+  };
   let effPrice = basePrice;
   let effMrp = baseMrp;
 
@@ -248,8 +262,20 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
     });
   }
   
+  const selectedBundleQty = Number(selectedVariant?.options?.bundleQty || 0);
+  const nonBundleVariant = variants.find((variant) => {
+    const options = variant?.options || {};
+    const colorMatch = selectedColor ? options?.color === selectedColor : true;
+    const sizeMatch = selectedSize ? options?.size === selectedSize : true;
+    const optionBundleQty = Number(options?.bundleQty);
+    const isBundleVariant = Number.isFinite(optionBundleQty) && optionBundleQty > 1;
+    return colorMatch && sizeMatch && !isBundleVariant;
+  }) || null;
+  const nonBundleBasePrice = nonBundleVariant?.price ?? product?.salePrice ?? product?.price ?? basePrice;
+  const nonBundleBaseMrp = nonBundleVariant?.mrp ?? product?.mrp ?? nonBundleBasePrice;
+  const nonBundleEffPrice = getEffectivePrice(nonBundleBasePrice, nonBundleBaseMrp);
   const availableStock = (typeof selectedVariant?.stock === 'number')
-    ? selectedVariant.stock
+    ? (selectedBundleQty > 1 ? selectedVariant.stock * selectedBundleQty : selectedVariant.stock)
     : (typeof product.stockQuantity === 'number' ? product.stockQuantity : 0);
   const maxOrderQty = Math.min(20, Math.max(0, availableStock));
   const hasAnyVariantStock = variants.length > 0
@@ -638,24 +664,37 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
       if (!Number.isFinite(qty) || qty <= 0) {
         qty = 1;
       }
-      for (let i = 0; i < qty; i++) {
+      const bundleQty = Number(selectedVariant?.options?.bundleQty || 0);
+      const bundleUnits = bundleQty > 1 ? Math.min(qty, bundleQty) : 0;
+      const normalUnits = Math.max(0, qty - bundleUnits);
+
+      const buildPayload = (price, nextBundleQty) => {
         const payload = {
-          productId: product._id, 
-          price: effPrice,
+          productId: product._id,
+          price,
           variantOptions: {
             color: selectedColor || null,
             size: selectedSize || null,
-            bundleQty: selectedVariant?.options?.bundleQty ?? null
-          }
+            bundleQty: nextBundleQty,
+          },
         };
-        
-        // If this is a special offer, include the offer token
+
         if (product.specialOffer?.offerToken) {
           payload.offerToken = product.specialOffer.offerToken;
           payload.discountPercent = product.specialOffer.discountPercent;
         }
-        
-        dispatch(addToCart(payload));
+
+        return payload;
+      };
+
+      for (let i = 0; i < bundleUnits; i++) {
+        dispatch(addToCart(buildPayload(effPrice, bundleQty)));
+      }
+      for (let i = 0; i < normalUnits; i++) {
+        dispatch(addToCart(buildPayload(nonBundleEffPrice || effPrice, null)));
+      }
+      if (bundleUnits === 0 && normalUnits === 0) {
+        dispatch(addToCart(buildPayload(nonBundleEffPrice || effPrice, null)));
       }
       // Go directly to checkout (guests can checkout there)
       router.push('/checkout');
@@ -675,24 +714,37 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
     if (!Number.isFinite(qty) || qty <= 0) {
       qty = 1;
     }
-    for (let i = 0; i < qty; i++) {
+    const bundleQty = Number(selectedVariant?.options?.bundleQty || 0);
+    const bundleUnits = bundleQty > 1 ? Math.min(qty, bundleQty) : 0;
+    const normalUnits = Math.max(0, qty - bundleUnits);
+
+    const buildPayload = (price, nextBundleQty) => {
       const payload = {
         productId: product._id,
-        price: effPrice,
+        price,
         variantOptions: {
           color: selectedColor || null,
           size: selectedSize || null,
-          bundleQty: selectedVariant?.options?.bundleQty ?? null
+          bundleQty: nextBundleQty,
         }
       };
-      
-      // If this is a special offer, include the offer token
+
       if (product.specialOffer?.offerToken) {
         payload.offerToken = product.specialOffer.offerToken;
         payload.discountPercent = product.specialOffer.discountPercent;
       }
-      
-      dispatch(addToCart(payload));
+
+      return payload;
+    };
+
+    for (let i = 0; i < bundleUnits; i++) {
+      dispatch(addToCart(buildPayload(effPrice, bundleQty)));
+    }
+    for (let i = 0; i < normalUnits; i++) {
+      dispatch(addToCart(buildPayload(nonBundleEffPrice || effPrice, null)));
+    }
+    if (bundleUnits === 0 && normalUnits === 0) {
+      dispatch(addToCart(buildPayload(nonBundleEffPrice || effPrice, null)));
     }
     
     // Upload to server if signed in
@@ -1016,7 +1068,7 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
             </div>
 
             {/* Mobile Thumbnail Gallery */}
-            <div className="lg:hidden -mx-4 sm:mx-0 px-4 sm:px-0 flex gap-2 overflow-x-auto pb-2 scrollbar-hide cursor-grab active:cursor-grabbing">
+            <div className="lg:hidden -mx-4 sm:mx-0 px-2 sm:px-0 flex gap-3 overflow-x-auto pb-2 scrollbar-hide cursor-grab active:cursor-grabbing">
               {mediaList.map((image, index) => (
                 <button
                   key={index}
@@ -1063,7 +1115,7 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
           </div>
 
           {/* RIGHT: Product Info */}
-          <div className="bg-white rounded-lg p-4 lg:p-6 space-y-5">
+          <div className="bg-white -mx-4 sm:mx-0 rounded-none sm:rounded-lg p-4 lg:p-6 space-y-5">
             {/* Special Offer - Countdown Timer */}
             {offerData?.countdownTimer && (
               <div className="mb-4">
@@ -1166,7 +1218,7 @@ const ProductDetails = ({ product, reviews = [], hideTitle = false, offerData = 
                   ))}
                 </div>
                 <span className="text-sm text-gray-600">
-                  {reviewCount > 0 ? `${reviewCount} Reviews` : 'No reviews'}
+                  {reviewCount > 0 ? `${reviewCount} Reviews` : '(0) Reviews'}
                 </span>
                 {reviewCount > 0 && (
                   <a 

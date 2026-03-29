@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import connectDB from '@/lib/mongodb';
 import Coupon from '@/models/Coupon';
 import Store from '@/models/Store';
+import authSeller from '@/middlewares/authSeller';
 
 // PUT - Update a coupon
 export async function PUT(req, { params }) {
@@ -29,8 +30,14 @@ export async function PUT(req, { params }) {
 
         const { code } = await params;
 
+        const storeId = await authSeller(userId);
+
+        if (!storeId) {
+            return NextResponse.json({ error: "Store not found" }, { status: 404 });
+        }
+
         // Get store
-        const store = await Store.findOne({ userId }).lean();
+        const store = await Store.findById(storeId).lean();
 
         if (!store) {
             return NextResponse.json({ error: "Store not found" }, { status: 404 });
@@ -147,8 +154,14 @@ export async function DELETE(req, { params }) {
 
         const { code } = await params;
 
+        const storeId = await authSeller(userId);
+
+        if (!storeId) {
+            return NextResponse.json({ error: "Store not found" }, { status: 404 });
+        }
+
         // Get store
-        const store = await Store.findOne({ userId }).lean();
+        const store = await Store.findById(storeId).lean();
 
         if (!store) {
             return NextResponse.json({ error: "Store not found" }, { status: 404 });

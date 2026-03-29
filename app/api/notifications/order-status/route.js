@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { sendMail } from "@/lib/email";
 
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://quickfynd.com';
+const EMAIL_LOGO_URL = `${BASE_URL}/assets/logo/logo3.png`;
+
 // Email notification for order status updates
 export async function POST(request) {
     try {
@@ -125,7 +128,16 @@ export async function POST(request) {
             await sendMail({
                 to: email,
                 subject: emailSubject,
-                html: emailBody,
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+                        <div style="background: #0f172a; padding: 20px; text-align: center;">
+                            <img src="${EMAIL_LOGO_URL}" alt="QuickFynd" style="width: 170px; max-width: 100%; height: auto;" />
+                        </div>
+                        <div style="padding: 24px; background: #f8fafc;">
+                            ${emailBody}
+                        </div>
+                    </div>
+                `,
             });
             return NextResponse.json({ 
                 success: true, 

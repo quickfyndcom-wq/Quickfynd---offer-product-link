@@ -2,6 +2,7 @@ import dbConnect from '@/lib/mongodb';
 import CategorySlider from '@/models/CategorySlider';
 import { NextResponse } from 'next/server';
 import { getAuth } from '@/lib/firebase-admin';
+import authSeller from '@/middlewares/authSeller';
 
 function parseAuthHeader(req) {
   const auth = req.headers.get('authorization') || req.headers.get('Authorization');
@@ -20,7 +21,8 @@ export async function PUT(req, { params }) {
     }
 
     const decoded = await getAuth().verifyIdToken(token);
-    const storeId = decoded.uid;
+    const resolvedStoreId = await authSeller(decoded.uid);
+    const storeIds = [...new Set([resolvedStoreId, decoded.uid].filter(Boolean))];
     const { id } = params;
 
     const { title, subtitle, productIds } = await req.json();
@@ -49,8 +51,8 @@ export async function PUT(req, { params }) {
 
     console.log('💾 About to update with:', JSON.stringify(updateData));
 
-    const slider = await CategorySlider.findOneAndUpdate(
-      { _id: id, storeId },
+    const slider = await CategorySlider.findByIdAndUpdate(
+      id,
       updateData,
       { new: true }
     );
@@ -92,10 +94,11 @@ export async function DELETE(req, { params }) {
     }
 
     const decoded = await getAuth().verifyIdToken(token);
-    const storeId = decoded.uid;
+    const resolvedStoreId = await authSeller(decoded.uid);
+    const storeIds = [...new Set([resolvedStoreId, decoded.uid].filter(Boolean))];
     const { id } = params;
 
-    const slider = await CategorySlider.findOneAndDelete({ _id: id, storeId });
+    const slider = await CategorySlider.findByIdAndDelete(id);
 
     if (!slider) {
       return NextResponse.json(

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import Loading from "../Loading"
 import Link from "next/link"
 import { ArrowRightIcon } from "lucide-react"
+import { usePathname } from "next/navigation"
 import SellerNavbar from "./StoreNavbar"
 import SellerSidebar from "./StoreSidebar"
 
@@ -13,10 +14,12 @@ import { useAuth } from "@/lib/useAuth";
 const StoreLayout = ({ children }) => {
 
     const { user, loading, getToken } = useAuth();
+    const pathname = usePathname();
 
     const [isSeller, setIsSeller] = useState(false);
     const [sellerLoading, setSellerLoading] = useState(true);
     const [storeInfo, setStoreInfo] = useState(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const fetchIsSeller = async () => {
         if (!user) return;
@@ -44,6 +47,10 @@ const StoreLayout = ({ children }) => {
         }
     }, [loading, user]);
 
+    useEffect(() => {
+        setIsSidebarOpen(false);
+    }, [pathname]);
+
     return (loading || sellerLoading) ? (
         <Loading />
     ) : !user ? (
@@ -58,11 +65,18 @@ const StoreLayout = ({ children }) => {
             </Link>
         </div>
     ) : isSeller ? (
-        <div className="flex flex-col h-screen">
-            <SellerNavbar storeInfo={storeInfo} />
-            <div className="flex flex-1 items-start h-full overflow-y-scroll no-scrollbar">
-                <SellerSidebar storeInfo={storeInfo} />
-                <div className="flex-1 h-full p-5 lg:pl-12 lg:pt-12 overflow-y-scroll">
+        <div className="flex flex-col h-[100dvh] overflow-hidden bg-slate-50/40">
+            <SellerNavbar
+                storeInfo={storeInfo}
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+            />
+            <div className="flex flex-1 min-h-0 items-stretch overflow-hidden">
+                <SellerSidebar
+                    storeInfo={storeInfo}
+                    isOpen={isSidebarOpen}
+                    onClose={() => setIsSidebarOpen(false)}
+                />
+                <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 lg:pl-12 lg:pt-12">
                     {children}
                 </div>
             </div>

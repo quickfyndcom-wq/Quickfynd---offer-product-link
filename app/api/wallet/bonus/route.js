@@ -11,6 +11,17 @@ export async function POST(request) {
     }
 
     const idToken = authHeader.split("Bearer ")[1];
+    if ((!process.env.GCLOUD_PROJECT || !process.env.GOOGLE_CLOUD_PROJECT) && process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+      try {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+        if (serviceAccount?.project_id) {
+          if (!process.env.GCLOUD_PROJECT) process.env.GCLOUD_PROJECT = serviceAccount.project_id;
+          if (!process.env.GOOGLE_CLOUD_PROJECT) process.env.GOOGLE_CLOUD_PROJECT = serviceAccount.project_id;
+        }
+      } catch {
+        // Ignore here; verifyIdToken will return a clear auth error if config is invalid.
+      }
+    }
     const decodedToken = await getAuth().verifyIdToken(idToken);
     const userId = decodedToken.uid;
 

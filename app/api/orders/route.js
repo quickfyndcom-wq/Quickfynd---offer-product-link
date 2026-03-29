@@ -23,6 +23,152 @@ const PaymentMethod = {
     WALLET: 'WALLET'
 };
 
+function findMatchingVariantIndex(variants = [], variantOptions = {}) {
+    if (!Array.isArray(variants) || variants.length === 0 || !variantOptions) return -1;
+
+    return variants.findIndex((variant) => {
+        const options = variant?.options || {};
+        const colorMatch = variantOptions?.color ? options?.color === variantOptions.color : true;
+        const sizeMatch = variantOptions?.size ? options?.size === variantOptions.size : true;
+
+        if (variantOptions?.bundleQty === null || variantOptions?.bundleQty === undefined) {
+            const optionBundleQty = Number(options?.bundleQty);
+            const isBundleVariant = Number.isFinite(optionBundleQty) && optionBundleQty > 1;
+            return colorMatch && sizeMatch && !isBundleVariant;
+        }
+
+        const bundleMatch = Number(options?.bundleQty || 0) === Number(variantOptions?.bundleQty || 0);
+        return colorMatch && sizeMatch && bundleMatch;
+    });
+}
+
+function buildVariantElemMatch(variantOptions = {}, requiredQty = null) {
+    const elemMatch = {};
+
+    if (variantOptions?.color) {
+        elemMatch['options.color'] = variantOptions.color;
+    }
+
+    if (variantOptions?.size) {
+        elemMatch['options.size'] = variantOptions.size;
+    }
+
+    if (variantOptions?.bundleQty === null || variantOptions?.bundleQty === undefined) {
+        elemMatch.$or = [
+            { 'options.bundleQty': { $exists: false } },
+            { 'options.bundleQty': null },
+            { 'options.bundleQty': { $lte: 1 } },
+        ];
+    } else {
+        elemMatch['options.bundleQty'] = Number(variantOptions.bundleQty);
+    }
+
+    if (Number.isFinite(requiredQty) && requiredQty > 0) {
+        elemMatch.stock = { $gte: requiredQty };
+    }
+
+    return elemMatch;
+}
+
+async function syncProductStockAggregate(productId) {
+    const latest = await Product.findById(productId).select('variants stockQuantity inStock').lean();
+    if (!latest) return;
+
+    if (Array.isArray(latest.variants) && latest.variants.length > 0) {
+        const totalVariantStock = latest.variants.reduce((sum, variant) => sum + Math.max(0, Number(variant?.stock ?? 0)), 0);
+        const hasStock = totalVariantStock > 0;
+        await Product.findByIdAndUpdate(productId, {
+            $set: {
+                stockQuantity: totalVariantStock,
+                inStock: hasStock,
+            },
+        });
+        return;
+    }
+
+    const hasStock = Number(latest.stockQuantity || 0) > 0;
+    if (latest.inStock !== hasStock) {
+        await Product.findByIdAndUpdate(productId, { $set: { inStock: hasStock } });
+    }
+}
+
+async function rollbackReservedInventory(reservations = []) {
+    for (const reservation of [...reservations].reverse()) {
+        const productId = reservation?.productId;
+        const quantity = Number(reservation?.quantity) || 0;
+        if (!productId || quantity <= 0) continue;
+
+        if (reservation?.variantOptions) {
+            const variantElemMatch = buildVariantElemMatch(reservation.variantOptions);
+            await Product.findOneAndUpdate(
+                {
+                    _id: productId,
+                    variants: { $elemMatch: variantElemMatch },
+                },
+                { $inc: { 'variants.$.stock': quantity } },
+                { new: true }
+            );
+            await syncProductStockAggregate(productId);
+            continue;
+        }
+
+        await Product.findByIdAndUpdate(productId, { $inc: { stockQuantity: quantity } });
+        await syncProductStockAggregate(productId);
+    }
+}
+
+async function reserveInventoryForOrderItems(orderItems = []) {
+    const reservations = [];
+
+    for (const item of orderItems) {
+        const productId = item?.productId;
+        const quantity = Number(item?.quantity) || 0;
+        if (!productId || quantity <= 0) continue;
+
+        if (item?.variantOptions) {
+            const variantElemMatch = buildVariantElemMatch(item.variantOptions, quantity);
+            const updated = await Product.findOneAndUpdate(
+                {
+                    _id: productId,
+                    variants: { $elemMatch: variantElemMatch },
+                },
+                { $inc: { 'variants.$.stock': -quantity } },
+                { new: true }
+            );
+
+            if (!updated) {
+                await rollbackReservedInventory(reservations);
+                throw new Error('Insufficient stock while reserving selected variant');
+            }
+
+            reservations.push({ productId, quantity, variantOptions: item.variantOptions });
+            await syncProductStockAggregate(productId);
+            continue;
+        }
+
+        const updated = await Product.findOneAndUpdate(
+            {
+                _id: productId,
+                stockQuantity: { $gte: quantity },
+            },
+            {
+                $inc: { stockQuantity: -quantity },
+            },
+            { new: true }
+        );
+
+        if (!updated) {
+            await rollbackReservedInventory(reservations);
+            throw new Error('Insufficient stock while reserving product quantity');
+        }
+
+        reservations.push({ productId, quantity, variantOptions: null });
+        await syncProductStockAggregate(productId);
+    }
+
+    return reservations;
+}
+
 
 
 export async function POST(request) {
@@ -314,6 +460,8 @@ export async function POST(request) {
 
         // Wallet redemption (logged-in users only)
         let redeemableCoins = 0;
+        let totalCoinsRedeemed = 0;
+        let totalWalletDiscount = 0;
         let walletRedeemApplied = false;
         let wallet = null;
         if (userId && Number(coinsToRedeem) > 0) {
@@ -385,6 +533,8 @@ export async function POST(request) {
                 coinsRedeemed = Math.min(redeemableCoins, maxCoinsByTotal);
                 walletDiscount = Number((coinsRedeemed * 1).toFixed(2));
                 total = Math.max(0, Number((total - walletDiscount).toFixed(2)));
+                totalCoinsRedeemed = coinsRedeemed;
+                totalWalletDiscount = walletDiscount;
                 walletRedeemApplied = true;
             }
 
@@ -403,8 +553,10 @@ export async function POST(request) {
                 walletDiscount,
                 orderItems: sellerItems.map(item => ({
                     productId: item.id,
+                    name: item.name || '',
                     quantity: item.quantity,
-                    price: item.price
+                    price: item.price,
+                    variantOptions: item.variantOptions || null
                 }))
             };
 
@@ -553,7 +705,14 @@ export async function POST(request) {
             // Create order
             console.log('ORDER API DEBUG: orderData keys:', Object.keys(orderData));
             console.log('ORDER API DEBUG: orderData before Order.create:', JSON.stringify(orderData, null, 2));
-            const order = await Order.create(orderData);
+            const reservedInventory = await reserveInventoryForOrderItems(orderData.orderItems || []);
+            let order;
+            try {
+                order = await Order.create(orderData);
+            } catch (createOrderError) {
+                await rollbackReservedInventory(reservedInventory);
+                throw createOrderError;
+            }
             orderIds.push(order._id);
 
             // --- AUTOMATIC DELHIVERY SHIPMENT CREATION ---
@@ -621,6 +780,18 @@ export async function POST(request) {
                 { code: couponCode },
                 { $inc: { usedCount: 1 } }
             );
+        }
+
+        if (wallet && totalCoinsRedeemed > 0) {
+            wallet.coins = Math.max(0, Number(wallet.coins || 0) - totalCoinsRedeemed);
+            wallet.transactions.push({
+                type: 'REDEEM',
+                coins: totalCoinsRedeemed,
+                rupees: totalWalletDiscount,
+                orderId: orderIds.map((id) => id.toString()).join(','),
+                description: 'Redeemed at checkout'
+            });
+            await wallet.save();
         }
 
         // Stripe payment

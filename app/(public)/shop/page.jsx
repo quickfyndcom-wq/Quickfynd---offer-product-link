@@ -157,6 +157,59 @@ function ShopContent() {
         return String(value).toLowerCase();
     }, []);
 
+    const tokenizeText = useCallback((value) => {
+        return normalizeText(value)
+            .split(/[^a-z0-9]+/)
+            .map((token) => token.trim())
+            .filter(Boolean);
+    }, [normalizeText]);
+
+    const boundedLevenshtein = useCallback((a = '', b = '', maxDistance = 1) => {
+        if (a === b) return 0;
+        const lenA = a.length;
+        const lenB = b.length;
+        if (!lenA) return lenB;
+        if (!lenB) return lenA;
+        if (Math.abs(lenA - lenB) > maxDistance) return maxDistance + 1;
+
+        let prev = new Array(lenB + 1);
+        let curr = new Array(lenB + 1);
+        for (let j = 0; j <= lenB; j++) prev[j] = j;
+
+        for (let i = 1; i <= lenA; i++) {
+            curr[0] = i;
+            let rowMin = curr[0];
+
+            for (let j = 1; j <= lenB; j++) {
+                const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+                curr[j] = Math.min(
+                    prev[j] + 1,
+                    curr[j - 1] + 1,
+                    prev[j - 1] + cost
+                );
+                if (curr[j] < rowMin) rowMin = curr[j];
+            }
+
+            if (rowMin > maxDistance) return maxDistance + 1;
+            [prev, curr] = [curr, prev];
+        }
+
+        return prev[lenB];
+    }, []);
+
+    const isFuzzyTokenMatch = useCallback((token, words) => {
+        if (!token || !Array.isArray(words) || words.length === 0) return false;
+        if (words.includes(token)) return true;
+        if (token.length < 4) return false;
+
+        const tolerance = token.length >= 8 ? 2 : 1;
+        return words.some((word) => {
+            if (!word) return false;
+            if (Math.abs(word.length - token.length) > tolerance) return false;
+            return boundedLevenshtein(token, word, tolerance) <= tolerance;
+        });
+    }, [boundedLevenshtein]);
+
     const getProductPrice = useCallback((product) => {
         if (!product) return 0;
         const basePrice = Number(product.price || 0);
@@ -219,6 +272,7 @@ function ShopContent() {
         // Filter by search term if search param exists
         if (search) {
             const searchTerm = normalizeText(search.trim());
+            const searchTokens = tokenizeText(searchTerm);
             filtered = filtered.filter((product) => {
                 const name = normalizeText(product.name);
                 const description = normalizeText(product.description || product.shortDescription);
@@ -247,18 +301,19 @@ function ShopContent() {
                     tags,
                     variants,
                 ].join(' ');
+                const haystackWords = tokenizeText(haystack);
 
-                // Use word boundary matching instead of partial match
-                // This ensures "car" matches "car" but not "skincare"
-                // Escape special regex characters first
-                const escapedTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const wordBoundaryRegex = new RegExp(`\\b${escapedTerm}\\b`, 'i');
-                return wordBoundaryRegex.test(haystack);
+                if (!searchTokens.length) return true;
+                if (haystack.includes(searchTerm)) return true;
+                return searchTokens.every((token) => {
+                    if (haystack.includes(token)) return true;
+                    return isFuzzyTokenMatch(token, haystackWords);
+                });
             });
         }
 
         return filtered;
-    }, [sourceProducts, search, normalizeText]);
+    }, [sourceProducts, search, normalizeText, tokenizeText, isFuzzyTokenMatch]);
 
     const visibleProducts = useMemo(() => {
         let list = [...filteredProducts];

@@ -2,6 +2,7 @@ import dbConnect from '@/lib/mongodb';
 import CategorySlider from '@/models/CategorySlider';
 import { NextResponse } from 'next/server';
 import { getAuth } from '@/lib/firebase-admin';
+import authSeller from '@/middlewares/authSeller';
 
 function parseAuthHeader(req) {
   const auth = req.headers.get('authorization') || req.headers.get('Authorization');
@@ -20,9 +21,8 @@ export async function GET(req) {
     }
 
     const decoded = await getAuth().verifyIdToken(token);
-    const storeId = decoded.uid;
-
-    const sliders = await CategorySlider.find({ storeId }).lean();
+    // Seller sees all sliders regardless of which storeId they were saved under
+    const sliders = await CategorySlider.find({}).lean();
     
     // Ensure all fields including subtitle are present
     const slidersWithDefaults = sliders.map(slider => ({
@@ -52,7 +52,8 @@ export async function POST(req) {
     }
 
     const decoded = await getAuth().verifyIdToken(token);
-    const storeId = decoded.uid;
+    const resolvedStoreId = await authSeller(decoded.uid);
+    const storeId = resolvedStoreId || decoded.uid;
 
     const { title, subtitle, productIds } = await req.json();
     console.log('=== 💾 POST SLIDER START ===');
@@ -121,7 +122,8 @@ export async function DELETE(req) {
     }
 
     const decoded = await getAuth().verifyIdToken(token);
-    const storeId = decoded.uid;
+    const resolvedStoreId = await authSeller(decoded.uid);
+    const storeIds = [...new Set([resolvedStoreId, decoded.uid].filter(Boolean))];
 
     // Get ID from query parameter
     const { searchParams } = new URL(req.url);
@@ -134,7 +136,7 @@ export async function DELETE(req) {
       );
     }
 
-    const slider = await CategorySlider.findOneAndDelete({ _id: id, storeId });
+    const slider = await CategorySlider.findByIdAndDelete(id);
 
     if (!slider) {
       return NextResponse.json(

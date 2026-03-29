@@ -5,6 +5,9 @@ const ProductSchema = new mongoose.Schema({
   slug: { type: String, unique: true },
   description: String,
   shortDescription: String,
+  metaTitle: { type: String, default: '' },
+  metaDescription: { type: String, default: '' },
+  seoKeywords: { type: [String], default: [] },
   mrp: Number,
   price: Number,
   costPrice: { type: Number, default: 0 }, // Actual cost/purchase price for profit calculation

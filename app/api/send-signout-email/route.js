@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getAuth } from '@/lib/firebase-admin';
 
+const EMAIL_LOGO_URL = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://quickfynd.com'}/assets/logo/logo3.png`;
+
 export async function POST(req) {
   try {
     const { email, name, skipAuth } = await req.json();
@@ -93,6 +95,7 @@ export async function POST(req) {
           </head>
           <body>
             <div class="header">
+              <img src="${EMAIL_LOGO_URL}" alt="QuickFynd" style="display:block; margin: 0 auto 14px auto; width: 170px; max-width: 100%; height: auto;" />
               <h1>👋 Signed Out Successfully</h1>
             </div>
             <div class="content">

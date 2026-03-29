@@ -13,9 +13,9 @@ export const metadata = {
   description:
     "Discover trending gadgets, fashion, home essentials & more at the best price. Fast delivery, secure checkout, and deals you don't want to miss.",
   icons: {
-    icon: '/Favicon.png',
-    shortcut: '/Favicon.png',
-    apple: '/Favicon.png',
+    icon: '/assets/logo/favicon.png',
+    shortcut: '/assets/logo/favicon.png',
+    apple: '/assets/logo/favicon.png',
   },
 };
 

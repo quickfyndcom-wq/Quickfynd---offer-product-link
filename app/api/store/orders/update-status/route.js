@@ -38,12 +38,12 @@ export async function POST(request) {
 
         // Validate status
         const validStatuses = [
-            'ORDER_PLACED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 
-            'PAYMENT_FAILED', 'RETURNED', 'RETURN_INITIATED', 'RETURN_APPROVED',
+            'ORDER_PLACED', 'PROCESSING', 'MANIFESTED', 'PICKUP_SCHEDULED', 'SHIPPED', 'DELIVERED', 'CANCELLED', 
+            'PAYMENT_FAILED', 'RTO', 'RETURNED', 'RETURN_INITIATED', 'RETURN_APPROVED',
             'RETURN_REQUESTED', 'PICKUP_REQUESTED', 'WAITING_FOR_PICKUP', 
             'PICKED_UP', 'WAREHOUSE_RECEIVED', 'OUT_FOR_DELIVERY',
             // Lowercase variants for compatibility
-            'pending', 'processing', 'shipped', 'delivered', 'cancelled'
+            'pending', 'processing', 'manifested', 'pickup_scheduled', 'shipped', 'delivered', 'cancelled', 'rto'
         ];
         if (!validStatuses.includes(status)) {
             return NextResponse.json({ error: `Invalid status. Allowed statuses: ${validStatuses.join(', ')}` }, { status: 400 });
